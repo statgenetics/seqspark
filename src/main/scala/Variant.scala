@@ -1,24 +1,40 @@
-abstract class Variant {
-  def chr: String
-  def pos: Int
-  def ref: String
-  def alt: String
-  def filter: String
-  def info: scala.collection.mutable.Map[String, String]
-  def format: List[String]
-  def geno: Array[String]
-  def toTitv(filterGeno: Boolean) : (Array[Int], Array[Int])
+@SerialVersionUID(3L)
+abstract class Variant[A] extends Serializable {
+  val chr: String
+  val pos: Int
+  val ref: String
+  val alt: String
+  val filter: String
+  val info: scala.collection.mutable.Map[String, String]
+  val format: List[String]
+  val geno: Array[A]
+  //def toTitv(filterGeno: Boolean) : (Array[Int], Array[Int])
+
+  def isTi: Boolean = {
+    if (Set(ref, alt) == Set("A", "G") || Set(ref, alt) == Set("C","T"))
+      true
+    else
+      false
+  }
+
+  def isTv: Boolean = {
+    val cur = Set(ref, alt)
+    if (cur == Set("A","C") || cur == Set("A","T") || cur == Set("G","C") || cur == Set("G","T"))
+      true
+    else
+      false
+  }
 }
 
 object Variant {
-  private class vcfVar (val line: String) extends Variant {
+  private class vcfVar (val line: String) extends Variant[String] {
     private val array = line.split("\\t")
-    def chr = array(0)
-    def pos = array(1).toInt
-    def ref = array(3)
-    def alt = array(4)
-    def filter = array(6)
-    def info = {
+    val chr = array(0)
+    val pos = array(1).toInt
+    val ref = array(3)
+    val alt = array(4)
+    val filter = array(6)
+    val info = {
       val res = scala.collection.mutable.Map[String, String]()
       for (item <- array(7).split(";")) {
         if (item.matches("=")) {
@@ -30,22 +46,9 @@ object Variant {
       }
       res
     }
-    def format = array(8).split(":").toList
-    def geno = array.slice(9,array.length)
-    def isTi: Boolean = {
-      if (Set(ref, alt) == Set("A", "G") || Set(ref, alt) == Set("C","T"))
-        true
-      else
-        false
-    }
-    def isTv: Boolean = {
-      val cur = Set(ref, alt)
-      if (cur == Set("A","C") || cur == Set("A","T") || cur == Set("G","C") || cur == Set("G","T"))
-        true
-      else
-        false
-    }
-    
+    val format = array(8).split(":").toList
+    val geno = array.slice(9,array.length)
+    /**
     def toTitv(filterGeno: Boolean): (Array[Int], Array[Int]) = {
       val cnt1: Array[Int] = for {
         gstring <- geno
@@ -69,10 +72,11 @@ object Variant {
         (cnt2, cnt2)
         //new Titv(cnt2, cnt2)
     }
+      */
   }
 
 
-  def apply(line: String): Variant = {
+  def apply(line: String): Variant[String] = {
     new vcfVar(line)
   }
 }

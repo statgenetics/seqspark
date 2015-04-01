@@ -6,18 +6,29 @@ import org.apache.spark.rdd.RDD
 import scala.io.Source
 import java.io._
 import scala.collection.mutable.Map
+import Utils._
 
 object Test {
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Test VCF")
     val sc = new SparkContext(conf)
-
-    val vcfFile = if (args.length >= 1) args(0) else "test.vcf.bz2"// Should be some file on your system
+    //Should be some file on your system
+    val vcfFile = if (args.length >= 1) args(0) else "test.vcf.bz2"    
     val headFile = "mhgrid_head"
     val refPattern = """^[ATCG]$"""
     val altPattern = refPattern
-    val initFilters = List("VQSRTrancheSNP99.00to99.90", "VQSRTrancheSNP99.90to100.00", "VQSRTrancheSNP99.90to100.00+", "GenoLowQual", "HighMis", "HighMisBatch", "BatchSpec", "HWE", "PASS")
-    val afterVQSR = initFilters.filterNot(f => f.matches("^VQSR"))
+    val initFilters =
+      List(
+        "VQSRTrancheSNP99.00to99.90",
+        "VQSRTrancheSNP99.90to100.00",
+        "VQSRTrancheSNP99.90to100.00+",
+        "GenoLowQual",
+        "HighMis",
+        "HighMisBatch",
+        "BatchSpec",
+        "HWE",
+        "PASS")
+    val afterVQSR = initFilters.filterNot(f => f.matches("^VQSR.*"))
     val afterGLQC = afterVQSR.filterNot(f => f == "GenoLowQual")
     val afterMis = afterGLQC.filterNot(f => f == "HighMis")
     val afterMisB = afterMis.filterNot(f => f == "HighMisBatch")
@@ -26,13 +37,14 @@ object Test {
     val testData = sc.textFile(vcfFile)
 
     def sampleId(file: String): Array[String] = {
-      //val allLines = Source.fromFile(file).getLines.toList
-      val allLines = sc.textFile(file).collect
+      val allLines = Source.fromFile(file).getLines.toList
+      //val allLines = sc.textFile(file).collect
       val line = allLines.filter(x => x.startsWith("#CHROM"))(0).split("\t")
       //println(line)
       line.slice(9, line.length)
     }
-    val ids = sampleId(headFile)
+
+    //val ids = sampleId(headFile)
     def filterLine(line: String): Boolean = {
       if (line.startsWith("#"))
         false
@@ -42,141 +54,64 @@ object Test {
           true
         else
           false}}
-    val vars = testData.filter(filterLine).map(line => Variant(line)).cache()
+    //val vars = testData.filter(filterLine).map(line => Variant(line)).cache()
+    val vars = testData.filter(line => ! line.startsWith("#")).map(line => Variant(line)).cache()
     def readBatch(file: String): Array[Int] = {
       val allLines = Source.fromFile(file).getLines.toList
       allLines.map(x => x.split(":")(1).toInt).toArray
     }
     val batch = readBatch("batch")
 
-    def filterVariant(variant: Variant, filters: List[String]): Boolean = {
+    def filterVariant(variant: Variant[String], filters: List[String]): Boolean = {
       if (filters.contains(variant.filter)) true
       else false}
 
-    def addTitv(a: (Array[Int], Array[Int]), b: (Array[Int], Array[Int])): (Array[Int], Array[Int]) = {
-      for (i <- Range(0, a._1.length)) {
-        a._1(i) += b._1(i)
-        a._2(i) += b._2(i)}
-      a
-    }
+    //val biAutoSnv = vars filter (v => afterVQSR.contains(v.filter))
 
-    def writeTitv(titv: (Array[Int], Array[Int]), file: String) {
-      val pw = new PrintWriter(new File(file))
-      for (i <- Range(0, titv._1.length)) {
-        pw.write(titv._1(i) + " " + titv._2(i) + " " + titv._1(i) * 1.0 / titv._2(i) + "\n")
-      }
-      pw.close
-      println(file + " done")
-    }
 
-    def writeTitvs(tag: String, titvs: Array[(String, (Array[Int], Array[Int]))]) {
-      for (titv <- titvs) {
-        writeTitv(titv._2, tag + "_" + titv._1 + ".txt")
-      }
-    }
+    val espIds = sampleId("espHead")
 
-    def writeCombinedTitvs(tag: String, titvs: Array[(String, (Array[Int], Array[Int]))]) {
-      val pw = new PrintWriter(new File(tag + "_titv.txt"))
-      pw.write("id")
-      titvs.map(x => pw.write("\t" + x._1 + "_ti" + "\t" + x._1 + "_tv"))
-      pw.write("\n")
-      //println(titvs(0)._2._1.length)
-      for (i <- Range(0, titvs(0)._2._1.length)) {
-        pw.write(ids(i))
-        titvs.map(x => pw.write("\t" + x._2._1(i) + "\t" + x._2._2(i)))
-        pw.write("\n")
-      }
-      pw.close
-    }
+    callRate(vars, "espCallRate", espIds)
 
-    def computeTitv(vars: RDD[Variant], tag: String) {
-      val rawTitvs = vars.map(x => (x.filter, x.toTitv(false))).reduceByKey((a, b) => addTitv(a, b)).collect
-      val cleanTitvs = vars.map(x => (x.filter, x.toTitv(true))).reduceByKey((a, b) => addTitv(a, b)).collect
-      writeCombinedTitvs("raw" + tag, rawTitvs)
-      writeCombinedTitvs("clean" + tag, cleanTitvs)
-    }
+    //val intersectSnv =
+    //inter(biAutoSnv, batch)
+    //countByGD(intersectSnv, "cntInterByGD.txt", batch)
+
+    //countByGD(biAutoSnv, "cntByGD.txt", batch)
+
+    //countByFilter(biAutoSnv, "biAutoSnv.cnts.txt")
+
+    //val cnts: RDD[(String, Int)] =
+    //  biAutoSnv map (v => (v.filter, 1)) reduceByKey ((a: Int, b: Int) => a + b)
+    //cnts foreach {case (f: String, c: Int) => println(f + ": " + c)}
+
+    //biAutoSnv.saveAsObjectFile("testObj")
+
+
+    //val maf1 = computeMaf(vars, true).map(identity)
+
+    /**
+      * val maf2 = computeMaf(vars, false).map(identity)
+      /*
+      * val pw = new PrintWriter(new File("mafQc.txt"))
+      * pw.write("chr\tpos\tmaf\tgroup\n")
+      * vars.map(v => (v.chr, v.pos, v.filter)).collect.foreach{x =>  pw.write("%s\t%s\t%s\t%s\n" format(x._1, x._2, maf1((x._1, x._2)), x._3))}
+      * pw.close*/
+      * val pw2 = new PrintWriter(new File("mafRaw.txt"))
+      * pw2.write("chr\tpos\tmaf\tgroup\n")
+      * vars.map(v => (v.chr, v.pos, v.filter)).collect.foreach{x =>  pw2.write("%s\t%s\t%s\t%s\n" format(x._1, x._2, maf2((x._1, x._2)), x._3))}
+      * pw2.close
+
+     */
+    //computeMis(vars, "MisRateRaw.txt", false, maf)
+
+    //computeMis(vars.filter(v => filterVariant(v, afterVQSR)), "MisRateQc.txt", true, maf)
+    //computeGQ(vars, "GqByMaf.txt", ids, maf)
+    //computeGQ(vars, "GqByGt.txt", ids)
+    //computeGQ(vars.filter(v => afterVQSR.contains(v.filter)), "raw")
     //computeTitv(vars, "All")
-    computeTitv(vars.filter(x => x.info.contains("DB")), "Known")
-    computeTitv(vars.filter(x => ! x.info.contains("DB")), "Novel")
-
-    def computeGenoCount {
-      def toGD(gs: Array[String], gq: Double): Map[Int, Int] = {
-        val gdMap = Map[Int, Int]()
-        for (gt <- gs) {
-          val g = gt.split(":")
-          if (g(0) == "./." || g(4).toDouble < gq || g(3).toInt > 249) {
-            if (gdMap.contains(0))
-              gdMap(0) += 1
-            else
-              gdMap(0) = 1
-          }
-          else {
-            if (gdMap.contains(g(3).toInt))
-              gdMap(g(3).toInt) += 1
-            else
-              gdMap(g(3).toInt) = 1
-          }
-        }
-        gdMap
-      }
-      def toGQ(gs: Array[String], gd: Int): Map[Int, Int] = {
-        val gqMap = Map[Int, Int]()
-        for (gt <- gs) {
-          val g = gt.split(":")
-          if (g(0) == "./." || g(3).toInt < gd || g(3).toInt > 249) {
-            if (gqMap.contains(-1))
-              gqMap(-1) += 1
-            else
-              gqMap(-1) = 1
-          }
-          else {
-            if (gqMap.contains(g(4).toInt))
-              gqMap(g(4).toInt) += 1
-            else
-              gqMap(g(4).toInt) = 1
-          }
-        }
-        gqMap
-      }
-
-      def toMap(variant: Variant, gx: String, cutoff: Int): scala.collection.immutable.Map[Int, Map[Int, Int]] = {
-        val funGX = if (gx == "gd") toGD(_ : Array[String], cutoff) else toGQ(_ : Array[String], cutoff)
-        variant.geno.zipWithIndex.groupBy{case (g, i) => batch(i)}.mapValues(g => funGX(g.map(x => x._1))).map(identity)
-      }
-
-      def addGX(a: Map[Int, Int], b: Map[Int, Int]): Map[Int, Int] = {
-        for (key <- a.keys ++ b.keys) {
-          if (a.contains(key) && b.contains(key)) {
-            a(key) += b(key)
-          } else if (b.contains(key)) {
-            a(key) = b(key)
-          }
-        }
-        a
-      }
-
-      def addMap(a: scala.collection.immutable.Map[Int, Map[Int, Int]], b: scala.collection.immutable.Map[Int, Map[Int, Int]]): scala.collection.immutable.Map[Int, Map[Int, Int]] = {
-        for (i <- 1 to 4){
-          addGX(a(i), b(i))
-        }
-        a
-      }
-
-      //val rawGD = vars.filter(x => afterVQSR.contains(x.filter)).map(x => toMap(x, "gd", 0)).reduce((a, b) => addMap(a, b))
-      val rawGQ = vars.filter(x => afterVQSR.contains(x.filter)).map(x => toMap(x, "gq", 0)).reduce((a, b) => addMap(a, b))
-      //val cleanGD = vars.filter(x => afterVQSR.contains(x.filter)).map(x => toMap(x, "gd",20)).reduce((a, b) => addMap(a, b))
-      //val cleanGQ = vars.filter(x => afterVQSR.contains(x.filter)).map(x => toMap(x, "gq",8)).reduce((a, b) => addMap(a, b))
-      def writeGX(file: String, gx: scala.collection.immutable.Map[Int, Map[Int, Int]]) {
-        val pw = new PrintWriter(new File(file))
-        pw.write("cutoff\tbatch1\tbatch2\tbatch3\tbatch4\n")
-        gx(1).keys.toList.sorted.map(x => {pw.write(x + "\t" + Range(1,5).map(i => gx(i)(x)).mkString("\t") + "\n")})
-        pw.close
-      }
-      //writeGX("rawGD.txt", rawGD)
-      writeGX("rawGQ.txt", rawGQ)
-      //writeGX("cleanGD.txt", cleanGD)
-      //writeGX("cleanGQ.txt", cleanGQ)
-    }
+    //computeTitv(vars.filter(x => x.info.contains("DB")), "Known")
+    //computeTitv(vars.filter(x => ! x.info.contains("DB")), "Novel")
     //computeGenoCount
   }
 }

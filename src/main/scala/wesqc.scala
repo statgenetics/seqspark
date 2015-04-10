@@ -4,16 +4,45 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 import scala.io.Source
-import java.io._
 import scala.collection.mutable.Map
+import java.io._
+import java.nio.file.{Paths, Files}
+import org.ini4j._
 import Utils._
+import Pipeline._
 
-object Test {
+object Wesqc {
   def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("Test VCF")
-    val sc = new SparkContext(conf)
-    //Should be some file on your system
-    val vcfFile = if (args.length >= 1) args(0) else "test.vcf.bz2"    
+    // Spark configuration
+    val scConf = new SparkConf().setAppName("Wesqc")
+    val sc = new SparkContext(scConf)
+
+    //Configuration file for wesqc
+    val conf = if (args.length >= 1) args(0) else "wesqc.conf"
+
+
+    //try {
+    val ini = new Ini(new File(conf))
+    //} catch {
+    //  case ex: FileNotFoundException => System.exit(1)
+    //}
+
+    val vcf = sc.textFile(ini.get("general", "vcf"))
+    //val pheno = ini.get("general", "pheno")
+    val vars = makeVariants(vcf, ini)
+      //vcf filter (line => ! line.startsWith("#")) map (line => Variant(line))
+    vars.cache()
+    
+    saveAsBed(vars, ini)
+
+    //checkSex(vars, pheno, ini)
+
+    //println("project: %s" format (ini.get("general", "project")))
+
+    
+
+    /**
+    val vcfFile = if (args.length >= 1) args(0) else "test.vcf.bz2"
     val headFile = "mhgrid_head"
     val refPattern = """^[ATCG]$"""
     val altPattern = refPattern
@@ -72,6 +101,7 @@ object Test {
     val espIds = sampleId("espHead")
 
     callRate(vars, "espCallRate", espIds)
+      */
 
     //val intersectSnv =
     //inter(biAutoSnv, batch)

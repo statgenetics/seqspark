@@ -5,10 +5,13 @@ abstract class Variant[A] extends Serializable {
   val ref: String
   val alt: String
   val filter: String
-  val info: scala.collection.mutable.Map[String, String]
+  val info: Map[String, String]
   val format: List[String]
   val geno: Array[A]
   //def toTitv(filterGeno: Boolean) : (Array[Int], Array[Int])
+
+  override def toString =
+    "%s\t%s\t%s\t%s\t%s" format (chr, pos, ref, alt, geno.mkString("\t"))
 
   def isTi: Boolean = {
     if (Set(ref, alt) == Set("A", "G") || Set(ref, alt) == Set("C","T"))
@@ -35,16 +38,11 @@ object Variant {
     val alt = array(4)
     val filter = array(6)
     val info = {
-      val res = scala.collection.mutable.Map[String, String]()
-      for (item <- array(7).split(";")) {
-        if (item.matches("=")) {
-          val p = item.split("=")
-          res += (p(0) -> p(1))
-        } else {
-          res += (item -> "true")
-        }
-      }
-      res
+      val res =
+        for {item <- array(7).split(";")
+          s = item.split("=")}
+        yield if (s.length == 1) (s(0) -> "true") else (s(0) -> s(1))
+      res.toMap
     }
     val format = array(8).split(":").toList
     val geno = array.slice(9,array.length)

@@ -12,28 +12,69 @@ import Utils._
 import Pipeline._
 
 object Wesqc {
+  def checkArgs(args: Array[String]): Boolean = {
+    val usage = """
+                |spark-submit --class Wesqc [options] /path/to/wesqc.xx.xx.jar wesqc.conf [steps]
+                |    options:     spark options, e.g. --num-executors
+                |    wesqc.conf:  the configuation file in INI format, could be other name
+                |    steps:       the QC steps to perform, default 0-3
+                |                 0: input from vcf
+                |                 1: genotype level qc
+                |                 2: sample level qc
+                |                 3: variant level qc
+                |"""
+
+    if (args.length == 0 || args.length > 2) {
+      println(usage)
+      false
+    } else if (args.length == 2) {
+      val p1 = "([0-3])".r
+      val p2 = "([0-3])-([0-3])".r
+      args(1) match {
+        case p1(s) => true
+        case p2(s1, s2) if (s2.toInt >= s1.toInt) => true
+        case p2(s1, s2) if (s2.toInt < s1.toInt) => {println(usage); false}
+        case _ => {println(usage); false}
+      }
+    } else
+      true
+  }
+
+  def checkConf(ini: Ini) {
+    println("Conf file fine")
+  }
+
+
   def main(args: Array[String]) {
-    // Spark configuration
-    val scConf = new SparkConf().setAppName("Wesqc")
-    val sc = new SparkContext(scConf)
+    /** check args */
+    if (! checkArgs(args)) {
+      System.exit(1)
+    }
 
-    //Configuration file for wesqc
-    val conf = if (args.length >= 1) args(0) else "wesqc.conf"
+    /** quick run */
+    val conf = new File(args(0))
+    try {
+      val ini = new Ini(conf)
+      val steps = if (args.length == 2) args(1) else "0-3"
+      checkConf(ini)
+      quickRun(ini, steps)
+    } catch {
+      case e: Exception => {e.printStackTrace()}
+    }
 
-
-    //try {
-    val ini = new Ini(new File(conf))
     //} catch {
     //  case ex: FileNotFoundException => System.exit(1)
     //}
 
-    val vcf = sc.textFile(ini.get("general", "vcf"))
+    //val vcf = sc.textFile(ini.get("general", "vcf"))
     //val pheno = ini.get("general", "pheno")
-    val vars = makeVariants(vcf, ini)
-      //vcf filter (line => ! line.startsWith("#")) map (line => Variant(line))
-    vars.cache()
+    //val vars = makeVariants(vcf, ini)
+    //vcf filter (line => ! line.startsWith("#")) map (line => Variant(line))
+    //vars.cache()
     
-    saveAsBed(vars, ini)
+    //saveAsBed(vars, ini, sc)
+
+    //varCountByFreqAndFunc(vars, "input/annotVar.csv", "input/freqVar.csv", ini)
 
     //checkSex(vars, pheno, ini)
 

@@ -1,393 +1,403 @@
 import org.apache.spark.rdd.RDD
-import java.io._
+import org.apache.spark.SparkContext
+import org.apache.spark.TaskContext
 import org.apache.spark.SparkContext._
 import org.ini4j._
+import java.io._
+import java.io.FileNotFoundException
 import scala.io.Source
+import sys.process._
+import com.ceph.fs._
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
+
+object Constant {
+  object Pheno {
+    val delim = "\t"
+  }
+  object Gt {
+    val mis = "./."
+    val ref = "0/0"
+    val het = "0/1"
+    val mut = "1/1"
+  }
+  object Hg19 {
+    /** 0-based closed intervals, as with Region */
+    val pseudoX = List(Region("X", 60000, 2699519), Region("X", 154931043, 155260559))
+    val pseudoY = List(Region("Y", 10000, 2649519), Region("Y", 59034049, 59363565))
+    val pseudo = pseudoX ::: pseudoY
+    /** use a definition of MHC region from BGI 
+      * url: 
+      * http://bgiamericas.com/service-solutions/genomics/human-mhc-seq/
+      */
+    val mhc = Region(6.toByte, 29691115, 33054975)
+  }
+  object Hg38 {
+    /** 0-based closed intervals, as with Region */
+    val pseudoX = List(Region("X", 10000, 2781478), Region("X", 155701382, 156030894))
+    val pseudoY = List(Region("Y", 10000, 2781478), Region("Y", 56887902, 57217414))
+    val pseudo = pseudoX ::: pseudoY
+  }
+}
 
 object Utils {
-  type Data = RDD[Variant[String]]
-  def readColumn (file: String, col: String, delim: String): List[String] = {
+  type Var = Variant[String]
+  type Data = RDD[Var]
+  type Pair = (Double, Double)
+  import Constant._
+ 
+  @annotation.tailrec
+  def retry[T](n: Int)(fn: => T): T = {
+    util.Try { fn } match {
+      case util.Success(x) => x
+      case _ if n > 1 => retry(n - 1)(fn)
+      case util.Failure(e) => throw e
+    }
+  }
+
+  def readColumn (file: String, col: String): Array[String] = {
+    val delim = Pheno.delim
     val data = Source.fromFile(file).getLines.toList
     val header = data(0).split(delim).zipWithIndex.toMap
     val idx = header(col)
     val res =
       for (line <- data.slice(1, data.length))
       yield line.split(delim)(idx)
-    res.toList
-  }
- 
-  def saveAsBed (vars: Data, ini: Ini) {
-    val map = Map("./." -> 1, "0/0" -> 0, "0/1" -> 2, "1/1" -> 3)
-    val gd = ini.get("genotype", "gd").split(",")
-    val gq = ini.get("genotype", "gq").toDouble
-    val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
-    val gdLower = gd(0).toDouble
-    val gdUpper = gd(1).toDouble
-    val gtIdx = gtFormat("GT")
-    val gdIdx = gtFormat("GD")
-    val gqIdx = gtFormat("GQ")
-    val pheno = ini.get("general", "pheno")
-    val p = Source.fromFile(pheno).getLines.toList
-    val delim = ini.get("pheno", "delimiter")
-    val header = p(0).split(delim).zipWithIndex.toMap
-    val batchCol = ini.get("pheno","batch")
-    val batchIdx = header(batchCol)
-    val batch = for (line <- p.slice(1,p.length)) yield line.split(delim)(batchIdx).toInt
-    val misRate = ini.get("variant", "batchMissing").toDouble
-    val mdsMaf = ini.get("sample", "mdsMaf").toDouble
-    val ctrl = readColumn(pheno, ini.get("pheno", "control"), delim)
-    val sampleName = readColumn(pheno, "sample_name", delim)
-
-    def miniQC (vars: Data, batch: List[Int]): Data = {
-      type Cnt = (Double, Double)
-      def makeCallRate (g: String): Cnt = {
-        val s = g split (":")
-        if (s(gtIdx) == "./." || s(gdIdx).toInt < gdLower || s(gdIdx).toInt > gdUpper || s(gqIdx).toDouble < gq)
-          (0.0, 1.0)
-        else
-          (1.0, 1.0)
-      }
-      def makeMaf (g: String): Cnt = {
-        val s = g split (":")
-        if (s(gtIdx) == "./." || s(gdIdx).toInt < gdLower || s(gdIdx).toInt > gdUpper || s(gqIdx).toDouble < gq)
-          (0.0, 0.0)
-        else if (s(gtIdx) == "0/0")
-          (0.0, 2.0)
-        else if (s(gtIdx) == "0/1")
-          (1.0, 2.0)
-        else if (s(gtIdx) == "1/1")
-          (2.0, 2.0)
-        else
-          (0.0, 0.0)
-      }
-      def callRateP (v: Variant[String]): Boolean = {
-        val cntB = Count[Cnt](v)(makeCallRate).collapseByBatch(batch.toArray)
-        val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
-        if (min._1/min._2 < (1 - misRate)) false else true
-      }
-      def mafP (v: Variant[String]): Boolean = {
-        val cnt = Count[Cnt](v)(makeMaf)
-        val cntA = cnt.collapse
-        val cntB = cnt.collapseByBatch(batch.toArray)
-        val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
-        val maf = cntA._1/cntA._2
-        val bSpec = if (! v.info.contains("DB") && max._1 > 1 && max._1 == cntA._1) true else false
-        if (maf >= mdsMaf && maf <= (1 - mdsMaf) && ! bSpec) true else false
-      }
-      vars filter (v => callRateP(v) && mafP(v))
-    }
-
-    def makeBed (vars: Data) {
-      var bed = None: Option[FileOutputStream]
-      val bim = new PrintWriter(new File("%s-plink.bim" format (ini.get("general", "project"))))
-      val fam = new PrintWriter(new File("%s-plink.fam" format (ini.get("general", "project"))))
-
-      def mkG (geno: Array[String], i: Int, j: Int): Byte = {
-        val idx = 4 * i + j
-        val s: Array[String] = if (idx < geno.length) geno(idx).split(":") else Array("./.")
-        if (idx >= geno.length)
-          0.toByte
-        else if (s(gtIdx) == "./." || s(gdIdx).toInt < gdLower || s(gdIdx).toInt > gdUpper || s(gqIdx).toDouble < gq)
-          1.toByte
-        else if (s(gtIdx) == "0/0")
-          0.toByte
-        else if (s(gtIdx) == "0/1" || s(gtIdx) == "1/0")
-          2.toByte
-        else if (s(gtIdx) == "1/1")
-          3.toByte
-        else
-          1.toByte
-      }
-
-      def convert (v: Variant[String]): List[Byte] = {
-        val res =
-          for {
-            i <- 0 to v.geno.length/4
-            four = 0 to 3 map (j => mkG(v.geno, i, j))}
-          yield
-            four.zipWithIndex.map(a => a._1 << 2 * a._2).sum.toByte
-        res.toList
-      }
-
-      try {
-        bed = Some(new FileOutputStream("%s-plink.bed" format (ini.get("general", "project"))))
-        val magical1 = Integer.parseInt("01101100", 2).toByte
-        val magical2 = Integer.parseInt("00011011", 2).toByte
-        val mode = Integer.parseInt("00000001", 2).toByte
-        bed.get.write(magical1)
-        bed.get.write(magical2)
-        bed.get.write(mode)
-
-        /** fam file */
-        for (i <- 0 until sampleName.length) {
-          val status = ctrl(i) match {
-            case "1" => 1
-            case "0" => 2
-            case "NA" => 0
-            case _ => 0
-          }
-          fam.write("%d\t%s\t0\t0\t0\t%d\n" format (i+1, sampleName(i), status))
-        }
-
-        /** bed and bim file */
-        for (p <- parts) {
-          val idx = p.index
-          val partRdd = vars.mapPartitionsWithIndex((a, b) => if (a == idx) b else Iterator(), true)
-          val data = partRdd.collect
-          for (v <- data) {
-            val snp = "%s-%d" format (v.chr, v.pos)
-            bim.write("%s\t%s\t0\t%d\t%s\t%s\n" format (v.chr, snp, v.pos, v.ref, v.alt))
-            for (c <- convert(v)) {
-              bed.get.write(c)
-            }
-          }
-        }
-      } catch {
-        case e: IOException => e.printStackTrace
-      } finally {
-        println("plink bed file generated!")
-        if (bed.isDefined) bed.get.close
-        bim.close
-        fam.close
-      }
-    }
-    makeBed(miniQC(vars, batch))
-
+    res.toArray
   }
 
-  def inter(vars: RDD[Variant[String]], batch: Array[Int]) {
-    //type Cnt = Map[Int, Int]
-    type Cnt = (Double, Double)
-    def make(g: String): Cnt = {
-      val s = g split (":")
-      //val gd = s(3).toInt
-      //val gq = s(4).toDouble
-      if (s(0) == "./.") (0.0, 1.0) else (1.0, 1.0)
-    }
-    def interP(v: Variant[String]): Boolean = {
-      val cntB = Count[Cnt](v)(make).collapseByBatch(batch)
-      val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
-      if (min._1/min._2 < 0.9) false else true
-    }
-    def interV (vars: RDD[Variant[String]]): RDD[Variant[String]] =
-      vars filter (v => interP(v))
-
-    def writeInter (vars: RDD[Variant[String]]) {
-      val file = "Bspec.txt"
-      val pw = new PrintWriter(new File(file))
-      val res = vars filter (v => ! interP(v)) map (x => (x.chr, x.pos, x.filter))
-      pw.write("chr\tpos\tfilter\n")
-      res.collect foreach { case (c, p, f) => pw.write("%s\t%d\t%s\n" format (c, p, f)) }
-      pw.close
-    }
-    writeInter(vars)
-    //interV(vars)
+  def hasColumn (file: String, col: String): Boolean = {
+    val delim = Pheno.delim
+    val header = Source.fromFile(file).getLines.toList
+    if (header(0).split(delim).contains(col))
+      true
+    else
+      false
   }
 
-  def countByGD(vars: RDD[Variant[String]], file: String, batch: Array[Int]) {
-    type Cnt = Map[(Int, Int), Int]
-    type Bcnt = Map[Int, Cnt]
-    def make(g: String): Cnt = {
-      val s = g split (":")
-      if (s(0) == "./.") Map((0, -1) -> 0) else Map((s(3).toInt, s(4).toInt) -> 1)
-    }
-    def cnt(vars: RDD[Variant[String]]): Array[(String, Bcnt)] = {
-      val all = vars map (
-        v => (v.filter, Count[Cnt](v)(make).collapseByBatch(batch)))
-      val res = all reduceByKey ((a, b) => Count.addByBatch[Cnt](a, b))
-      res.collect
-    }
-    def writeCnt(cnt: Array[(String, Bcnt)], file: String) {
-      val pw = new PrintWriter(new File(file))
-      pw.write("qc\tbatch\tgd\tgq\tcnt\n")
-      for ((qc, map1) <- cnt)
-        for ((batch, map2) <- map1)
-          for (((gd, gq), c) <- map2)
-            pw.write("%s\t%d\t%d\t%d\t%d\n" format (qc, batch, gd, gq, c))
-      pw.close
-    }
-    writeCnt(cnt(vars), file)
-  }
-
-  def countByFilter(vars: RDD[Variant[String]], file: String) {
+  def writeArray(file: String, data: Array[String]) {
     val pw = new PrintWriter(new File(file))
-    val cnts: RDD[(String, Int)] =
-      vars map (v => (v.filter, 1)) reduceByKey ((a: Int, b: Int) => a + b)
-    cnts.collect foreach {case (f: String, c: Int) => pw.write(f + ": " + c + "\n")}
+    data foreach (d => pw.write(d + "\n"))
     pw.close
   }
 
-  def computeMis(vars: RDD[Variant[String]], file: String, qc: Boolean, group: Map[(String, Int), String] = null) = {
-    val grp = vars.map(v => (v.chr, v.pos) -> v.filter).collect.toMap
-    def pass(g: String): Boolean = {
-      val s = g.split(":")
-      if (s(0) == "./." || (qc && s(1) != "PASS")) false else true
-    }
-    def make(g: String): Int = {
-      if (pass(g)) 1 else 0
-    }
-    def cnt(vars: RDD[Variant[String]]): Map[(String, Int), Int] = {
-      vars.map(v => (v.chr, v.pos) -> v.geno.map(g => make(g)).reduce((a,b) => a + b)).collect.toMap
-    }
-    def writeMis(c: Map[(String, Int), Int], file: String) {
-      val pw = new PrintWriter(new File(file))
-      pw.write("chr\tpos\tcnt\tqc\tfreq\n")
-      c.foreach {case ((chr, pos), cnt) => pw.write("%s\t%d\t%d\t%s\t%s\n" format(chr, pos, cnt,grp((chr, pos)), group((chr, pos)) ))}
-      pw.close
-    }
-    writeMis(cnt(vars), file)
+  def getFam (file: String): Array[String] = {
+    val delim = Pheno.delim
+    val data = Source.fromFile(file).getLines.toArray
+    val res =
+      for (line <- data.drop(1))
+      yield line.split(delim).slice(0, 6).mkString(delim)
+    res
   }
 
-  def computeMaf(vars: RDD[Variant[String]], qc: Boolean) = {
-    def pass(g: String): Boolean = {
-      val s = g.split(":")
-      if (s(0) == "./.") false else true}
-    def pass1(g: String) = {
-      val s = g.split(":")
-      if (s(0) == "./." || (qc && s(1) != "PASS")) false else true
+  def saveAsBed(vars: Data, ini: Ini, dir: String) {
+    val bed = vars.map(v => Bed(v))
+    val cephHome = ini.get("general", "cephHome")
+    if (cephHome != null)
+      saveInCeph(bed, "%s/%s" format(cephHome, dir))
+    else
+      bed.saveAsObjectFile(dir)
+    val fam = getFam(ini.get("general", "pheno"))    
+    val famFile = "results/%s/2sample/all.fam" format (ini.get("general", "project"))
+    writeArray(famFile, fam)
+   }
+
+  def saveInCeph(bed: RDD[Bed], dir: String) {
+
+    def mkdir(dir: String) {
+      val cephConf = "/etc/ceph/ceph.conf"
+      val cephMnt = new CephMount()
+
+      try {
+        cephMnt.conf_read_file(cephConf)
+        cephMnt.mount("/")
+      } catch {
+        case e: Exception => println("cannot mount ceph")
+      }
+
+      try {
+        cephMnt.mkdirs(dir, BigInt("755", 8).toInt)
+      } catch {
+        case e: CephFileAlreadyExistsException => println("ceph dir %s alreadt exits, do nothing" format (dir))
+      }
+
+      cephMnt.unmount()
     }
-    def make(g: String): Gq = {
-      val s = g.split(":")
-      if (pass(g)){
-        val a = s(0).split("/").map(_.toInt)
-        new Gq((a.sum, 2))
-      }else
-        new Gq((0, 0))
+
+    def savePart(iter: Iterator[Bed], idx: Int) {
+
+      val bimFile = "%s/part-%s.bim" format (dir, idx)
+      val bedFile = "%s/part-%s.bed" format (dir, idx)
+      val bedMagical1 = Integer.parseInt("01101100", 2).toByte
+      val bedMagical2 = Integer.parseInt("00011011", 2).toByte
+      val bedMode = Integer.parseInt("00000001", 2).toByte
+      val bedHead = Array[Byte](bedMagical1, bedMagical2, bedMode)
+      val mode = BigInt("644", 8).toInt
+
+
+      try {
+        val cephConf = "/etc/ceph/ceph.conf"
+        val cephMnt = new CephMount()
+        //println("mark 1")
+        cephMnt.conf_read_file(cephConf)
+        //println("mark 2")
+        cephMnt.mount("/")
+        //println("mark 3")
+        val bim0 = cephMnt.open(bimFile, CephMount.O_CREAT, mode)
+        val bim1 = cephMnt.open(bimFile, CephMount.O_WRONLY, mode)
+        val bed0 = cephMnt.open(bedFile, CephMount.O_CREAT, mode)
+        val bed1 = cephMnt.open(bedFile, CephMount.O_WRONLY, mode)
+        //println("mark 4")
+        val data = iter reduce ((a, b) => Bed.add(a, b))
+        //println("mark 5")
+        cephMnt.write(bim1, data.bim, data.bim.length, 0)
+        //println("mark 6")
+        cephMnt.write(bed1, bedHead, 3, 0)
+        //println("mark 7")
+        cephMnt.write(bed1, data.bed, data.bed.length, 3)
+        //println("mark 8")
+        cephMnt.close(bim0)
+        cephMnt.close(bim1)
+        cephMnt.close(bed0)
+        cephMnt.close(bed1)
+        //println("mark 9")
+        cephMnt.unmount()
+        //println("mark 10")
+      } catch {
+        case e: Exception => {
+          println("Could not save part %d for bed" format (idx))
+          println(e)
+        }
+      }
     }
-    def maf(vars: RDD[Variant[String]]): Map[(String, Int), String] = {
-      val m = vars.map(v => {val maf = v.geno.map(g => make(g)).reduce((a, b) => a + b); val cat = if (maf.cnt == 0) "Nocall" else if (maf.total == 1 || maf.cnt - maf.total == 1) "Singleton" else if (maf.mean < 0.01 || maf.mean > 0.99) "Rare" else if (maf.mean < 0.05 || maf.mean > 0.95) "Infrequent" else "Common"; (v.chr, v.pos, cat)}).collect
-      m.map(v => (v._1, v._2) -> v._3).toMap
-    }
-    maf(vars)
+    mkdir(dir)
+    bed.foreachPartition {p => val pid = TaskContext.get.partitionId; savePart(p, pid)}
+  }
+}
+
+object GenotypeLevel {
+  import Constant._
+  import Utils._
+
+  /** compute call rate */
+  def makeCallRate (g: String): Pair = {
+    val gt = g.split(":")(0)
+    if (gt == Gt.mis)
+      (0.0, 1.0)
+    else
+      (1.0, 1.0)
   }
 
-  def computeGQ(vars: RDD[Variant[String]], file: String, ids: Array[String], group: Map[(String, Int), String] = null) {
-    val grp = Option(group).getOrElse(vars.map(v => (v.chr, v.pos) -> v.filter).collect.toMap)
-    def pass(g: String): Boolean = {
-      val s = g.split(":")
-      if (s(0) == "./.") false else true}
-    def make(g: String): Gqmap = {
-      val s = g.split(":")
-      if (pass(g))
-        new Gqmap(scala.collection.mutable.Map[String, Gq](s(0) -> new Gq((s(4).toDouble, 1))))
-      else
-        new Gqmap(scala.collection.mutable.Map[String, Gq]("./." -> new Gq((0, 1))))}
-    def add (a: Gtinfo[Gqmap], b: Gtinfo[Gqmap]) = {
-      for (i <- Range(0, a.length))
-        a.elems(i) += b.elems(i)
-      a}
+  /** compute maf of alt */
+  def makeMaf (g: String): Pair = {
+    val gt = g.split(":")(0)
+    if (gt == Gt.mis)
+      (0.0, 0.0)
+    else if (gt == Gt.ref)
+      (0.0, 2.0)
+    else if (gt == Gt.het)
+      (1.0, 2.0)
+    else if (gt == Gt.mut)
+      (2.0, 2.0)
+    else
+      (0.0, 0.0)
+  }
 
-    def gq(vars: RDD[Variant[String]]): Array[(String, Gtinfo[Gqmap])] = {
-      vars.map(v => (grp((v.chr, v.pos)), new Gtinfo[Gqmap]{val elems =v.geno.map(g => make(g))})).reduceByKey((a: Gtinfo[Gqmap], b: Gtinfo[Gqmap]) => add(a, b)).collect
+  /** compute by GD, GQ */
+  def statGdGq(vars: Data, ini: Ini) {
+    type Cnt = Int2IntOpenHashMap
+    type Bcnt = Map[Int, Cnt]
+    val phenoFile = ini.get("general", "pheno")
+    val batchCol = ini.get("pheno", "batch")
+    val batchStr = readColumn(phenoFile, batchCol)
+    val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
+    val batchMap = batchKeys.zipWithIndex.toMap
+    val batchIdx = batchStr.map(b => batchMap(b))
+    val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
+    val gtIdx = gtFormat("GT")
+    val gdIdx = gtFormat("GD")
+    val gqIdx = gtFormat("GQ")
+    def make(g: String): Cnt = {
+      val s = g split (":")
+      if (s(gtIdx) == Gt.mis)
+        new Int2IntOpenHashMap(Array(0), Array(1))
+      else {
+        val key = s(gdIdx).toDouble.toInt * 100 + s(gqIdx).toDouble.toInt
+        new Int2IntOpenHashMap(Array(key), Array(1))
+      }
     }
-    def writeGQ(gq: Array[(String, Gtinfo[Gqmap])], file: String) {
-      val pw = new PrintWriter(new File(file))
-      val delim = "\t"
-      //val header = gq.map(x => x._2.elems(0).headers.map(h => x._1 + h).mkString(delim)).mkString(delim)
-      val header = "group\tsample\tgt\ttotal\tcnt\n"
-      pw.write(header)
-      for (j <- Range(0, gq.length)) {
-        for (i <- Range(0,gq(0)._2.length)) {
-          val g =  gq(j)._2.elems(i).elem
-          for (k <- g.keys
-            if (k != "./."))
-            pw.write("%s\t%s\t%s\t%s\t%s\n".format(gq(j)._1, ids(i),k, g(k).elem._1, g(k).elem._2))
+    def count(vars: Data): Bcnt = {
+      val all = vars map (v => Count[Cnt](v)(make).collapseByBatch(batchIdx))
+      val res = all reduce ((a, b) => Count.addByBatch[Cnt](a, b))
+      res
+    }
+
+    def writeBcnt(b: Bcnt) {
+      val outDir =  "results/%s/1genotype" format (ini.get("general", "project"))
+      val exitCode = "mkdir -p %s".format(outDir).!
+      println(exitCode)
+      val outFile = "%s/CountByGdGq.txt" format (outDir)
+      val pw = new PrintWriter(new File(outFile))
+      pw.write("batch\tgd\tgq\tcnt\n")
+      for ((i, cnt) <- b) {
+        val iter = cnt.keySet.iterator
+        while (iter.hasNext) {
+          val key = iter.next
+          val gd: Int = key / 100
+          val gq: Int = key - gd * 100
+          val c = cnt.get(key)
+          pw.write("%s\t%d\t%d\t%d\n" format (batchKeys(i), gd, gq, c))
         }
       }
       pw.close
     }
-    writeGQ(gq(vars), file)
+    writeBcnt(count(vars))
   }
+}
 
-  def callRate (vars: RDD[Variant[String]], file: String, id: Array[String]) {
-    type Cnt = (Double, Double)
-    
-    def make (g: String): Cnt = {
-      val s = g.split(":")
-      //if (s(0) == "./." || s(1).toDouble < 8.0 || s(2).toDouble < 20.0) (0.0, 1.0) else (1.0, 1.0)
-      if (s(0) == "./.") (0.0, 1.0) else (1.0, 1.0)
-    }
+object SampleLevel {
+  import Constant._
+  import Utils._
 
-    def cnt (vars: RDD[Variant[String]]): Count[Cnt] = {
-      vars map (v => Count[Cnt](v)(make)) reduce ((a: Count[Cnt], b: Count[Cnt]) => a add b)
-    }
+  def checkSex(vars: Data, ini: Ini) {
+    /** Assume:
+      *  1. genotype are cleaned before. 
+      *  2. only SNV
+      * */
 
-    def writeCnt (c: Count[Cnt], file: String, id: Array[String]) {
-      val pw = new PrintWriter(new File(file))
-      pw.write("id\tcall\ttotal\trate\n")
-      for ((i, (cnt, total)) <- id zip c.geno )
-        pw.write("%s\t%s\t%s\t%.4f\n" format (i, cnt, total, cnt/total))
-      pw.close
-    }
-    writeCnt(cnt(vars), file, id)
-  }
-
-  def checkSex(vars: RDD[Variant[String]], pheno: String, ini: Ini) {
-    
-    def getPhenoSex(pheno: String, ini: Ini): (List[String], List[String]) = {
-      //try {
-      val p = Source.fromFile(pheno).getLines.toList
-      //} catch {
-      //  case ex: FileNotFoundException => System.exit(1)
-      //}
-      val sexCol = ini.get("pheno", "sex")
-      val delim = ini.get("pheno", "delimiter")
-      val header = p(0).split(delim)
-      val sexMap = header.zipWithIndex.toMap
-      val sexIdx = sexMap(sexCol)
-      val ids = for (i <- 1 until p.length) yield p(i).split(delim)(0)
-      val sex = for (i <- 1 until p.length) yield p(i).split(delim)(sexIdx)
-      (ids.toList, sex.toList)
+    /** count heterozygosity rate */
+    def makex (g: String): Pair = {
+      if (g == Gt.mis)
+        (0.0, 0.0)
+      else if (g == Gt.het)
+        (1.0, 1.0)
+      else
+        (0.0, 1.0)
     }
     
-    type Cnt = (Double, Double)
+    /** count the call rate */
+    def makey (g: String): Pair =
+      if (g == Gt.mis) (0.0, 1.0) else (1.0, 1.0)
     
-    def makex (g: String): Cnt = {
-      val s = g.split(":")
-      if (s(0) == "./." || s(3).toDouble < 8 || s(4).toDouble < 20) (0.0, 0.0) else if (s(0) == "0/1") (1.0, 1.0) else (0.0, 1.0)
+    /** count for all the SNVs on allosomes */
+    def count (vars: Data): (Array[Pair], Array[Pair]) = {
+      val pXY =
+        if (ini.get("general", "build") == "hg19")
+          Hg19.pseudo
+        else
+          Hg38.pseudo
+      val allo = vars
+        .filter (v => v.chr == "X" || v.chr == "Y")
+        .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos - 1)) )
+      allo.cache
+      val xVars = allo filter (v => v.chr == "X")
+      val yVars = allo filter (v => v.chr == "Y")
+      val emp: Array[Pair] =
+        (0 until vars.take(1)(0).geno.length)
+          .map (i => (0.0, 0.0))
+          .toArray
+      val xHetRate =
+        if (xVars.isEmpty)
+          emp
+        else
+          xVars
+            .map (v => Count[Pair](v)(makex).geno)
+            .reduce ((a, b) => Count.addGeno[Pair](a, b))
+      val yCallRate =
+        if (yVars.isEmpty)
+          emp
+        else
+          yVars
+            .map (v => Count[Pair](v)(makey).geno)
+            .reduce ((a, b) => Count.addGeno[Pair](a, b))
+      (xHetRate, yCallRate)
     }
 
-    def makey (g: String): Cnt = {
-      val s = g.split(":")
-      if (s(0) == "./." || s(3).toDouble < 8 || s(4).toDouble < 20) (0.0, 1.0) else (1.0, 1.0)
-    }
-
-    def inferSex (vars: RDD[Variant[String]]): (Count[Cnt], Count[Cnt]) = {
-      val pX = List((60001, 2699520), (154931044, 155260560))
-      val pY = List((10001, 2649520), (59034050, 59363566))
-      val tmp = vars filter (v => v.chr == "X" || v.chr == "Y")
-      val allo = tmp filter (v => v.ref.matches("^[ATCG]$") && v.alt.matches("^[ATCG]$"))
-      allo.cache()
-      val x = allo filter (v => v.chr == "X" && v.pos > pX(0)._2 && v.pos < pX(1)._1) map (v => Count[Cnt](v)(makex)) reduce ((a: Count[Cnt], b: Count[Cnt]) => a add b)
-      val y = allo filter (v => v.chr == "Y" && v.pos > pY(0)._2 && v.pos < pY(1)._1) map (v => Count[Cnt](v)(makey)) reduce ((a: Count[Cnt], b: Count[Cnt]) => a add b)
-      (x, y)
-    }
-
-    def write (idsex: (List[String], List[String]) , res: (Count[Cnt], Count[Cnt]), file: String) {
-      val pw = new PrintWriter(new File(file))
-      pw.write("id\tsex\tXhet\tXhom\tYcall\tYmis\n")
-      val ids = idsex._1
-      val sex = idsex._2
-      val x = res._1.geno map (g => (g._1.toInt, g._2.toInt))
-      val y = res._2.geno map (g => (g._1.toInt, g._2.toInt))
-      for (i <- 0 until ids.length) {
-        pw.write("%s,%s,%d,%d,%d,%d\n" format (ids(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
+    /** write the result into file */
+    def write (res: (Array[Pair], Array[Pair])) {
+      val pheno = ini.get("general", "pheno")
+      val fids = readColumn(pheno, "FID")
+      val iids = readColumn(pheno, "IID")
+      val sex = readColumn(pheno, "Sex")
+      val prefDir = "results/%s/2sample" format (ini.get("general", "project"))
+      val exitCode = "mkdir -p %s".format(prefDir).!
+      println(exitCode)
+      val outFile = "%s/sexCheck.csv" format (prefDir)
+      val pw = new PrintWriter(new File(outFile))
+      pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
+      val x = res._1 map (g => (g._1.toInt, g._2.toInt))
+      val y = res._2 map (g => (g._1.toInt, g._2.toInt))
+      for (i <- 0 until iids.length) {
+        pw.write("%s,%s,%s,%d,%d,%d,%d\n" format (fids(i), iids(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
       }
       pw.close
     }
-
-    write(getPhenoSex(pheno, ini), inferSex(vars), "sexCheck")
-
-    def test (vars: RDD[Variant[String]]) {
-      val pw = new PrintWriter(new File("sex.vcf"))
-      val sex = vars filter (v => v.chr == "X" || v.chr == "Y") map (v => v.geno.slice(0,99))
-      sex.collect foreach {
-        g => pw.write(g.mkString("\t") + "\n")
-      }
-      pw.close
-    }
-    //test(vars)
-
+    write(count(vars))
   }
 
+  def mds (vars: Data, ini: Ini) {
+    /** 
+      * Assume:
+      *     1. genotype are cleaned before
+      *     2. only SNVs
+      */
+    val pheno = ini.get("general", "pheno")
+    val mdsMaf = ini.get("sample", "mdsMaf").toDouble
+    def mafFunc (m: Double): Boolean =
+      if (m >= mdsMaf && m <= (1 - mdsMaf)) true else false
+
+    val snp = VariantLevel.miniQC(vars, ini, pheno, mafFunc)
+    saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
+    }
+}
+
+object VariantLevel {
+  import Utils._
+  import Constant._
+  
+  def miniQC(vars: Data, ini: Ini, pheno: String, mafFunc: Double => Boolean): Data = {
+    //val pheno = ini.get("general", "pheno")
+    val batchCol = ini.get("pheno", "batch")
+    val batchStr = readColumn(pheno, batchCol)
+    val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
+    val batchMap = batchKeys.zipWithIndex.toMap
+    val batchIdx = batchStr.map(b => batchMap(b))
+    val batch = batchIdx
+    val misRate = ini.get("variant", "batchMissing").toDouble
+    
+    /** if call rate is high enough */
+    def callRateP (v: Var): Boolean = {
+      //println("!!! var: %s-%d geno.length %d" format(v.chr, v.pos, v.geno.length))
+      val cntB = Count[Pair](v)(GenotypeLevel.makeCallRate).collapseByBatch(batch)
+      val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
+      if (min._1/min._2 < (1 - misRate)) {
+        //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
+        false
+      } else {
+        //println("!!!min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
+        true
+      }
+    }
+
+    /** if maf is high enough and not a batch-specific snv */
+    def mafP (v: Var): Boolean = {
+      val cnt = Count[Pair](v)(GenotypeLevel.makeMaf)
+      val cntA = cnt.collapse
+      val cntB = cnt.collapseByBatch(batch)
+      val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
+      val maf = cntA._1/cntA._2
+      val bSpec =
+        if (! v.info.contains("DB") && max._1 > 1 && max._1 == cntA._1) {
+          true
+        } else {
+          //println("bspec var %s-%d %f" format (v.chr, v.pos, max._1))
+          false
+        }
+      //println("!!!!!! var: %s-%d maf: %f" format (v.chr, v.pos, maf))
+      if (mafFunc(maf) && ! bSpec) true else false
+    }
+    //println("there are %d var before miniQC" format (vars.count))
+    val snv = vars.filter(v => callRateP(v) && mafP(v))
+    //println("there are %d snv passed miniQC" format (snv.count))
+    snv
+  }
 }

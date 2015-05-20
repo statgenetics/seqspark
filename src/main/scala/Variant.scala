@@ -8,7 +8,6 @@ abstract class Variant[A] extends Serializable {
   val info: Map[String, String]
   val format: List[String]
   val geno: Array[A]
-  //def toTitv(filterGeno: Boolean) : (Array[Int], Array[Int])
 
   override def toString =
     "%s\t%s\t%s\t%s\t%s" format (chr, pos, ref, alt, geno.mkString("\t"))
@@ -30,6 +29,17 @@ abstract class Variant[A] extends Serializable {
 }
 
 object Variant {
+  private class snv (v: Variant[String], gs: Array[String]) extends Variant[String] {
+    val chr = v.chr
+    val pos = v.pos
+    val ref = v.ref
+    val alt = v.alt
+    val filter = v.filter
+    val info = v.info
+    val format = List("GT")
+    val geno = gs
+  }
+
   private class vcfVar (val line: String) extends Variant[String] {
     private val array = line.split("\\t")
     val chr = array(0)
@@ -46,35 +56,15 @@ object Variant {
     }
     val format = array(8).split(":").toList
     val geno = array.slice(9,array.length)
-    /**
-    def toTitv(filterGeno: Boolean): (Array[Int], Array[Int]) = {
-      val cnt1: Array[Int] = for {
-        gstring <- geno
-        gfields = gstring.split(":")
-        cnt = {
-          if (gfields(0) == "./.")
-            0
-          else if (filterGeno == false || gfields(1) == "PASS")
-            gfields(0).split("/").map(_.toInt).sum
-          else
-            0
-        }} yield cnt
-      val cnt2 = Array.fill(geno.length)(0)
-      if (this.isTi)
-        (cnt1, cnt2)
-        //new Titv(cnt1, cnt2)
-      else if (this.isTv)
-        (cnt2, cnt1)
-        //new Titv(cnt2, cnt1)
-      else
-        (cnt2, cnt2)
-        //new Titv(cnt2, cnt2)
-    }
-      */
   }
-
 
   def apply(line: String): Variant[String] = {
     new vcfVar(line)
+  }
+  def transElem(v: Variant[String], make: String => String): Variant[String] = {
+    new snv(v, v.geno.map(g => make(g)))
+  }
+  def transWhole(v: Variant[String], make: Array[String] => Array[String]): Variant[String] = {
+    new snv(v, make(v.geno))
   }
 }

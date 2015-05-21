@@ -10,24 +10,17 @@ import org.apache.spark._
   */
 
 
-object Mds {
-  def readBedFromCeph(dir: String) {
-    
-  }
+object Command {
 
-  def run (ini: Ini, sc: SparkContext) {
+  def runMds (ini: Ini, sc: SparkContext) {
     
-    /** 1. copy files from ceph back to local */
-    val cephHome = ini.get("general", "cephHome")
     val project = ini.get("general", "project")
-    val beds =
-      if (cephHome != null)
-        readBedFromCeph("%s/%s/9external/plink" format (cephHome, project))
-      else
-        sc.ObjectFile("%s/9external/plink" format (project)).collect
-    val srcDir = "%s/"
-    val copy = "cp "
-    
+    val prefix = "results/%s/2sample"
+    val bfile = "%s/all" format (prefix)
+    val plink = ini.get("sample", "plink")
+    val king = ini.get("sample", "king")
+    val hwe = ini.get("variant", "hwePvalue")
+    val selectSNP = "%s --bfile %s --hwe %s --indep-pairwise 50 5 0.5 --allow-no-sex --out %s/pruned" format (plink, bfile, hwe, prefix)
 
   }
 }

@@ -376,6 +376,7 @@ object SampleLevel {
       }
     }
     write(bed)
+    Command.runMds(ini: Ini)
   }
 }
 

@@ -346,8 +346,37 @@ object SampleLevel {
       if (m >= mdsMaf && m <= (1 - mdsMaf)) true else false
 
     val snp = VariantLevel.miniQC(vars, ini, pheno, mafFunc)
-    saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
+    //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
+
+    val bed = snp map (s => Bed(s))
+    
+
+    def write (bed: RDD[Bed]) {
+      val pBed =
+        bed mapPartitions(p => p reduce ((a, b) => List(Bed.add(a, b)).iterator))
+      val prefix = "results/%s/2sample" format (ini.get("general", "project"))
+      val bimFile = "%s/all.bim" format (prefix)
+      val bedFile = "%s/all.bed" format (prefix)
+      var bimStream = None: Option[FileOutputStream]
+      var bedStream = None: Option[FileOutputStream]
+      val iter = pBed.toLocalIterator
+      try {
+        bimStream = Some(new FileOutputStream(bimFile))
+        bedStream = Some(new FileOutputStream(bedFile))
+        while (iter.hasNext) {
+          val cur = iter.next
+          bimStream.get.write(cur.bim)
+          bedStream.get.write(cur.bed)
+        }
+      } catch {
+        case e: IOException => e.printStackTrace
+      } finally {
+        if (bimStream.isDefined) bimStream.get.close
+        if (bedStream.isDefined) bedStream.get.close
+      }
     }
+    write(bed)
+  }
 }
 
 object VariantLevel {

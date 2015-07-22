@@ -13,4 +13,5 @@ libraryDependencies ++= Seq(
 )
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+
 assemblyJarName in assembly := "SeqA-1.0.jar"

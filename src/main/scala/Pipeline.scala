@@ -20,20 +20,25 @@ object Pipeline {
     val project = ini.get("general", "project")
 
     /** Spark configuration */
-    val scConf = new SparkConf().setAppName("Wesqc-%s" format (project))
+    val scConf = new SparkConf().setAppName("SeqA-%s" format (project))
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[Tped], classOf[Bed], classOf[Var], classOf[Count[Pair]]))
     val sc = new SparkContext(scConf)
 
     /** determine the input*/
-    val dirs = List("1genotype", "2sample", "3variant")
+    val dirs = List("1genotype", "2sample", "3variant", "4association")
     val s = steps.split("-").map(_.toInt)
     val raw = sc.textFile(ini.get("general", "vcf"))
+    val file = "%s/%s/all.vcf" format (project, dirs(s(0) - 1))
+    println(file)
+    val vars = sc.textFile(file) filter (_ != "") map (l => Variant(l))
+    postProcess(vars, ini)
+    /*
     val vars0: Data =
       if (s(0) == 0)
         makeVariants(sc.textFile(ini.get("general", "vcf")), ini)
       else
-        sc.objectFile("%s/%s" format(project, dirs(s(0) - 1)))
+        sc.textFile("%s/%s" format(project, dirs(s(0) - 1))) map (l => Variant(l))
     vars0.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val vars1 =
       if (1 >= s(0) && 1 <= s.last)
@@ -53,6 +58,10 @@ object Pipeline {
       else
         vars2
     vars2.unpersist()
+    /* cut the vcf by sample group */
+    if (4 >= s(0) && 4 <= s.last)
+      postProcess(vars3, ini)
+     */
   }
 
 
@@ -123,7 +132,7 @@ object Pipeline {
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("general", "save") == "true")
+    if (ini.get("genotype", "save") == "true")
       try {
         res.saveAsObjectFile("%s/2sample" format (ini.get("general", "project")))
       } catch {
@@ -170,7 +179,7 @@ object Pipeline {
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("general", "save") == "true")
+    if (ini.get("sample", "save") == "true")
       try {
         res.saveAsObjectFile("%s/3variant" format (ini.get("general", "project")))
       } catch {
@@ -191,13 +200,20 @@ object Pipeline {
     val rare = miniQC(vars, ini, newPheno, mafFunc)
     rare.persist(StorageLevel.MEMORY_AND_DISK_SER)
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("general", "save") == "true")
+    if (ini.get("variant", "save") == "true")
       try {
-        rare.saveAsObjectFile("%s/4association" format (ini.get("general", "project")))
+        rare.saveAsTextFile("%s/4association" format (ini.get("general", "project")))
       } catch {
         case e: Exception => {println("step3: save failed"); System.exit(1)}
       }
     rare
   }
 
+  def postProcess (vars: Data, ini: Ini) {
+    import PostLevel.cut
+    vars.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    println("we have %d variants in post processing step" format (vars.count))
+    cut(vars, ini)
+
+  }
 }

@@ -1,4 +1,4 @@
-name := "wesqc"
+name := "seqa"
 
 version := "1.0"
 
@@ -13,4 +13,4 @@ libraryDependencies ++= Seq(
 )
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
-assemblyJarName in assembly := "wesqc-1.0.jar"
+assemblyJarName in assembly := "SeqA-1.0.jar"

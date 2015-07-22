@@ -11,12 +11,12 @@ import org.ini4j._
 import Utils._
 import Pipeline._
 
-object Wesqc {
+object SeqA {
   def checkArgs(args: Array[String]): Boolean = {
     val usage = """
-                |spark-submit --class Wesqc [options] /path/to/wesqc.xx.xx.jar wesqc.conf [steps]
+                |spark-submit --class SeqA [options] /path/to/wesqc.xx.xx.jar seqa.conf [steps]
                 |    options:     spark options, e.g. --num-executors
-                |    wesqc.conf:  the configuation file in INI format, could be other name
+                |    seqa.conf:  the configuation file in INI format, could be other name
                 |    steps:       the QC steps to perform, default 0-3
                 |                 0: input from vcf
                 |                 1: genotype level qc
@@ -28,8 +28,8 @@ object Wesqc {
       println(usage)
       false
     } else if (args.length == 2) {
-      val p1 = "([0-3])".r
-      val p2 = "([0-3])-([0-3])".r
+      val p1 = "([0-4])".r
+      val p2 = "([0-4])-([0-4])".r
       args(1) match {
         case p1(s) => true
         case p2(s1, s2) if (s2.toInt >= s1.toInt) => true

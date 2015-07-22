@@ -10,7 +10,7 @@ abstract class Variant[A] extends Serializable {
   val geno: Array[A]
 
   override def toString =
-    "%s\t%s\t%s\t%s\t%s" format (chr, pos, ref, alt, geno.mkString("\t"))
+    s"$chr\t$pos\t${chr}-${pos}\t$ref\t$alt\t100\tPASS\tNO\t${format mkString (':'.toString)}\t${geno mkString ('\t'.toString)}"
 
   def isTi: Boolean = {
     if (Set(ref, alt) == Set("A", "G") || Set(ref, alt) == Set("C","T"))
@@ -41,7 +41,7 @@ object Variant {
   }
 
   private class vcfVar (val line: String) extends Variant[String] {
-    private val array = line.split("\\t")
+    private val array = line.split("\t")
     val chr = array(0)
     val pos = array(1).toInt
     val ref = array(3)

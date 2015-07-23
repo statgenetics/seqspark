@@ -1,17 +1,8 @@
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
 import org.apache.spark.TaskContext
-import org.apache.spark.SparkContext._
 import org.ini4j._
 import java.io._
-import java.io.FileNotFoundException
 import scala.io.Source
-import sys.process._
-import com.ceph.fs._
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
-import scala.concurrent._
-import ExecutionContext.Implicits.global
-import scala.util.{Success, Failure}
 
 object Constant {
   object Pheno {
@@ -95,16 +86,16 @@ object Utils {
   def saveAsBed(vars: Data, ini: Ini, dir: String) {
     val bed = vars.map(v => Bed(v))
     val cephHome = ini.get("general", "cephHome")
-    if (cephHome != null)
-      saveInCeph(bed, "%s/%s" format(cephHome, dir))
-    else
+//    if (cephHome != null)
+//      saveInCeph(bed, "%s/%s" format(cephHome, dir))
+//    else
       bed.saveAsObjectFile(dir)
     val fam = getFam(ini.get("general", "pheno"))    
     val famFile = "results/%s/2sample/all.fam" format (ini.get("general", "project"))
     writeArray(famFile, fam)
-   }
+  }
 
-  def saveInCeph(bed: RDD[Bed], dir: String) {
+  /*def saveInCeph(bed: RDD[Bed], dir: String) {
 
     def mkdir(dir: String) {
       val cephConf = "/etc/ceph/ceph.conf"
@@ -137,7 +128,7 @@ object Utils {
       val mode = BigInt("644", 8).toInt
 
 
-      try
+      try {
         val cephConf = "/etc/ceph/ceph.conf"
         val cephMnt = new CephMount()
         //println("mark 1")
@@ -172,7 +163,11 @@ object Utils {
         }
       }
     }
+
     mkdir(dir)
+
     bed.foreachPartition {p => val pid = TaskContext.get.partitionId; savePart(p, pid)}
-  }
+
+  }*/
+
 }

@@ -1,49 +1,37 @@
+import breeze.collection.mutable.SparseArray
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
-import org.apache.spark.TaskContext
-import org.apache.spark.SparkContext._
 import org.ini4j._
 import java.io._
-import java.io.FileNotFoundException
-import scala.io.Source
 import sys.process._
-import com.ceph.fs._
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
-import scala.concurrent._
-import ExecutionContext.Implicits.global
-import scala.util.{Success, Failure}
-
 
 object GenotypeLevel {
   import Constant._
   import Utils._
 
   /** compute call rate */
-  def makeCallRate (g: String): Pair = {
-    val gt = g.split(":")(0)
-    if (gt == Gt.mis)
-      (0.0, 1.0)
+  def makeCallRate (g: Byte): Pair = {
+    //val gt = g.split(":")(0)
+    if (g == Bt.mis)
+      (0, 1)
     else
-      (1.0, 1.0)
+      (1, 1)
   }
 
   /** compute maf of alt */
-  def makeMaf (g: String): Pair = {
-    val gt = g.split(":")(0)
-    if (gt == Gt.mis)
-      (0.0, 0.0)
-    else if (gt == Gt.ref)
-      (0.0, 2.0)
-    else if (gt == Gt.het)
-      (1.0, 2.0)
-    else if (gt == Gt.mut)
-      (2.0, 2.0)
-    else
-      (0.0, 0.0)
+  def makeMaf (g: Byte): Pair = {
+    //val gt = g.split(":")(0)
+    g match {
+      case Bt.mis => (0, 0)
+      case Bt.ref => (0, 2)
+      case Bt.het => (1, 2)
+      case Bt.mut => (2, 2)
+      case _ => (0, 0)
+    }
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: Data, ini: Ini) {
+  def statGdGq(vars: RawVCF, ini: Ini) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
     val phenoFile = ini.get("general", "pheno")
@@ -65,8 +53,9 @@ object GenotypeLevel {
         new Int2IntOpenHashMap(Array(key), Array(1))
       }
     }
-    def count(vars: Data): Bcnt = {
-      val all = vars map (v => Count[Cnt](v)(make).collapseByBatch(batchIdx))
+
+    def count(vars: RawVCF): Bcnt = {
+      val all = vars map (v => Count[String, Cnt](v, make, new Cnt(Array(0), Array(1))).collapseByBatch(batchIdx))
       val res = all reduce ((a, b) => Count.addByBatch[Cnt](a, b))
       res
     }
@@ -98,28 +87,28 @@ object SampleLevel {
   import Constant._
   import Utils._
 
-  def checkSex(vars: Data, ini: Ini) {
+  def checkSex(vars: VCF, ini: Ini) {
     /** Assume:
       *  1. genotype are cleaned before. 
       *  2. only SNV
       * */
 
     /** count heterozygosity rate */
-    def makex (g: String): Pair = {
-      if (g == Gt.mis)
-        (0.0, 0.0)
-      else if (g == Gt.het)
-        (1.0, 1.0)
+    def makex (g: Byte): Pair = {
+      if (g == Bt.mis)
+        (0, 0)
+      else if (g == Bt.het)
+        (0, 1)
       else
-        (0.0, 1.0)
+        (0, 1)
     }
     
     /** count the call rate */
-    def makey (g: String): Pair =
-      if (g == Gt.mis) (0.0, 1.0) else (1.0, 1.0)
+    def makey (g: Byte): Pair =
+      if (g == Bt.mis) (0, 1) else (1, 1)
     
     /** count for all the SNVs on allosomes */
-    def count (vars: Data): (Array[Pair], Array[Pair]) = {
+    def count (vars: VCF): (Array[Pair], Array[Pair]) = {
       val pXY =
         if (ini.get("general", "build") == "hg19")
           Hg19.pseudo
@@ -127,29 +116,26 @@ object SampleLevel {
           Hg38.pseudo
       val allo = vars
         .filter (v => v.chr == "X" || v.chr == "Y")
-        .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos - 1)) )
+        .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos.toInt - 1)) )
       allo.cache
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
-      val emp: Array[Pair] =
-        (0 until vars.take(1)(0).geno.length)
-          .map (i => (0.0, 0.0))
-          .toArray
+      val emp: SparseArray[Pair] = new SparseArray[Pair](allo.take(1)(0).geno.length, (0, 0))
       val xHetRate =
         if (xVars.isEmpty)
           emp
         else
           xVars
-            .map (v => Count[Pair](v)(makex).geno)
+            .map (v => Count[Byte, Pair](v, makex, (0, 0)).cnt)
             .reduce ((a, b) => Count.addGeno[Pair](a, b))
       val yCallRate =
         if (yVars.isEmpty)
           emp
         else
           yVars
-            .map (v => Count[Pair](v)(makey).geno)
+            .map (v => Count[Byte, Pair](v, makey, (0, 0)).cnt)
             .reduce ((a, b) => Count.addGeno[Pair](a, b))
-      (xHetRate, yCallRate)
+      (xHetRate.toArray, yCallRate.toArray)
     }
 
     /** write the result into file */
@@ -174,7 +160,7 @@ object SampleLevel {
     write(count(vars))
   }
 
-  def mds (vars: Data, ini: Ini) {
+  def mds (vars: VCF, ini: Ini) {
     /** 
       * Assume:
       *     1. genotype are cleaned before
@@ -240,7 +226,7 @@ object VariantLevel {
   import Utils._
   import Constant._
   
-  def miniQC(vars: Data, ini: Ini, pheno: String, mafFunc: Double => Boolean): Data = {
+  def miniQC(vars: VCF, ini: Ini, pheno: String, mafFunc: Double => Boolean): VCF = {
     //val pheno = ini.get("general", "pheno")
     val batchCol = ini.get("pheno", "batch")
     val batchStr = readColumn(pheno, batchCol)
@@ -252,8 +238,8 @@ object VariantLevel {
     
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {
-      //println("!!! var: %s-%d geno.length %d" format(v.chr, v.pos, v.geno.length))
-      val cntB = Count[Pair](v)(GenotypeLevel.makeCallRate).collapseByBatch(batch)
+      //println("!!! var: %s-%d cnt.length %d" format(v.chr, v.pos, v.cnt.length))
+      val cntB = Count[Byte, Pair](v, GenotypeLevel.makeCallRate, (0, 0)).collapseByBatch(batch)
       val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
       if (min._1/min._2 < (1 - misRate)) {
         //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
@@ -266,7 +252,7 @@ object VariantLevel {
 
     /** if maf is high enough and not a batch-specific snv */
     def mafP (v: Var): Boolean = {
-      val cnt = Count[Pair](v)(GenotypeLevel.makeMaf)
+      val cnt = Count[Byte, Pair](v, GenotypeLevel.makeMaf, (0, 0))
       val cntA = cnt.collapse
       val cntB = cnt.collapseByBatch(batch)
       val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
@@ -287,11 +273,22 @@ object VariantLevel {
     snv
   }
 }
+/*
+object Association {
+  import Utils._
+
+  def run (vars: VCF, ini: Ini): Unit = {
+
+
+  }
+
+}
+
 
 object PostLevel {
   import Utils._
 
-  def cut (vars: Data, ini: Ini) {
+  def cut (vars: VCF, ini: Ini) {
     val newPheno = ini.get("general", "newPheno")
     val sexAbFile = ini.get("pheno", "sexAbFile")
     val ids = readColumn(newPheno, "IID")
@@ -308,10 +305,10 @@ object PostLevel {
       } yield geno(i)
     }
 
-    val aaFemale = vars.map(v => Variant.transWhole(v, make("African_American", "2", _)))
-    val aaMale = vars.map(v => Variant.transWhole(v, make("African_American", "1", _)))
-    val eaFemale = vars.map(v => Variant.transWhole(v, make("European_American", "2", _)))
-    val eaMale = vars.map(v => Variant.transWhole(v, make("European_American", "1", _)))
+    val aaFemale = vars.map(v => v.transWhole(make("African_American", "2", _)))
+    val aaMale = vars.map(v => v.transWhole(make("African_American", "1", _)))
+    val eaFemale = vars.map(v => v.transWhole(make("European_American", "2", _)))
+    val eaMale = vars.map(v => v.transWhole(make("European_American", "1", _)))
     aaFemale.saveAsTextFile("%s/5aaFemale" format (ini.get("general", "project")))
     aaMale.saveAsTextFile("%s/6aaMale" format (ini.get("general", "project")))
     eaFemale.saveAsTextFile("%s/7eaFemale" format (ini.get("general", "project")))
@@ -319,3 +316,4 @@ object PostLevel {
 
   }
 }
+*/

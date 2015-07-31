@@ -134,13 +134,13 @@ object UtilsOld {
           val snpId = "%s-%d" format(chr, b.pos(i))
           bim.write("%s\t%s\t0\t%d\t%s\t%s\n" format (b.chr(i), snpId, b.pos(i), b.a1(i), b.a2(i)))
         }
-        for (c <- b.geno) {
+        for (c <- b.cnt) {
           bed.get.write(c)
         }
 
 /*        for (b <- bedAccum) {
           bim.write("%s\t%s\t%d\t%d\t%s\t%s\n" format (b.chr, b.snp, b.gDis, b.pos, b.a1, b.a2))
-          for (c <- b.geno) {
+          for (c <- b.cnt) {
             bed.get.write(c)
           }
         }
@@ -232,7 +232,7 @@ object UtilsOld {
       if (pass(g)) 1 else 0
     }
     def cnt(vars: RDD[Variant[String]]): Map[(String, Int), Int] = {
-      vars.map(v => (v.chr, v.pos) -> v.geno.map(g => make(g)).reduce((a,b) => a + b)).collect.toMap
+      vars.map(v => (v.chr, v.pos) -> v.cnt.map(g => make(g)).reduce((a,b) => a + b)).collect.toMap
     }
     def writeMis(c: Map[(String, Int), Int], file: String) {
       val pw = new PrintWriter(new File(file))
@@ -260,7 +260,7 @@ object UtilsOld {
         new Gq((0, 0))
     }
     def maf(vars: RDD[Variant[String]]): Map[(String, Int), String] = {
-      val m = vars.map(v => {val maf = v.geno.map(g => make(g)).reduce((a, b) => a + b); val cat = if (maf.cnt == 0) "Nocall" else if (maf.total == 1 || maf.cnt - maf.total == 1) "Singleton" else if (maf.mean < 0.01 || maf.mean > 0.99) "Rare" else if (maf.mean < 0.05 || maf.mean > 0.95) "Infrequent" else "Common"; (v.chr, v.pos, cat)}).collect
+      val m = vars.map(v => {val maf = v.cnt.map(g => make(g)).reduce((a, b) => a + b); val cat = if (maf.cnt == 0) "Nocall" else if (maf.total == 1 || maf.cnt - maf.total == 1) "Singleton" else if (maf.mean < 0.01 || maf.mean > 0.99) "Rare" else if (maf.mean < 0.05 || maf.mean > 0.95) "Infrequent" else "Common"; (v.chr, v.pos, cat)}).collect
       m.map(v => (v._1, v._2) -> v._3).toMap
     }
     maf(vars)
@@ -283,7 +283,7 @@ object UtilsOld {
       a}
 
     def gq(vars: RDD[Variant[String]]): Array[(String, Gtinfo[Gqmap])] = {
-      vars.map(v => (grp((v.chr, v.pos)), new Gtinfo[Gqmap]{val elems =v.geno.map(g => make(g))})).reduceByKey((a: Gtinfo[Gqmap], b: Gtinfo[Gqmap]) => add(a, b)).collect
+      vars.map(v => (grp((v.chr, v.pos)), new Gtinfo[Gqmap]{val elems =v.cnt.map(g => make(g))})).reduceByKey((a: Gtinfo[Gqmap], b: Gtinfo[Gqmap]) => add(a, b)).collect
     }
     def writeGQ(gq: Array[(String, Gtinfo[Gqmap])], file: String) {
       val pw = new PrintWriter(new File(file))
@@ -320,7 +320,7 @@ object UtilsOld {
     def writeCnt (c: Count[Cnt], file: String, id: Array[String]) {
       val pw = new PrintWriter(new File(file))
       pw.write("id\tcall\ttotal\trate\n")
-      for ((i, (cnt, total)) <- id zip c.geno )
+      for ((i, (cnt, total)) <- id zip c.cnt )
         pw.write("%s\t%s\t%s\t%.4f\n" format (i, cnt, total, cnt/total))
       pw.close
     }
@@ -373,8 +373,8 @@ object UtilsOld {
       pw.write("id\tsex\tXhet\tXhom\tYcall\tYmis\n")
       val ids = idsex._1
       val sex = idsex._2
-      val x = res._1.geno map (g => (g._1.toInt, g._2.toInt))
-      val y = res._2.geno map (g => (g._1.toInt, g._2.toInt))
+      val x = res._1.cnt map (g => (g._1.toInt, g._2.toInt))
+      val y = res._2.cnt map (g => (g._1.toInt, g._2.toInt))
       for (i <- 0 until ids.length) {
         pw.write("%s,%s,%d,%d,%d,%d\n" format (ids(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
       }
@@ -385,7 +385,7 @@ object UtilsOld {
 
     def test (vars: RDD[Variant[String]]) {
       val pw = new PrintWriter(new File("sex.vcf"))
-      val sex = vars filter (v => v.chr == "X" || v.chr == "Y") map (v => v.geno.slice(0,99))
+      val sex = vars filter (v => v.chr == "X" || v.chr == "Y") map (v => v.cnt.slice(0,99))
       sex.collect foreach {
         g => pw.write(g.mkString("\t") + "\n")
       }
@@ -469,7 +469,7 @@ object UtilsOld {
       pw.write("annot,freq,sample_name,cnt\n")
       for (((a, f), c) <- cnt.collect) {
         for (i <- 0 until sn.length) {
-          pw.write("%s,%s,%s,%d\n" format (a, f, sn(i), c.geno(i).toInt))
+          pw.write("%s,%s,%s,%d\n" format (a, f, sn(i), c.cnt(i).toInt))
         }
       }
       pw.close

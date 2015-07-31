@@ -1,8 +1,7 @@
+import breeze.linalg.{Vector, SparseVector}
 import org.apache.spark.rdd.RDD
-import java.io._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import scala.io.Source
 import org.ini4j._
@@ -14,54 +13,62 @@ object Pipeline {
   //type Data = RDD[Variant[String]]
 
   /**
-    * quick run. run through the specified steps 
-    */
+   * quick run. run through the specified steps
+   * act as if the vcf is the only input
+   */
   def quickRun(ini:Ini, steps: String) {
     val project = ini.get("general", "project")
 
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqA-%s" format (project))
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[Tped], classOf[Bed], classOf[Var], classOf[Count[Pair]]))
+    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Count[Pair]]))
     val sc = new SparkContext(scConf)
 
     /** determine the input*/
     val dirs = List("1genotype", "2sample", "3variant", "4association")
     val s = steps.split("-").map(_.toInt)
-    val raw = sc.textFile(ini.get("general", "vcf"))
-    val file = "%s/%s/all.vcf" format (project, dirs(s(0) - 1))
-    println(file)
-    val vars = sc.textFile(file) filter (_ != "") map (l => Variant(l))
-    postProcess(vars, ini)
-    /*
-    val vars0: Data =
-      if (s(0) == 0)
-        makeVariants(sc.textFile(ini.get("general", "vcf")), ini)
-      else
-        sc.textFile("%s/%s" format(project, dirs(s(0) - 1))) map (l => Variant(l))
-    vars0.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    //val file = "%s/%s/all.vcf" format (project, dirs(s(0) - 1))
+    //println(file)
+    //val vars = sc.textFile(file) filter (_ != "") map (l => Variant(l))
+    //postProcess(vars, ini)
+    var rawVCF: RawVCF = null
+    var preVar: VCF = null
+    if (s(0) == 0) {
+      val raw = sc.textFile(ini.get("general", "vcf"))
+      rawVCF = makeVariants(raw, ini)
+      rawVCF.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    } else {
+      val input = "%s/%s" format(ini.get("general", "project"), dirs(s(0) - 1))
+      preVar = sc.objectFile(input)
+      preVar.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    }
     val vars1 =
-      if (1 >= s(0) && 1 <= s.last)
-        genotype(vars0, ini)
+      if (1 >= s(0) && 1 <= s.last && rawVCF != null)
+        genotype(rawVCF, ini)
       else
-        vars0
-    vars0.unpersist()
+        preVar
     val vars2 =
       if (2 >= s(0) && 2 <= s.last)
         sample(vars1, ini)
       else
         vars1
-    vars1.unpersist()
+    vars2.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val vars3 =
       if (3 >= s(0) && 3 <= s.last)
         variant(vars2, ini)
       else
         vars2
-    vars2.unpersist()
+    vars3.saveAsTextFile("%s/%s" format(ini.get("general", "project"), dirs(s.last)))
+/*    if (4 >= s(0) && 4<= s.last) {
+      association(vars3)
+    }
+*/
     /* cut the vcf by sample group */
-    if (4 >= s(0) && 4 <= s.last)
-      postProcess(vars3, ini)
-     */
+    //if (4 >= s(0) && 4 <= s.last)
+    //  postProcess(vars3, ini)
+
   }
 
 
@@ -69,7 +76,7 @@ object Pipeline {
     * 1. filter column in vcf 
     * 2. only bi-allelic SNPs if biAllelicSNV is true in Conf
     */
-  def makeVariants(raw: RDD[String], ini: Ini): Data = {
+  def makeVariants(raw: RDD[String], ini: Ini): RawVCF = {
     val filterNot = ini.get("variant", "filterNot")
     val filter = ini.get("variant", "filter")
     val biAllelicSNV = ini.get("variant", "biAllelicSNV")
@@ -77,7 +84,7 @@ object Pipeline {
     val s1 = 
       if (filterNot != null)
         vars filter (v => ! v.filter.matches(filterNot))
-      else
+       else
         vars
     val s2 =
       if (filter != null)
@@ -104,7 +111,7 @@ object Pipeline {
     * 1. compute various stats for genotypes
     * 2. use SNVs on allosomes to check Sex
     */
-  def genotype (vars: Data, ini: Ini): Data = {
+  def genotype (vars: RawVCF, ini: Ini): VCF = {
     import GenotypeLevel._
 
     statGdGq(vars, ini)
@@ -126,9 +133,7 @@ object Pipeline {
         Gt.mis
     }
 
-
-
-    val res = vars.map(v => Variant.transElem(v, make(_)))
+    val res = vars.map(v => v.transElem(make(_)).compress(Bt.conv(_)))
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
@@ -141,7 +146,7 @@ object Pipeline {
     res
   }
   
-  def sample (vars: Data, ini: Ini): Data = {
+  def sample (vars: VCF, ini: Ini): VCF = {
     import SampleLevel._
 
     checkSex(vars, ini)
@@ -168,14 +173,20 @@ object Pipeline {
       } yield phenoArray(i + 1)
     writeArray(newPheno, header +: newPhenoArray)
 
-    /** save geno after remove bad samples */
-    def make(geno: Array[String]): Array[String] = {
-      for {
-        i <- (0 until geno.length).toArray
-        if (remove(i) != "1")
-      } yield geno(i)
+    /** save cnt after remove bad samples */
+    //import breeze.linalg.{}
+    import Semi.SemiByte
+    def make(gv: Vector[Byte]): Vector[Byte] = {
+      val geno = gv.asInstanceOf[SparseVector[Byte]]
+      geno.compact()
+      val idx = geno.index
+      val dat = geno.data
+      val newIdx = idx.filter(p => remove(p) != 1)
+      val newDat = dat.zip(idx).filter(p => remove(p._2) != 1).map(p => p._1)
+      val res: Vector[Byte] = new SparseVector[Byte](newIdx, newDat, geno.size - (idx.size - newIdx.size))
+      res
     }
-    val res = vars.map(v => Variant.transWhole(v, make(_)))
+    val res = vars.map(v => v.transWhole(make(_)))
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
@@ -188,7 +199,7 @@ object Pipeline {
     res
   }
 
-  def variant (vars: Data, ini: Ini): Data = {
+  def variant (vars: VCF, ini: Ini): VCF = {
     import VariantLevel._
 
     val rareMaf = ini.get("variant", "rareMaf").toDouble
@@ -208,12 +219,20 @@ object Pipeline {
       }
     rare
   }
+/*
+  def association (vars: VCF, ini: Ini): Unit = {
+    import Association._
 
-  def postProcess (vars: Data, ini: Ini) {
+    run (vars, ini)
+
+  }
+
+  def postProcess (vars: VCF, ini: Ini) {
     import PostLevel.cut
     vars.persist(StorageLevel.MEMORY_AND_DISK_SER)
     println("we have %d variants in post processing step" format (vars.count))
     cut(vars, ini)
 
   }
+  */
 }

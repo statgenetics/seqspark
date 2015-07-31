@@ -1,7 +1,7 @@
 import org.apache.spark.AccumulableParam
 import scala.collection.mutable.ArrayBuffer
 
-@SerialVersionUID(7L)
+@SerialVersionUID(4L)
 class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
   /**
     * This class is for holding the output buf,
@@ -13,20 +13,21 @@ class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
 }
 
 object Bed {
+  import Constant._
   def apply(): Bed = {
     new Bed(Array[Byte](), Array[Byte]())
   }
-  def apply(v: Variant[String]): Bed = {
-    def make (g: String): Byte = {
-      val s = g split (":")
-      val b: Byte = s(0) match {
-        case "./." => 1.toByte
-        case "0/0" => 0.toByte
-        case "0/1" => 2.toByte
-        case "1/1" => 3.toByte
+  def apply(v: Variant[Byte]): Bed = {
+    def make (g: Byte): Byte = {
+      //val s = g split (":")
+      g match {
+        case Bt.mis => 1.toByte
+        case Bt.ref => 0.toByte
+        case Bt.het => 2.toByte
+        case Bt.mut => 3.toByte
         case _ => 1.toByte
       }
-      b
+      g
     }
     val id = "%s-%s" format(v.chr, v.pos)
     val bim: Array[Byte] = 
@@ -47,7 +48,7 @@ object Bed {
   }
 }
 
-
+/**
 @SerialVersionUID(9L)
 class Tped (c: Byte, p: Int, g: Array[Byte]) extends Serializable {
   val chr = c
@@ -87,7 +88,7 @@ object Tped {
 }
 
 
-/** Not in use
+
   * object BedAccumulableParam extends AccumulableParam[Array[Bed], Bed] {
   * type Res = Array[Bed]
   * def addAccumulator(r: Res, t: Bed): Res = {
@@ -120,10 +121,10 @@ class Bed (v: Variant[String], make: String => Byte) extends Serializable {
   val pos = ArrayBuffer[Int](v.pos)
   val a1 = ArrayBuffer[Byte](v.ref(0).toByte)
   val a2 = ArrayBuffer[Byte](v.alt(0).toByte)
-  val geno: ArrayBuffer[Byte] =
+  val cnt: ArrayBuffer[Byte] =
     for {
-      i <- ArrayBuffer[Int]() ++ (0 to v.geno.length/4)
-      four = 0 to 3 map (j => if (4 * i + j < v.geno.length) make(v.geno(4 * i + j)) else 0.toByte)
+      i <- ArrayBuffer[Int]() ++ (0 to v.cnt.length/4)
+      four = 0 to 3 map (j => if (4 * i + j < v.cnt.length) make(v.cnt(4 * i + j)) else 0.toByte)
     } yield
       four.zipWithIndex.map(a => a._1 << 2 * a._2).sum.toByte
 }
@@ -137,7 +138,7 @@ object Bed {
     a.pos ++= b.pos
     a.a1 ++= b.a1
     a.a2 ++= b.a2
-    a.geno ++= b.geno
+    a.cnt ++= b.cnt
     a
   }
 }

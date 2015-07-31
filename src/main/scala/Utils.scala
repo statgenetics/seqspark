@@ -8,6 +8,21 @@ object Constant {
   object Pheno {
     val delim = "\t"
   }
+  object Bt {
+    val mis: Byte = -9
+    val ref: Byte = 0
+    val het: Byte = 1
+    val mut: Byte = 2
+    def conv(g: String): Byte = {
+      g match {
+        case Gt.het => het
+        case Gt.mis => mis
+        case Gt.mut => mut
+        case Gt.ref => ref
+        case _ => mis
+      }
+    }
+  }
   object Gt {
     val mis = "./."
     val ref = "0/0"
@@ -34,9 +49,11 @@ object Constant {
 }
 
 object Utils {
-  type Var = Variant[String]
-  type Data = RDD[Var]
-  type Pair = (Double, Double)
+  type RawVar = Variant[String]
+  type Var = Variant[Byte]
+  type RawVCF = RDD[RawVar]
+  type VCF = RDD[Var]
+  type Pair = (Int, Int)
   import Constant._
 /**
   @annotation.tailrec
@@ -83,19 +100,19 @@ object Utils {
     res
   }
 
-  def saveAsBed(vars: Data, ini: Ini, dir: String) {
+  /*def saveAsBed(vars: RawVCF, ini: Ini, dir: String) {
     val bed = vars.map(v => Bed(v))
-    val cephHome = ini.get("general", "cephHome")
+//    val cephHome = ini.get("general", "cephHome")
 //    if (cephHome != null)
 //      saveInCeph(bed, "%s/%s" format(cephHome, dir))
 //    else
-      bed.saveAsObjectFile(dir)
-    val fam = getFam(ini.get("general", "pheno"))    
-    val famFile = "results/%s/2sample/all.fam" format (ini.get("general", "project"))
-    writeArray(famFile, fam)
-  }
+//      bed.saveAsObjectFile(dir)
+//    val fam = getFam(ini.get("general", "pheno"))
+//    val famFile = "results/%s/2sample/all.fam" format (ini.get("general", "project"))
+//    writeArray(famFile, fam)
+//  }
 
-  /*def saveInCeph(bed: RDD[Bed], dir: String) {
+  def saveInCeph(bed: RDD[Bed], dir: String) {
 
     def mkdir(dir: String) {
       val cephConf = "/etc/ceph/ceph.conf"

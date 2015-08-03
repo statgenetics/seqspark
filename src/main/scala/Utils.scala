@@ -1,6 +1,4 @@
 import org.apache.spark.rdd.RDD
-import org.apache.spark.TaskContext
-import org.ini4j._
 import java.io._
 import scala.io.Source
 
@@ -13,12 +11,21 @@ object Constant {
     val ref: Byte = 0
     val het: Byte = 1
     val mut: Byte = 2
-    def conv(g: String): Byte = {
+    def conv(g: Byte): String = {
       g match {
-        case Gt.het => het
-        case Gt.mis => mis
-        case Gt.mut => mut
-        case Gt.ref => ref
+        case Bt.het => Gt.het
+        case Bt.mis => Gt.mis
+        case Bt.mut => Gt.mut
+        case Bt.ref => Gt.ref
+        case _ => Gt.mis
+      }
+    }
+    def flip(g: Byte): Byte = {
+      g match {
+        case Bt.het => het
+        case Bt.mis => mis
+        case Bt.ref => mut
+        case Bt.mut => ref
         case _ => mis
       }
     }
@@ -28,6 +35,15 @@ object Constant {
     val ref = "0/0"
     val het = "0/1"
     val mut = "1/1"
+    def conv(g: String): Byte = {
+      g match {
+        case Gt.het => Bt.het
+        case Gt.mis => Bt.mis
+        case Gt.mut => Bt.mut
+        case Gt.ref => Bt.ref
+        case _ => Bt.mis
+      }
+    }
   }
   object Hg19 {
     /** 0-based closed intervals, as with Region */
@@ -91,6 +107,12 @@ object Utils {
     pw.close
   }
 
+  def writeAny(file: String, data: String): Unit = {
+    val pw = new PrintWriter(new File(file))
+    pw.write(data + "\n")
+    pw.close()
+  }
+
   def getFam (file: String): Array[String] = {
     val delim = Pheno.delim
     val data = Source.fromFile(file).getLines.toArray
@@ -100,6 +122,10 @@ object Utils {
     res
   }
 
+  def peek[A](dat: RDD[A]): Unit = {
+    println("There are %s records like this:" format(dat.count()))
+    println(dat.takeSample(false,1)(0))
+  }
   /*def saveAsBed(vars: RawVCF, ini: Ini, dir: String) {
     val bed = vars.map(v => Bed(v))
 //    val cephHome = ini.get("general", "cephHome")

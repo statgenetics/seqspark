@@ -37,8 +37,8 @@ abstract class Variant[A] extends Serializable {
   val geno: Vector[A]
   val flip: Option[Boolean]
 
-  def toString(implicit cm: ClassTag[A]) =
-    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.toArray.mkString('\t'.toString)}"
+  override def toString =
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format"
 
   def meta(): Array[String] = {
     Array[String](chr, pos, id, ref, alt, qual, filter, info, format)
@@ -116,7 +116,6 @@ abstract class Variant[A] extends Serializable {
 }
 
 object Variant {
-
   /** Just store everything from the raw vcf file */
   def apply(line: String): Variant[String] = {
     val fields = line.split("\t")
@@ -150,6 +149,19 @@ object Variant {
       val geno = gv
       val flip = fo
     }
+  }
+
+  import Constant.Bt
+
+  def makeVCF(v: Variant[Byte]): String = {
+    val meta = v.meta.mkString("\t")
+    val fp = v.flip.getOrElse(false)
+    val gs =
+      if (fp)
+        v.geno.map(g => Bt.conv(Bt.flip(g))).toArray.mkString("\t")
+      else
+        v.geno.map(g => Bt.conv(g)).toArray.mkString("\t")
+    meta + "\t" + gs
   }
 
 }

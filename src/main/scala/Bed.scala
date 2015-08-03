@@ -27,11 +27,10 @@ object Bed {
         case Bt.mut => 3.toByte
         case _ => 1.toByte
       }
-      g
     }
     val id = "%s-%s" format(v.chr, v.pos)
     val bim: Array[Byte] = 
-      ( "%s\t%s\t%d\t%d\t%s\t%s\n"
+      ( "%s\t%s\t%d\t%s\t%s\t%s\n"
         .format(v.chr,id,0,v.pos,v.ref,v.alt)
         .toArray
         .map(_.toByte) )

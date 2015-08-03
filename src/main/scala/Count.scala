@@ -91,19 +91,17 @@ object SemiGroup {
 }
 
 abstract class Count[A] {
-  val cnt: SparseArray[A]
+  val cnt: Array[A]
 
   def collapse(implicit sg: SemiGroup[A]): A = {
-    cnt.compact()
-    val elems = cnt.data.reduce((a, b) => sg.op(a, b))
-    val zeros = sg.pow(cnt.default, cnt.size - cnt.activeSize)
-    sg.op(elems, zeros)
+    //cnt.compact()
+    cnt.reduce((a, b) => sg.op(a, b))
   }
 
   def collapseByBatch(batch: Array[Int])
                      (implicit cm:ClassTag[A], sg: SemiGroup[A]): Map[Int, A] = {
-    cnt.compact
-    cnt.toArray.zipWithIndex groupBy { case (c, i) => batch(i) } mapValues (
+    //cnt.compact
+    cnt.zipWithIndex groupBy { case (c, i) => batch(i) } mapValues (
       c => c map (x => x._1) reduce ((a, b) => sg.op(a, b))
     ) map identity
   }
@@ -118,36 +116,12 @@ object Count {
     } yield (i -> sg.op(xa, ya))
   }
 
-  def addGeno[A: ClassTag](g1: SparseArray[A], g2: SparseArray[A])(implicit sg: SemiGroup[A]): SparseArray[A] = {
-    g1.compact()
-    g2.compact()
-    require(g1.default == g2.default && g1.size == g2.size)
-    val res = new SparseArray[A](g1.size, g1.default)
-    var offset = 0
-    while( offset < g1.activeSize) {
-      val index: Int = g1.indexAt(offset)
-      val value: A = g1.valueAt(offset)
-      res.update(index, value)
-      offset += 1
-    }
-    offset = 0
-    while( offset < g2.activeSize) {
-      val index: Int = g2.indexAt(offset)
-      val value: A = g2.valueAt(offset)
-      if (g1.contains(index))
-        res.update(index, sg.op(g1(index), value))
-      else
-        res.update(index, value)
-    }
-    res.compact()
-    res
+  def addGeno[A: ClassTag](g1: Array[A], g2: Array[A])(implicit sg: SemiGroup[A]): Array[A] = {
+    for (i <- (0 until g1.length).toArray) yield sg.op(g1(i), g2(i))
   }
 
-  def apply[A, B: ClassTag](v: Variant[A], make: A => B, default: B)(implicit cm: ClassTag[A]): Count[B] = {
-    val sCnt = v.geno.toArray.map(g => make(g)).zipWithIndex.filterNot(g => g._1 == default)
-    val indexes: Array[Int] = sCnt.map (x => x._2)
-    val values: Array[B] = sCnt.map (x => x._1)
-    val newCnt = new SparseArray[B](indexes, values, indexes.length, v.geno.length, default)
+  def apply[A, B: ClassTag](v: Variant[A], make: A => B)(implicit cm: ClassTag[A]): Count[B] = {
+    val newCnt = v.geno.toArray.map(make(_))
     new Count[B]() {
       val chr = v.chr
       val pos = v.pos

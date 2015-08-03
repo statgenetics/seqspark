@@ -55,7 +55,7 @@ object GenotypeLevel {
     }
 
     def count(vars: RawVCF): Bcnt = {
-      val all = vars map (v => Count[String, Cnt](v, make, new Cnt(Array(0), Array(1))).collapseByBatch(batchIdx))
+      val all = vars map (v => Count[String, Cnt](v, make).collapseByBatch(batchIdx))
       val res = all reduce ((a, b) => Count.addByBatch[Cnt](a, b))
       res
     }
@@ -98,7 +98,7 @@ object SampleLevel {
       if (g == Bt.mis)
         (0, 0)
       else if (g == Bt.het)
-        (0, 1)
+        (1, 1)
       else
         (0, 1)
     }
@@ -118,24 +118,35 @@ object SampleLevel {
         .filter (v => v.chr == "X" || v.chr == "Y")
         .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos.toInt - 1)) )
       allo.cache
+      println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
-      val emp: SparseArray[Pair] = new SparseArray[Pair](allo.take(1)(0).geno.length, (0, 0))
+      val emp: Array[Pair] = Array.fill(vars.take(1)(0).geno.length)((0,0))
       val xHetRate =
         if (xVars.isEmpty)
           emp
-        else
-          xVars
-            .map (v => Count[Byte, Pair](v, makex, (0, 0)).cnt)
-            .reduce ((a, b) => Count.addGeno[Pair](a, b))
+        else {
+          val tmp =
+            ( xVars
+              .map(v => Count[Byte, Pair](v, makex)) )
+
+          //peek(tmp)
+          val testVar = xVars.takeSample(false, 100)
+          val testCnt = testVar.map(v => Count[Byte, Pair](v, makex))
+          writeArray("Var", testVar.map(_.toString))
+          writeArray("Cnt", testCnt.map(_.cnt.mkString("\t")))
+          val sumCnt = testCnt.map(_.cnt).reduce((a, b) => Count.addGeno(a, b))
+          writeAny("Sum", sumCnt.mkString("\t"))
+          tmp.map(c => c.cnt).reduce((a, b) => Count.addGeno[Pair](a, b))
+        }
       val yCallRate =
         if (yVars.isEmpty)
           emp
         else
           yVars
-            .map (v => Count[Byte, Pair](v, makey, (0, 0)).cnt)
+            .map (v => Count[Byte, Pair](v, makey).cnt)
             .reduce ((a, b) => Count.addGeno[Pair](a, b))
-      (xHetRate.toArray, yCallRate.toArray)
+      (xHetRate, yCallRate)
     }
 
     /** write the result into file */
@@ -173,9 +184,9 @@ object SampleLevel {
 
     val snp = VariantLevel.miniQC(vars, ini, pheno, mafFunc)
     //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
-
+    println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
     val bed = snp map (s => Bed(s))
-    
+    println("\n\n\n\tThere are %s beds for mds" format(bed.count()))
     def write (bed: RDD[Bed]) {
       val pBed =
         bed mapPartitions (p => List(p reduce ((a, b) => Bed.add(a, b))).iterator)
@@ -239,9 +250,9 @@ object VariantLevel {
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {
       //println("!!! var: %s-%d cnt.length %d" format(v.chr, v.pos, v.cnt.length))
-      val cntB = Count[Byte, Pair](v, GenotypeLevel.makeCallRate, (0, 0)).collapseByBatch(batch)
+      val cntB = Count[Byte, Pair](v, GenotypeLevel.makeCallRate).collapseByBatch(batch)
       val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
-      if (min._1/min._2 < (1 - misRate)) {
+      if (min._1/min._2.toDouble < (1 - misRate)) {
         //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
         false
       } else {
@@ -252,11 +263,11 @@ object VariantLevel {
 
     /** if maf is high enough and not a batch-specific snv */
     def mafP (v: Var): Boolean = {
-      val cnt = Count[Byte, Pair](v, GenotypeLevel.makeMaf, (0, 0))
+      val cnt = Count[Byte, Pair](v, GenotypeLevel.makeMaf)
       val cntA = cnt.collapse
       val cntB = cnt.collapseByBatch(batch)
       val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
-      val maf = cntA._1/cntA._2
+      val maf = cntA._1/cntA._2.toDouble
       val bSpec =
         if (! v.info.contains("DB") && max._1 > 1 && max._1 == cntA._1) {
           true

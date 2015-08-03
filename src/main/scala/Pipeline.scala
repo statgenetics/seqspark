@@ -54,17 +54,23 @@ object Pipeline {
         sample(vars1, ini)
       else
         vars1
+    //println("var number after genotype qc: %s" format (vars1.count))
+    //val test = vars2.takeSample(false, 1)(0)
+    //writeAny("test", test.toString)
+
     vars2.persist(StorageLevel.MEMORY_AND_DISK_SER)
     val vars3 =
       if (3 >= s(0) && 3 <= s.last)
         variant(vars2, ini)
       else
         vars2
-    vars3.saveAsTextFile("%s/%s" format(ini.get("general", "project"), dirs(s.last)))
-/*    if (4 >= s(0) && 4<= s.last) {
-      association(vars3)
-    }
-*/
+    select(vars3, ini).map(v => Variant.makeVCF(v)).saveAsTextFile("%s/%s" format(ini.get("general", "project"), dirs(s.last)))
+
+    /*
+            if (4 >= s(0) && 4<= s.last) {
+              association(vars3)
+            }
+        */
     /* cut the vcf by sample group */
     //if (4 >= s(0) && 4 <= s.last)
     //  postProcess(vars3, ini)
@@ -133,7 +139,7 @@ object Pipeline {
         Gt.mis
     }
 
-    val res = vars.map(v => v.transElem(make(_)).compress(Bt.conv(_)))
+    val res = vars.map(v => v.transElem(make(_)).compress(Gt.conv(_)))
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
@@ -219,6 +225,18 @@ object Pipeline {
       }
     rare
   }
+
+  def select (vars: VCF, ini: Ini): VCF = {
+    val targetFile = ini.get("variant", "table")
+    val iter = Source.fromFile(targetFile).getLines()
+    val res =
+      for {l <- iter
+           s = l.split("\t")
+      } yield "%s-%s".format(s(0), s(1)) -> (s(2) + s(3))
+    val vMap = res.toMap
+    vars.filter(v => vMap.contains("%s-%s".format(v.chr, v.pos)) && vMap("%s-%s".format(v.chr, v.pos)) == (v.ref + v.alt))
+  }
+
 /*
   def association (vars: VCF, ini: Ini): Unit = {
     import Association._

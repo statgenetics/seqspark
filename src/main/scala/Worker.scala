@@ -1,13 +1,109 @@
-import breeze.collection.mutable.SparseArray
+import breeze.linalg.{SparseVector, Vector}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.ini4j._
 import java.io._
+import scala.io.Source
 import sys.process._
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
+import Constants._
+import Utils._
 
-object GenotypeLevel {
-  import Constant._
-  import Utils._
+/** An abstract class that only contains a run method*/
+trait Worker[A, B] {
+  val name: WorkerName
+  def apply(input: A)(implicit ini: Ini, sc: SparkContext): B
+}
+
+object Worker {
+  val slaves = Map[String, Worker[VCF, VCF]](
+    "sample" -> SampleLevelQC,
+    "variant" -> VariantLevelQC,
+    "annotation" -> Annotation)
+}
+
+object ReadVCF extends Worker[String, RawVCF] {
+  implicit val name = new WorkerName("readvcf")
+
+  def apply(input: String)(implicit ini: Ini, sc: SparkContext): RawVCF = {
+    val raw = sc.textFile(input)
+    makeVariants(raw)
+  }
+
+  /** filter variants based on
+    * 1. filter column in vcf
+    * 2. only bi-allelic SNPs if biAllelicSNV is true in Conf
+    */
+  def makeVariants(raw: RDD[String])(implicit ini: Ini): RawVCF = {
+    val filterNot = ini.get("variant", "filterNot")
+    val filter = ini.get("variant", "filter")
+    val biAllelicSNV = ini.get("variant", "biAllelicSNV")
+    val vars = raw filter (l => ! l.startsWith("#")) map (l => Variant(l))
+    val s1 =
+      if (filterNot != null)
+        vars filter (v => ! v.filter.matches(filterNot))
+      else
+        vars
+    val s2 =
+      if (filter != null)
+        s1 filter (v => v.filter.matches(filter))
+      else
+        s1
+    val s3 =
+      if (biAllelicSNV == "true")
+        s2 filter (v => v.ref.matches("[ATCG]") && v.alt.matches("[ATCG]"))
+      else
+        s2
+    /** save is very time-consuming and resource-demanding */
+    if (ini.get("general", "save") == "true")
+      try {
+        s3.saveAsObjectFile("%s/1genotype" format (ini.get("general", "project")))
+      } catch {
+        case e: Exception => {println("step1: save failed"); System.exit(1)}
+      }
+    s3
+  }
+}
+
+object GenotypeLevelQC extends Worker[RawVCF, VCF] {
+
+  implicit val name = new WorkerName("genotype")
+
+  def apply(input: RawVCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+    statGdGq(input, ini)
+    val gd = ini.get("genotype", "gd").split(",")
+    val gq = ini.get("genotype", "gq").toDouble
+    val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
+    val gdLower = gd(0).toDouble
+    val gdUpper = gd(1).toDouble
+    val gtIdx = gtFormat("GT")
+    val gdIdx = gtFormat("GD")
+    val gqIdx = gtFormat("GQ")
+    def make(g: String): String = {
+      val s = g.split(":")
+      if (s.length == 1)
+        g
+      else if (s(gtIdx) == Gt.mis)
+        Gt.mis
+      else if (s(gdIdx).toInt >= gdLower && s(gdIdx).toInt <= gdUpper && s(gqIdx).toDouble >= gq)
+        s(gtIdx)
+      else
+        Gt.mis
+    }
+
+    val res = input.map(v => v.transElem(make(_)).compress(Gt.conv(_)))
+    //res.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    /** save is very time-consuming and resource-demanding */
+    if (ini.get("genotype", "save") == "true")
+      try {
+        res.saveAsObjectFile("%s/2sample" format (ini.get("general", "project")))
+      } catch {
+        case e: Exception => {println("step1: save failed"); System.exit(1)}
+      }
+    res
+  }
 
   /** compute call rate */
   def makeCallRate (g: Byte): Pair = {
@@ -83,10 +179,63 @@ object GenotypeLevel {
   }
 }
 
-object SampleLevel {
-  import Constant._
-  import Utils._
+object SampleLevelQC extends Worker[VCF, VCF] {
 
+  implicit val name = new WorkerName("sample")
+
+  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+    checkSex(input, ini)
+
+    mds(input, ini)
+
+    val pheno = ini.get("general", "pheno")
+    val newPheno = ini.get("general", "newPheno")
+    val samples = readColumn(pheno, "IID")
+    val removeCol = ini.get("pheno", "remove")
+    val remove =
+      if (hasColumn(pheno, removeCol))
+        readColumn(pheno, removeCol)
+      else
+        Array.fill(samples.length)("0")
+
+    /** save new pheno file after remove bad samples */
+    val phenoArray = Source.fromFile(pheno).getLines.toArray
+    val header = phenoArray(0)
+    val newPhenoArray =
+      for {
+        i <- (0 until remove.length).toArray
+        if (remove(i) != "1")
+      } yield phenoArray(i + 1)
+    writeArray(newPheno, header +: newPhenoArray)
+
+    /** save cnt after remove bad samples */
+    //import breeze.linalg.{}
+    import Semi.SemiByte
+    def make(gv: Vector[Byte]): Vector[Byte] = {
+      val geno = gv.asInstanceOf[SparseVector[Byte]]
+      geno.compact()
+      val idx = geno.index
+      val dat = geno.data
+      val newIdx = idx.filter(p => remove(p) != 1)
+      val newDat = dat.zip(idx).filter(p => remove(p._2) != 1).map(p => p._1)
+      val res: Vector[Byte] = new SparseVector[Byte](newIdx, newDat, geno.size - (idx.size - newIdx.size))
+      res
+    }
+
+    val res = input.map(v => v.transWhole(make(_)))
+    res.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    /** save is very time-consuming and resource-demanding */
+    if (ini.get("sample", "save") == "true")
+      try {
+        res.saveAsObjectFile("%s/3variant" format (ini.get("general", "project")))
+      } catch {
+        case e: Exception => {println("step2: save failed"); System.exit(1)}
+      }
+    res
+  }
+
+  /** Check the concordance of the genetic sex and recorded sex */
   def checkSex(vars: VCF, ini: Ini) {
     /** Assume:
       *  1. genotype are cleaned before. 
@@ -171,6 +320,7 @@ object SampleLevel {
     write(count(vars))
   }
 
+  /** run the global ancestry analysis */
   def mds (vars: VCF, ini: Ini) {
     /** 
       * Assume:
@@ -182,7 +332,7 @@ object SampleLevel {
     def mafFunc (m: Double): Boolean =
       if (m >= mdsMaf && m <= (1 - mdsMaf)) true else false
 
-    val snp = VariantLevel.miniQC(vars, ini, pheno, mafFunc)
+    val snp = VariantLevelQC.miniQC(vars, ini, pheno, mafFunc)
     //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
     println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
     val bed = snp map (s => Bed(s))
@@ -223,7 +373,7 @@ object SampleLevel {
     write(bed)
     /**
     val f: Future[String] = future {
-      Command.popCheck(ini: Ini)
+      Commands.popCheck(ini: Ini)
     }
     f onComplete {
       case Success(m) => println(m)
@@ -233,9 +383,44 @@ object SampleLevel {
   }
 }
 
-object VariantLevel {
-  import Utils._
-  import Constant._
+object VariantLevelQC extends Worker[VCF, VCF] {
+
+  implicit val name = new WorkerName("variant")
+
+  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+    val rareMaf = ini.get("variant", "rareMaf").toDouble
+    def mafFunc (m: Double): Boolean =
+      if (m < rareMaf || m > (1 - rareMaf)) true else false
+
+    val newPheno = ini.get("general", "newPheno")
+    val afterQC = miniQC(input, ini, newPheno, mafFunc)
+    val targetFile = ini.get("variant", "target")
+    val select: Boolean = Option(targetFile) match {
+      case Some(f) => true
+      case None => false
+    }
+    val rare =
+      if (select) {
+        val iter = Source.fromFile(targetFile).getLines()
+        val res =
+          for {l <- iter
+               s = l.split("\t")
+          } yield "%s-%s".format(s(0), s(1)) -> (s(2) + s(3))
+        val vMap = res.toMap
+        afterQC.filter(v => vMap.contains("%s-%s".format(v.chr, v.pos)) && vMap("%s-%s".format(v.chr, v.pos)) == (v.ref + v.alt))
+      } else
+        afterQC
+
+    rare.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    /** save is very time-consuming and resource-demanding */
+    if (ini.get("variant", "save") == "true")
+      try {
+        rare.saveAsTextFile("%s/4association" format (ini.get("general", "project")))
+      } catch {
+        case e: Exception => {println("step3: save failed"); System.exit(1)}
+      }
+    rare
+  }
   
   def miniQC(vars: VCF, ini: Ini, pheno: String, mafFunc: Double => Boolean): VCF = {
     //val pheno = ini.get("general", "pheno")
@@ -250,7 +435,7 @@ object VariantLevel {
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {
       //println("!!! var: %s-%d cnt.length %d" format(v.chr, v.pos, v.cnt.length))
-      val cntB = Count[Byte, Pair](v, GenotypeLevel.makeCallRate).collapseByBatch(batch)
+      val cntB = Count[Byte, Pair](v, GenotypeLevelQC.makeCallRate).collapseByBatch(batch)
       val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
       if (min._1/min._2.toDouble < (1 - misRate)) {
         //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
@@ -263,7 +448,7 @@ object VariantLevel {
 
     /** if maf is high enough and not a batch-specific snv */
     def mafP (v: Var): Boolean = {
-      val cnt = Count[Byte, Pair](v, GenotypeLevel.makeMaf)
+      val cnt = Count[Byte, Pair](v, GenotypeLevelQC.makeMaf)
       val cntA = cnt.collapse
       val cntB = cnt.collapseByBatch(batch)
       val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
@@ -284,47 +469,48 @@ object VariantLevel {
     snv
   }
 }
-/*
-object Association {
-  import Utils._
 
-  def run (vars: VCF, ini: Ini): Unit = {
+object Annotation extends Worker[VCF, VCF] {
 
+  implicit val name = new WorkerName("annotation")
 
+  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+    val rawSites = workerDir + "/sites.raw.vcf"
+    val annotatedSites = workerDir + "/sites.annotated"
+    writeRDD(input.map(_.meta().mkString("\t")), rawSites)
+    Commands.annovar(ini, rawSites, annotatedSites, workerDir)
+    val annot = sc.broadcast(readAnnot(annotatedSites))
+    input.zipWithIndex().map{case (v, i: Long) => {
+      val meta = v.meta().clone()
+      meta(7) =
+        if (meta(7) == ".")
+          annot.value(i.toInt)
+        else
+          "%s;%s" format (meta(7), annot.value(i.toInt))
+      Variant[Byte](meta, v.geno, v.flip)
+    }}
   }
 
-}
+  def readAnnot(sites: String): Array[String] = {
+    val varFile = sites + ".variant_function"
+    val exonFile = sites + ".exonic_variant_function"
+    val varArr: Array[(String, String)] =
+      (for {
+        l <- Source.fromFile(varFile).getLines()
+        s = l.split("\t")
+      } yield (s(0), s(1))).toArray
 
-
-object PostLevel {
-  import Utils._
-
-  def cut (vars: VCF, ini: Ini) {
-    val newPheno = ini.get("general", "newPheno")
-    val sexAbFile = ini.get("pheno", "sexAbFile")
-    val ids = readColumn(newPheno, "IID")
-    val sexSelf = readColumn(newPheno, "Sex")
-    val sexAbnormal = readColumn(sexAbFile, "IID")
-    val sex =
-      for (i <- (0 until ids.length).toArray)
-      yield if (sexAbnormal.contains(ids(i))) 0 else sexSelf(i)
-    val race = readColumn(newPheno, "mds_race")
-    def make (r: String, s: String, geno: Array[String]) = {
-      for {
-        i <- (0 until geno.length).toArray
-        if (race(i) == r && sex(i) == s)
-      } yield geno(i)
-    }
-
-    val aaFemale = vars.map(v => v.transWhole(make("African_American", "2", _)))
-    val aaMale = vars.map(v => v.transWhole(make("African_American", "1", _)))
-    val eaFemale = vars.map(v => v.transWhole(make("European_American", "2", _)))
-    val eaMale = vars.map(v => v.transWhole(make("European_American", "1", _)))
-    aaFemale.saveAsTextFile("%s/5aaFemale" format (ini.get("general", "project")))
-    aaMale.saveAsTextFile("%s/6aaMale" format (ini.get("general", "project")))
-    eaFemale.saveAsTextFile("%s/7eaFemale" format (ini.get("general", "project")))
-    eaMale.saveAsTextFile("%s/8eaMale" format (ini.get("general", "project")))
-
+    val exonMap: Map[Int, String] =
+      (for {
+        l <- Source.fromFile(exonFile).getLines()
+        s = l.split("\t")
+      } yield s(0).substring(4).toInt -> s(1))
+      .toMap
+    varArr.zipWithIndex.map{case ((a, b), i: Int) =>
+      if (a == "exonic")
+        "ANNO=exonic:%s;GROUP=%s" format (exonMap(i + 1), b)
+      else
+        "ANNO=%s;GROUP=%s" format (a, b)}
   }
 }
-*/
+

@@ -1,6 +1,7 @@
 import breeze.linalg.{Vector, DenseVector, VectorBuilder, SparseVector}
 import breeze.math.Semiring
 import scala.reflect.ClassTag
+import Constants._
 
 object Semi {
 
@@ -37,9 +38,12 @@ abstract class Variant[A] extends Serializable {
   val geno: Vector[A]
   val flip: Option[Boolean]
 
-  override def toString =
-    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format"
-
+  override def toString = {
+  import Variant._
+    val gs: String = geno
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t$gs\n"
+  }
+  
   def meta(): Array[String] = {
     Array[String](chr, pos, id, ref, alt, qual, filter, info, format)
   }
@@ -116,6 +120,21 @@ abstract class Variant[A] extends Serializable {
 }
 
 object Variant {
+  /** implicit convert Vector[Byte] to String */
+  implicit def convertGenoByteToString(gb: Vector[Byte]): String = {
+    gb.map(x => Bt.conv(x)).toArray.mkString("\t")
+  }
+
+  /** implicit convert Vector[String] to String */
+  implicit def convertGenoStringToString(gb: Vector[String]): String = {
+    gb.toArray.mkString("\t")
+  }
+
+  /** dummy other */
+  implicit def convertGenoOtherToString[A](gb: Vector[A]): String = {
+    gb.map(_.toString).toArray.mkString("\t")
+  }
+
   /** Just store everything from the raw vcf file */
   def apply(line: String): Variant[String] = {
     val fields = line.split("\t")
@@ -151,7 +170,7 @@ object Variant {
     }
   }
 
-  import Constant.Bt
+  import Constants.Bt
 
   def makeVCF(v: Variant[Byte]): String = {
     val meta = v.meta.mkString("\t")

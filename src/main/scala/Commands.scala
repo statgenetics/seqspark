@@ -10,7 +10,17 @@ import org.apache.spark._
   */
 
 
-object Command {
+object Commands {
+
+  def annovar (ini: Ini, input: String, output: String, workerDir: String): Unit = {
+    val progDir = Option(ini.get("annotation", "programDir")).getOrElse("")
+    val build = Option(ini.get("general", "build")).getOrElse("hg19")
+    val annovardb = Option(ini.get("annotation", "annovardb")).getOrElse(List(progDir, "humandb").filter(_ != "").mkString("/"))
+    val script = "runAnnovar.sh"
+    val cmd = s"${script} ${progDir} ${annovardb} ${input} ${output} ${workerDir}"
+    cmd.!
+  }
+
   def popCheck (ini: Ini): String = {    
     val project = ini.get("general", "project")
     val prefix = "results/%s/2sample" format (project)

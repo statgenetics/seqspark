@@ -65,7 +65,6 @@ class Region(c: Byte, s: Int, e: Int) extends Serializable {
       false
   }
 
-
 }
 
 object Region {

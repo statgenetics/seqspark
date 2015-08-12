@@ -13,7 +13,7 @@ class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
 }
 
 object Bed {
-  import Constant._
+  import Constants._
   def apply(): Bed = {
     new Bed(Array[Byte](), Array[Byte]())
   }

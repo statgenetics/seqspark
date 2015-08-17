@@ -92,6 +92,7 @@ object Utils {
     val fw = new FileWriter(file)
     if (head != "")
       fw.write(head)
+    data.foreach(v => Unit) //for compute
     val iterator = data.toLocalIterator
     while (iterator.hasNext) {
       val cur = iterator.next()

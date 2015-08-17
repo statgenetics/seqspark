@@ -9,6 +9,7 @@ scalacOptions ++= Seq("-unchecked", "-deprecation")
 libraryDependencies ++= Seq(
 	"org.apache.spark" %% "spark-core" % "1.3.1" % "provided",
 	"org.ini4j" % "ini4j" % "0.5.4",
+	"com.typesafe" % "config" % "1.3.0",
 	"it.unimi.dsi" % "fastutil" % "7.0.4",
 	"org.scalanlp" %% "breeze" % "0.11.2"
 )

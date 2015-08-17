@@ -21,6 +21,13 @@ object Worker {
     "sample" -> SampleLevelQC,
     "variant" -> VariantLevelQC,
     "annotation" -> Annotation)
+
+  def recurSlaves(input: VCF, sl: List[String])(implicit ini: Ini, sc: SparkContext): VCF = {
+    if (sl.tail == Nil)
+      slaves(sl.head)(input)
+    else
+      recurSlaves(slaves(sl.head)(input), sl.tail)
+  }
 }
 
 object ReadVCF extends Worker[String, RawVCF] {
@@ -71,7 +78,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
   implicit val name = new WorkerName("genotype")
 
   def apply(input: RawVCF)(implicit ini: Ini, sc: SparkContext): VCF = {
-    statGdGq(input, ini)
+    statGdGq(input)
     val gd = ini.get("genotype", "gd").split(",")
     val gq = ini.get("genotype", "gq").toDouble
     val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
@@ -127,7 +134,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: RawVCF, ini: Ini) {
+  def statGdGq(vars: RawVCF)(implicit ini: Ini) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
     val phenoFile = ini.get("general", "pheno")
@@ -157,7 +164,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     }
 
     def writeBcnt(b: Bcnt) {
-      val outDir =  "results/%s/1genotype" format (ini.get("general", "project"))
+      val outDir =  workerDir
       val exitCode = "mkdir -p %s".format(outDir).!
       println(exitCode)
       val outFile = "%s/CountByGdGq.txt" format (outDir)
@@ -184,12 +191,12 @@ object SampleLevelQC extends Worker[VCF, VCF] {
   implicit val name = new WorkerName("sample")
 
   def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
-    checkSex(input, ini)
+    checkSex(input)
 
-    mds(input, ini)
+    mds(input)
 
     val pheno = ini.get("general", "pheno")
-    val newPheno = ini.get("general", "newPheno")
+    val newPheno = workerDir + "/" + pheno.split("/").last
     val samples = readColumn(pheno, "IID")
     val removeCol = ini.get("pheno", "remove")
     val remove =
@@ -236,7 +243,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
   }
 
   /** Check the concordance of the genetic sex and recorded sex */
-  def checkSex(vars: VCF, ini: Ini) {
+  def checkSex(vars: VCF)(implicit ini: Ini) {
     /** Assume:
       *  1. genotype are cleaned before. 
       *  2. only SNV
@@ -267,7 +274,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
         .filter (v => v.chr == "X" || v.chr == "Y")
         .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos.toInt - 1)) )
       allo.cache
-      println("The number of variants on allosomes is %s" format (allo.count()))
+      //println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
       val emp: Array[Pair] = Array.fill(vars.take(1)(0).geno.length)((0,0))
@@ -275,18 +282,17 @@ object SampleLevelQC extends Worker[VCF, VCF] {
         if (xVars.isEmpty)
           emp
         else {
-          val tmp =
-            ( xVars
-              .map(v => Count[Byte, Pair](v, makex)) )
-
+          xVars
+            .map(v => Count[Byte, Pair](v, makex).cnt)
+            .reduce((a, b) => Count.addGeno[Pair](a, b))
           //peek(tmp)
-          val testVar = xVars.takeSample(false, 100)
-          val testCnt = testVar.map(v => Count[Byte, Pair](v, makex))
-          writeArray("Var", testVar.map(_.toString))
-          writeArray("Cnt", testCnt.map(_.cnt.mkString("\t")))
-          val sumCnt = testCnt.map(_.cnt).reduce((a, b) => Count.addGeno(a, b))
-          writeAny("Sum", sumCnt.mkString("\t"))
-          tmp.map(c => c.cnt).reduce((a, b) => Count.addGeno[Pair](a, b))
+          //val testVar = xVars.takeSample(false, 100)
+          //val testCnt = testVar.map(v => Count[Byte, Pair](v, makex))
+          //writeArray("Var", testVar.map(_.toString))
+          //writeArray("Cnt", testCnt.map(_.cnt.mkString("\t")))
+          //val sumCnt = testCnt.map(_.cnt).reduce((a, b) => Count.addGeno(a, b))
+          //writeAny("Sum", sumCnt.mkString("\t"))
+          //tmp.map(c => c.cnt).reduce((a, b) => Count.addGeno[Pair](a, b))
         }
       val yCallRate =
         if (yVars.isEmpty)
@@ -304,7 +310,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
       val fids = readColumn(pheno, "FID")
       val iids = readColumn(pheno, "IID")
       val sex = readColumn(pheno, "Sex")
-      val prefDir = "results/%s/2sample" format (ini.get("general", "project"))
+      val prefDir = workerDir
       val exitCode = "mkdir -p %s".format(prefDir).!
       println(exitCode)
       val outFile = "%s/sexCheck.csv" format (prefDir)
@@ -321,7 +327,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
   }
 
   /** run the global ancestry analysis */
-  def mds (vars: VCF, ini: Ini) {
+  def mds (vars: VCF)(implicit ini: Ini) {
     /** 
       * Assume:
       *     1. genotype are cleaned before
@@ -334,16 +340,16 @@ object SampleLevelQC extends Worker[VCF, VCF] {
 
     val snp = VariantLevelQC.miniQC(vars, ini, pheno, mafFunc)
     //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
-    println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
+    //println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
     val bed = snp map (s => Bed(s))
-    println("\n\n\n\tThere are %s beds for mds" format(bed.count()))
+    //println("\n\n\n\tThere are %s beds for mds" format(bed.count()))
     def write (bed: RDD[Bed]) {
       val pBed =
         bed mapPartitions (p => List(p reduce ((a, b) => Bed.add(a, b))).iterator)
       /** this is a hack to force compute all partitions*/
       pBed.cache()
       pBed foreachPartition (p => None)
-      val prefix = "results/%s/2sample" format (ini.get("general", "project"))
+      val prefix = workerDir
       val bimFile = "%s/all.bim" format (prefix)
       val bedFile = "%s/all.bed" format (prefix)
       var bimStream = None: Option[FileOutputStream]
@@ -392,13 +398,14 @@ object VariantLevelQC extends Worker[VCF, VCF] {
     def mafFunc (m: Double): Boolean =
       if (m < rareMaf || m > (1 - rareMaf)) true else false
 
-    val newPheno = ini.get("general", "newPheno")
+    val newPheno = "%s/%s/%s" format(resultsDir, SampleLevelQC.name, ini.get("general", "pheno").split("/").last)
     val afterQC = miniQC(input, ini, newPheno, mafFunc)
     val targetFile = ini.get("variant", "target")
     val select: Boolean = Option(targetFile) match {
       case Some(f) => true
       case None => false
     }
+
     val rare =
       if (select) {
         val iter = Source.fromFile(targetFile).getLines()
@@ -475,9 +482,11 @@ object Annotation extends Worker[VCF, VCF] {
   implicit val name = new WorkerName("annotation")
 
   def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+    val exitCode = ("mkdir -p %s" format workerDir).!
+    println(exitCode)
     val rawSites = workerDir + "/sites.raw.vcf"
-    val annotatedSites = workerDir + "/sites.annotated"
-    writeRDD(input.map(_.meta().mkString("\t")), rawSites)
+    val annotatedSites = "sites.annotated"
+    writeRDD(input.map(_.meta().slice(0, 8).mkString("\t") + "\n"), rawSites)
     Commands.annovar(ini, rawSites, annotatedSites, workerDir)
     val annot = sc.broadcast(readAnnot(annotatedSites))
     input.zipWithIndex().map{case (v, i: Long) => {
@@ -514,3 +523,13 @@ object Annotation extends Worker[VCF, VCF] {
   }
 }
 
+/**
+object Association extends Worker[VCF, Array[String]] {
+  implicit val name = "association"
+
+  def apply(input: VCF): Array[String] = {
+
+  }
+
+}
+  */

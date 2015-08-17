@@ -16,8 +16,9 @@ object Commands {
     val progDir = Option(ini.get("annotation", "programDir")).getOrElse("")
     val build = Option(ini.get("general", "build")).getOrElse("hg19")
     val annovardb = Option(ini.get("annotation", "annovardb")).getOrElse(List(progDir, "humandb").filter(_ != "").mkString("/"))
-    val script = "runAnnovar.sh"
-    val cmd = s"${script} ${progDir} ${annovardb} ${input} ${output} ${workerDir}"
+    val script = "%s/scripts/runAnnovar.sh" format (ini.get("general", "seqaHome"))
+    val cmd = s"${script} ${progDir} ${annovardb} ${build} ${input} ${output} ${workerDir}"
+    println(cmd)
     cmd.!
   }
 

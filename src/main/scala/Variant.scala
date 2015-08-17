@@ -43,9 +43,13 @@ abstract class Variant[A] extends Serializable {
     val gs: String = geno
     s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t$gs\n"
   }
-  
+
   def meta(): Array[String] = {
     Array[String](chr, pos, id, ref, alt, qual, filter, info, format)
+  }
+
+  def site(): String = {
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t.\n"
   }
 
   def isTi: Boolean = {

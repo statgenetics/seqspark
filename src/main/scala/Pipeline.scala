@@ -36,19 +36,25 @@ object Pipeline {
 
     val raw: RawVCF = ReadVCF(ini.get("general", "vcf"))
 
-    var current: VCF =
+    println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
+    val current: VCF =
       if (s(0) == 1)
         GenotypeLevelQC(raw)
       else
         raw
+
+    val last = Worker.recurSlaves(current, s.tail.map(dirs(_)))
+    /**
     for (i <- s.slice(2, s.length - 1)) {
       val currentWorker = Worker.slaves(dirs(i))
+      println("Current Worker: %s %s" format(dirs(i), currentWorker.name))
       current.persist(StorageLevel.MEMORY_AND_DISK_SER)
       current = currentWorker(current)
     }
+    */
 
     Option(ini.get("general", "save")) match {
-      case Some(x) => writeRDD(current.map(v => v.toString), "%s/%s.vcf" format (resultsDir, project))
+      case Some(x) => writeRDD(last.map(v => v.toString), "%s/%s-%s.vcf" format (resultsDir, project, dirs(s.last)))
       case None => {println("No need to save VCF.")}
     }
   }

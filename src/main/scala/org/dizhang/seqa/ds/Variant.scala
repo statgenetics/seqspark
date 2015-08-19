@@ -1,31 +1,86 @@
-import breeze.linalg.{Vector, DenseVector, VectorBuilder, SparseVector}
-import breeze.math.Semiring
+package org.dizhang.seqa.ds
+
+import breeze.linalg.{DenseVector, Vector, VectorBuilder}
+import org.dizhang.seqa.util
+import org.dizhang.seqa.util.Constant
+import org.dizhang.seqa.util.Constant._
+
 import scala.reflect.ClassTag
-import Constants._
 
-object Semi {
 
-  /** To work with SparseVector[Byte], we need to extend breeze.math.Semiring to support Byte */
-  @SerialVersionUID(1L)
-  implicit object SemiByte extends Semiring[Byte] {
-    def zero = 0.toByte
+/**
+ * Created by zhangdi on 8/18/15.
+ */
 
-    def one = 1.toByte
+object Variant {
+  /** implicit convert Vector[Byte] to String */
+  implicit def convertGenoByteToString(gb: Vector[Byte]): String = {
+    gb.map(x => Bt.conv(x)).toArray.mkString("\t")
+  }
 
-    def +(a: Byte, b: Byte) = (a + b).toByte
+  /** implicit convert Vector[String] to String */
+  implicit def convertGenoStringToString(gb: Vector[String]): String = {
+    gb.toArray.mkString("\t")
+  }
 
-    def *(a: Byte, b: Byte) = (a * b).toByte
+  /** dummy other */
+  implicit def convertGenoOtherToString[A](gb: Vector[A]): String = {
+    gb.map(_.toString).toArray.mkString("\t")
+  }
 
-    def ==(a: Byte, b: Byte) = a == b
+  /** Just store everything from the raw vcf file */
+  def apply(line: String): Variant[String] = {
+    val fields = line.split("\t")
+    new Variant[String]() {
+      val chr = fields(0)
+      val pos = fields(1)
+      val id = fields(2)
+      val ref = fields(3)
+      val alt = fields(4)
+      val qual = fields(5)
+      val filter = fields(6)
+      val info = fields(7)
+      val format = fields(8)
+      val geno = new DenseVector[String](fields.slice(9, fields.length))
+      val flip = None
+    }
+  }
 
-    def !=(a: Byte, b: Byte) = a != b
+  /** Some applies to initialize new instances */
+  def apply[A](ma: Array[String], gv: Vector[A], fo: Option[Boolean]): Variant[A] = {
+    new Variant[A] {
+      val chr = ma(0)
+      val pos = ma(1)
+      val id = ma(2)
+      val ref = ma(3)
+      val alt = ma(4)
+      val qual = ma(5)
+      val filter = ma(6)
+      val info = ma(7)
+      val format = ma(8)
+      val geno = gv
+      val flip = fo
+    }
+  }
+
+  import Constant.Bt
+
+  def makeVCF(v: Variant[Byte]): String = {
+    val meta = v.meta.mkString("\t")
+    val fp = v.flip.getOrElse(false)
+    val gs =
+      if (fp)
+        v.geno.map(g => Bt.conv(Bt.flip(g))).toArray.mkString("\t")
+      else
+        v.geno.map(g => Bt.conv(g)).toArray.mkString("\t")
+    meta + "\t" + gs
   }
 
 }
 
 @SerialVersionUID(2L)
 abstract class Variant[A] extends Serializable {
-  import Semi.SemiByte
+  import util.Semi.SemiByte
   val chr: String
   val pos: String
   val id: String
@@ -122,70 +177,3 @@ abstract class Variant[A] extends Serializable {
     Variant[Byte](this.meta, newGeno, newFlip)
   }
 }
-
-object Variant {
-  /** implicit convert Vector[Byte] to String */
-  implicit def convertGenoByteToString(gb: Vector[Byte]): String = {
-    gb.map(x => Bt.conv(x)).toArray.mkString("\t")
-  }
-
-  /** implicit convert Vector[String] to String */
-  implicit def convertGenoStringToString(gb: Vector[String]): String = {
-    gb.toArray.mkString("\t")
-  }
-
-  /** dummy other */
-  implicit def convertGenoOtherToString[A](gb: Vector[A]): String = {
-    gb.map(_.toString).toArray.mkString("\t")
-  }
-
-  /** Just store everything from the raw vcf file */
-  def apply(line: String): Variant[String] = {
-    val fields = line.split("\t")
-    new Variant[String]() {
-      val chr = fields(0)
-      val pos = fields(1)
-      val id = fields(2)
-      val ref = fields(3)
-      val alt = fields(4)
-      val qual = fields(5)
-      val filter = fields(6)
-      val info = fields(7)
-      val format = fields(8)
-      val geno = new DenseVector[String](fields.slice(9, fields.length))
-      val flip = None
-    }
-  }
-
-  /** Some applies to initialize new instances */
-  def apply[A](ma: Array[String], gv: Vector[A], fo: Option[Boolean]): Variant[A] = {
-    new Variant[A] {
-      val chr = ma(0)
-      val pos = ma(1)
-      val id = ma(2)
-      val ref = ma(3)
-      val alt = ma(4)
-      val qual = ma(5)
-      val filter = ma(6)
-      val info = ma(7)
-      val format = ma(8)
-      val geno = gv
-      val flip = fo
-    }
-  }
-
-  import Constants.Bt
-
-  def makeVCF(v: Variant[Byte]): String = {
-    val meta = v.meta.mkString("\t")
-    val fp = v.flip.getOrElse(false)
-    val gs =
-      if (fp)
-        v.geno.map(g => Bt.conv(Bt.flip(g))).toArray.mkString("\t")
-      else
-        v.geno.map(g => Bt.conv(g)).toArray.mkString("\t")
-    meta + "\t" + gs
-  }
-
-}
-

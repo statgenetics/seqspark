@@ -1,10 +1,19 @@
-import org.apache.spark.rdd.RDD
-import java.io._
-import org.ini4j.Ini
-import scala.io.Source
-import Constants._
+package org.dizhang.seqa.util
 
-object Utils {
+import java.io.{File, FileWriter, PrintWriter}
+
+import org.apache.spark.rdd.RDD
+import Constant.{Gt, Pheno}
+import org.dizhang.seqa.ds.Variant
+import org.ini4j.Ini
+
+import scala.io.Source
+
+/**
+ * Created by zhangdi on 8/18/15.
+ */
+
+object InputOutput {
   type RawVar = Variant[String]
   type Var = Variant[Byte]
   type RawVCF = RDD[RawVar]

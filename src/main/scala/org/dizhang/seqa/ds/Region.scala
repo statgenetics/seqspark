@@ -1,4 +1,6 @@
-import scala.math.{min, max}
+package org.dizhang.seqa.ds
+
+import scala.math.{max, min}
 
 @SerialVersionUID(8L)
 class Region(c: Byte, s: Int, e: Int) extends Serializable {

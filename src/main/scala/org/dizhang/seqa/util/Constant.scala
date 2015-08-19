@@ -1,5 +1,12 @@
+package org.dizhang.seqa.util
 
-object Constants {
+import org.dizhang.seqa.ds.Region
+
+/**
+ * Created by zhangdi on 8/18/15.
+ */
+
+object Constant {
 
   object Pheno {
     val delim = "\t"

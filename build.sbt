@@ -2,6 +2,8 @@ name := "seqa"
 
 version := "1.0"
 
+organization := "org.dizhang"
+
 scalaVersion := "2.10.5"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")

@@ -1,8 +1,7 @@
-import scala.sys.process._
+package org.dizhang.seqa.util
+
 import org.ini4j._
-import org.apache.spark._
-//import scala.concurrent._
-//import ExecutionContext.Implicits.global
+import scala.sys.process._
 
 /**
   * This is for the task that can be run concurrently, include but not
@@ -10,7 +9,7 @@ import org.apache.spark._
   */
 
 
-object Commands {
+object Command {
 
   def annovar (ini: Ini, input: String, output: String, workerDir: String): Unit = {
     val progDir = Option(ini.get("annotation", "programDir")).getOrElse("")
@@ -22,7 +21,7 @@ object Commands {
     cmd.!
   }
 
-  def popCheck (ini: Ini): String = {    
+  def popCheck (ini: Ini): String = {
     val project = ini.get("general", "project")
     val prefix = "results/%s/2sample" format (project)
     val all = "%s/all" format (prefix)

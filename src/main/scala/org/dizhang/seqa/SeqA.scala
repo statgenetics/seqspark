@@ -1,7 +1,17 @@
-/* SimpleApp.scala */
+package org.dizhang.seqa
 
-import java.io._
-import org.ini4j._
+import org.apache.spark.{SparkContext, SparkConf}
+import org.dizhang.seqa.ds.{Count, Bed}
+import org.dizhang.seqa.util.InputOutput._
+import org.dizhang.seqa.worker.{ReadVCF, GenotypeLevelQC}
+import org.ini4j.Ini
+import com.typesafe.config.ConfigFactory
+import java.io.File
+import worker._
+
+/**
+ * Created by zhangdi on 8/18/15.
+ */
 
 object SeqA {
   def checkArgs(args: Array[String]): Boolean = {
@@ -54,6 +64,62 @@ object SeqA {
     println("Conf file fine")
   }
 
+  def run(modules: String)(implicit ini: Ini): Unit = {
+    /**
+     * May have other run mode later
+     **/
+    quickRun(modules)
+  }
+
+  /**
+   * quick run. run through the specified modules
+   * act as if the vcf is the only input
+   */
+  def quickRun(modules: String)(implicit ini: Ini) {
+    val project = ini.get("general", "project")
+
+    /** determine the input */
+    val dirs = List("readvcf", "genotype", "sample", "variant", "annotation", "association")
+    val rangeP = """(\d+)-(\d+)""".r
+    val listP = """(\d+)(,\d+)+""".r
+    val singleP = """(\d+)""".r
+    val s = modules match {
+      case rangeP(start, end) => (start.toInt to end.toInt).toList
+      case listP(_*) => modules.split(",").map(_.toInt).toList
+      case singleP(a) => List(a.toInt)
+    }
+
+    /** Spark configuration */
+    val scConf = new SparkConf().setAppName("SeqA-%s" format project)
+    scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Count[Pair]]))
+    implicit val sc: SparkContext = new SparkContext(scConf)
+
+    val raw: RawVCF = ReadVCF(ini.get("general", "vcf"))
+
+    println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
+    val current: VCF =
+      if (s(0) == 1)
+        GenotypeLevelQC(raw)
+      else
+        raw
+
+    val last = Worker.recurSlaves(current, s.tail.map(dirs(_)))
+
+    /**
+    for (i <- s.slice(2, s.length - 1)) {
+      val currentWorker = Worker.slaves(dirs(i))
+      println("Current Worker: %s %s" format(dirs(i), currentWorker.name))
+      current.persist(StorageLevel.MEMORY_AND_DISK_SER)
+      current = currentWorker(current)
+    }
+      */
+
+    Option(ini.get("general", "save")) match {
+      case Some(x) => writeRDD(last.map(v => v.toString), "%s/%s-%s.vcf" format (resultsDir, project, dirs(s.last)))
+      case None => {println("No need to save VCF.")}
+    }
+  }
 
   def main(args: Array[String]) {
     /** check args */
@@ -65,9 +131,11 @@ object SeqA {
     val conf = new File(args(0))
     try {
       implicit val ini = new Ini(conf)
+      val applicationConf = ConfigFactory.load()
+      implicit val cnf = ConfigFactory.load(args(0)).withFallback(applicationConf)
       val modules = if (args.length == 2) args(1) else "1-4"
       checkConf
-      Pipeline.run(modules)
+      run(modules)
     } catch {
       case e: Exception => {
         e.printStackTrace()

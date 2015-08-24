@@ -5,7 +5,7 @@ import org.dizhang.seqa.ds.{Count, Bed}
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.worker.{ReadVCF, GenotypeLevelQC}
 import org.ini4j.Ini
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, Config}
 import java.io.File
 import worker._
 
@@ -14,6 +14,31 @@ import worker._
  */
 
 object SeqA {
+
+  def main(args: Array[String]) {
+    /** check args */
+    if (!checkArgs(args)) {
+      System.exit(1)
+    }
+
+    /** quick run */
+    val userConfFile = new File(args(0))
+    require(userConfFile.exists())
+    try {
+      implicit val ini = new Ini(userConfFile)
+
+      implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load())
+
+      val modules = if (args.length == 2) args(1) else "1-4"
+      checkConf
+      run(modules)
+    } catch {
+      case e: Exception => {
+        e.printStackTrace()
+      }
+    }
+  }
+
   def checkArgs(args: Array[String]): Boolean = {
     val usage = """
                 |spark-submit --class SeqA [options] /path/to/wesqc.xx.xx.jar seqa.conf [modules]
@@ -60,11 +85,11 @@ object SeqA {
       true
   }
 
-  def checkConf(implicit ini: Ini) {
+  def checkConf(implicit cnf: Config) {
     println("Conf file fine")
   }
 
-  def run(modules: String)(implicit ini: Ini): Unit = {
+  def run(modules: String)(implicit cnf: Config): Unit = {
     /**
      * May have other run mode later
      **/
@@ -75,8 +100,8 @@ object SeqA {
    * quick run. run through the specified modules
    * act as if the vcf is the only input
    */
-  def quickRun(modules: String)(implicit ini: Ini) {
-    val project = ini.get("general", "project")
+  def quickRun(modules: String)(implicit cnf: Config) {
+    val project = cnf.getString("project")
 
     /** determine the input */
     val dirs = List("readvcf", "genotype", "sample", "variant", "annotation", "association")
@@ -95,7 +120,7 @@ object SeqA {
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Count[Pair]]))
     implicit val sc: SparkContext = new SparkContext(scConf)
 
-    val raw: RawVCF = ReadVCF(ini.get("general", "vcf"))
+    val raw: RawVCF = ReadVCF(cnf.getString("genotypeInput.source"))
 
     println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
     val current: VCF =
@@ -115,31 +140,11 @@ object SeqA {
     }
       */
 
-    Option(ini.get("general", "save")) match {
+    Option(cnf.getBoolean("save")) match {
       case Some(x) => writeRDD(last.map(v => v.toString), "%s/%s-%s.vcf" format (resultsDir, project, dirs(s.last)))
       case None => {println("No need to save VCF.")}
     }
   }
 
-  def main(args: Array[String]) {
-    /** check args */
-    if (!checkArgs(args)) {
-      System.exit(1)
-    }
 
-    /** quick run */
-    val conf = new File(args(0))
-    try {
-      implicit val ini = new Ini(conf)
-      val applicationConf = ConfigFactory.load()
-      implicit val cnf = ConfigFactory.load(args(0)).withFallback(applicationConf)
-      val modules = if (args.length == 2) args(1) else "1-4"
-      checkConf
-      run(modules)
-    } catch {
-      case e: Exception => {
-        e.printStackTrace()
-      }
-    }
-  }
 }

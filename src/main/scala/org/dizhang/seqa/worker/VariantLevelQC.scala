@@ -1,28 +1,29 @@
 package org.dizhang.seqa.worker
 
+import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.ds.Count
 import org.dizhang.seqa.util.InputOutput._
-import org.ini4j.Ini
 
 import scala.io.Source
 
 /**
  * Created by zhangdi on 8/18/15.
  */
+
 object VariantLevelQC extends Worker[VCF, VCF] {
 
   implicit val name = new WorkerName("variant")
 
-  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
-    val rareMaf = ini.get("variant", "rareMaf").toDouble
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
+    val rareMaf = cnf.getString("variantLevelQC.rareMaf").toDouble
     def mafFunc (m: Double): Boolean =
       if (m < rareMaf || m > (1 - rareMaf)) true else false
 
-    val newPheno = "%s/%s/%s" format(resultsDir, SampleLevelQC.name, ini.get("general", "pheno").split("/").last)
-    val afterQC = miniQC(input, ini, newPheno, mafFunc)
-    val targetFile = ini.get("variant", "target")
+    val newPheno = "%s/%s/%s" format(resultsDir, SampleLevelQC.name, cnf.getString("sampleInfo.source").split("/").last)
+    val afterQC = miniQC(input, newPheno, mafFunc)
+    val targetFile = cnf.getString("variantLevelQC.target")
     val select: Boolean = Option(targetFile) match {
       case Some(f) => true
       case None => false
@@ -42,24 +43,24 @@ object VariantLevelQC extends Worker[VCF, VCF] {
 
     rare.persist(StorageLevel.MEMORY_AND_DISK_SER)
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("variant", "save") == "true")
+    if (cnf.getString("save") == "true")
       try {
-        rare.saveAsTextFile("%s/4association" format (ini.get("general", "project")))
+        rare.saveAsTextFile(workerDir)
       } catch {
         case e: Exception => {println("step3: save failed"); System.exit(1)}
       }
     rare
   }
 
-  def miniQC(vars: VCF, ini: Ini, pheno: String, mafFunc: Double => Boolean): VCF = {
+  def miniQC(vars: VCF, pheno: String, mafFunc: Double => Boolean)(implicit cnf: Config): VCF = {
     //val pheno = ini.get("general", "pheno")
-    val batchCol = ini.get("pheno", "batch")
+    val batchCol = cnf.getString("sampleInfo.batch")
     val batchStr = readColumn(pheno, batchCol)
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))
     val batch = batchIdx
-    val misRate = ini.get("variant", "batchMissing").toDouble
+    val misRate = cnf.getString("variantLevelQC.batchMissing").toDouble
 
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {

@@ -1,12 +1,10 @@
 package org.dizhang.seqa.util
 
 import java.io.{File, FileWriter, PrintWriter}
-
+import com.typesafe.config.Config
 import org.apache.spark.rdd.RDD
 import Constant.{Gt, Pheno}
 import org.dizhang.seqa.ds.Variant
-import org.ini4j.Ini
-
 import scala.io.Source
 
 /**
@@ -36,23 +34,18 @@ object InputOutput {
     raw.map(v => v.transElem(make(_)).compress(Gt.conv(_)))
   }
 
-  def runtimeRootDir(implicit ini: Ini): String = {
-    val root = Option(ini.get("general", "runtimeRootDir"))
-    root match {
-      case Some(d) => d
-      case None => "."
-    }
-  }
+  def runtimeRootDir(implicit cnf: Config): String =
+    cnf.getString("runtimeRootDir")
 
-  def resultsDir(implicit ini: Ini): String = {
+  def resultsDir(implicit cnf: Config): String = {
     "%s/results" format runtimeRootDir
   }
 
-  def workerDir(implicit ini: Ini, name: WorkerName): String = {
+  def workerDir(implicit cnf: Config, name: WorkerName): String = {
     "%s/%s" format (resultsDir, name)
   }
 
-  def sitesFile(implicit ini: Ini, name: WorkerName): String = {
+  def sitesFile(implicit cnf: Config, name: WorkerName): String = {
     "%s/sites.raw.vcf" format workerDir
   }
 

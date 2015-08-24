@@ -2,7 +2,7 @@ package org.dizhang.seqa.util
 
 import org.ini4j._
 import scala.sys.process._
-
+import com.typesafe.config.Config
 /**
   * This is for the task that can be run concurrently, include but not
   * limited to external commands like plink and king
@@ -11,16 +11,16 @@ import scala.sys.process._
 
 object Command {
 
-  def annovar (ini: Ini, input: String, output: String, workerDir: String): Unit = {
-    val progDir = Option(ini.get("annotation", "programDir")).getOrElse("")
-    val build = Option(ini.get("general", "build")).getOrElse("hg19")
-    val annovardb = Option(ini.get("annotation", "annovardb")).getOrElse(List(progDir, "humandb").filter(_ != "").mkString("/"))
-    val script = "%s/scripts/runAnnovar.sh" format (ini.get("general", "seqaHome"))
+  def annovar (input: String, output: String, workerDir: String)(implicit cnf: Config): Unit = {
+    val progDir = cnf.getString("annotation.programDir")
+    val build = cnf.getString(".genomeBuild")
+    val annovardb = cnf.getString("annotation.databaseDir")
+    val script = "%s/scripts/runAnnovar.sh" format (cnf.getString("seqaHome"))
     val cmd = s"${script} ${progDir} ${annovardb} ${build} ${input} ${output} ${workerDir}"
     println(cmd)
     cmd.!
   }
-
+/**
   def popCheck (ini: Ini): String = {
     val project = ini.get("general", "project")
     val prefix = "results/%s/2sample" format (project)
@@ -47,4 +47,5 @@ object Command {
     }
     "exit codes for mds and kinship are %d %d %d %d" format (exitCode1, exitCode2, exitCode3, exitCode4)
   }
+  */
 }

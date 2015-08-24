@@ -1,10 +1,10 @@
 package org.dizhang.seqa.worker
 
+import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqa.ds.Variant
 import org.dizhang.seqa.util.InputOutput._
-import org.ini4j.Ini
 
 /**
  * Created by zhangdi on 8/18/15.
@@ -12,7 +12,7 @@ import org.ini4j.Ini
 object ReadVCF extends Worker[String, RawVCF] {
   implicit val name = new WorkerName("readvcf")
 
-  def apply(input: String)(implicit ini: Ini, sc: SparkContext): RawVCF = {
+  def apply(input: String)(implicit cnf: Config, sc: SparkContext): RawVCF = {
     val raw = sc.textFile(input)
     makeVariants(raw)
   }
@@ -21,10 +21,11 @@ object ReadVCF extends Worker[String, RawVCF] {
     * 1. filter column in vcf
     * 2. only bi-allelic SNPs if biAllelicSNV is true in Conf
     */
-  def makeVariants(raw: RDD[String])(implicit ini: Ini): RawVCF = {
-    val filterNot = ini.get("variant", "filterNot")
-    val filter = ini.get("variant", "filter")
-    val biAllelicSNV = ini.get("variant", "biAllelicSNV")
+  def makeVariants(raw: RDD[String])(implicit cnf: Config): RawVCF = {
+    val genoInCnf = cnf.getConfig("genotypeInput")
+    val filterNot = genoInCnf.getString("filterNot")
+    val filter = genoInCnf.getString("filter")
+    val biAllelicSNV = genoInCnf.getString("biAllelicSNV")
     val vars = raw filter (l => ! l.startsWith("#")) map (l => Variant(l))
     val s1 =
       if (filterNot != null)
@@ -42,9 +43,9 @@ object ReadVCF extends Worker[String, RawVCF] {
       else
         s2
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("general", "save") == "true")
+    if (cnf.getBoolean("save") == true)
       try {
-        s3.saveAsObjectFile("%s/1genotype" format (ini.get("general", "project")))
+        s3.saveAsObjectFile(workerDir)
       } catch {
         case e: Exception => {println("step1: save failed"); System.exit(1)}
       }

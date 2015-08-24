@@ -2,28 +2,30 @@ package org.dizhang.seqa.worker
 
 import java.io.{File, PrintWriter}
 
+import com.typesafe.config.Config
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.ds.Count
 import org.dizhang.seqa.util.Constant
 import Constant.{Bt, Gt}
 import org.dizhang.seqa.util.InputOutput._
-import org.ini4j.Ini
+import sys.process._
 
 /**
  * Created by zhangdi on 8/18/15.
  */
 object GenotypeLevelQC extends Worker[RawVCF, VCF] {
 
-  implicit val name = new WorkerName("genotype")
+  implicit val name = new WorkerName("genotypeLevelQC")
 
-  def apply(input: RawVCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+  def apply(input: RawVCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     statGdGq(input)
-    val gd = ini.get("genotype", "gd").split(",")
-    val gq = ini.get("genotype", "gq").toDouble
-    val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
-    val gdLower = gd(0).toDouble
-    val gdUpper = gd(1).toDouble
+    val genoCnf : Config = cnf.getConfig(name.toString)
+    val gd = genoCnf.getIntList("gd")
+    val gq = genoCnf.getDouble("gq")
+    val gtFormat = genoCnf.getString("format").split(":").zipWithIndex.toMap
+    val gdLower : Int = gd.get(0)
+    val gdUpper : Int = gd.get(1)
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
     val gqIdx = gtFormat("GQ")
@@ -43,9 +45,9 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     //res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("genotype", "save") == "true")
+    if (genoCnf.getString("save") == "true")
       try {
-        res.saveAsObjectFile("%s/2sample" format (ini.get("general", "project")))
+        res.saveAsObjectFile(workerDir)
       } catch {
         case e: Exception => {println("step1: save failed"); System.exit(1)}
       }
@@ -74,16 +76,16 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: RawVCF)(implicit ini: Ini) {
+  def statGdGq(vars: RawVCF)(implicit cnf: Config) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
-    val phenoFile = ini.get("general", "pheno")
-    val batchCol = ini.get("pheno", "batch")
+    val phenoFile = cnf.getString("sampleInfo.source")
+    val batchCol = cnf.getString("sampleInfo.batch")
     val batchStr = readColumn(phenoFile, batchCol)
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))
-    val gtFormat = ini.get("genotype", "format").split(":").zipWithIndex.toMap
+    val gtFormat = cnf.getString("genotypeLevelQC.format").split(":").zipWithIndex.toMap
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
     val gqIdx = gtFormat("GQ")

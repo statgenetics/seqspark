@@ -1,10 +1,11 @@
 package org.dizhang.seqa.worker
 
+import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.ds.Variant
 import org.dizhang.seqa.util.Command
 import org.dizhang.seqa.util.InputOutput._
-import org.ini4j.Ini
+import sys.process._
 
 import scala.io.Source
 
@@ -16,13 +17,13 @@ object Annotation extends Worker[VCF, VCF] {
 
   implicit val name = new WorkerName("annotation")
 
-  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     val exitCode = ("mkdir -p %s" format workerDir).!
     println(exitCode)
     val rawSites = workerDir + "/sites.raw.vcf"
     val annotatedSites = "sites.annotated"
     writeRDD(input.map(_.meta().slice(0, 8).mkString("\t") + "\n"), rawSites)
-    Command.annovar(ini, rawSites, annotatedSites, workerDir)
+    Command.annovar(rawSites, annotatedSites, workerDir)
     val annot = sc.broadcast(readAnnot(annotatedSites))
     input.zipWithIndex().map{case (v, i: Long) => {
       val meta = v.meta().clone()
@@ -35,7 +36,7 @@ object Annotation extends Worker[VCF, VCF] {
     }}
   }
 
-  def readAnnot(sites: String)(implicit ini: Ini): Array[String] = {
+  def readAnnot(sites: String)(implicit cnf: Config): Array[String] = {
     val varFile = "%s/%s.variant_function" format (workerDir, sites)
     val exonFile = "%s/%s.exonic_variant_function" format (workerDir, sites)
     val varArr: Array[(String, String)] =

@@ -1,5 +1,6 @@
 package org.dizhang.seqa.worker
-import org.ini4j.Ini
+
+import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.util.InputOutput._
 
@@ -12,7 +13,7 @@ object Worker {
     "variant" -> VariantLevelQC,
     "annotation" -> Annotation)
 
-  def recurSlaves(input: VCF, sl: List[String])(implicit ini: Ini, sc: SparkContext): VCF = {
+  def recurSlaves(input: VCF, sl: List[String])(implicit cnf: Config, sc: SparkContext): VCF = {
     if (sl.tail == Nil)
       slaves(sl.head)(input)
     else
@@ -23,5 +24,5 @@ object Worker {
 /** An abstract class that only contains a run method*/
 trait Worker[A, B] {
   val name: WorkerName
-  def apply(input: A)(implicit ini: Ini, sc: SparkContext): B
+  def apply(input: A)(implicit cnf: Config, sc: SparkContext): B
 }

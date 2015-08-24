@@ -3,6 +3,7 @@ package org.dizhang.seqa.worker
 import java.io.{File, FileOutputStream, IOException, PrintWriter}
 
 import breeze.linalg.{SparseVector, Vector}
+import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -10,8 +11,8 @@ import org.dizhang.seqa.ds.{Count, Bed}
 import org.dizhang.seqa.util.Constant
 import Constant.{Bt, Hg19, Hg38}
 import org.dizhang.seqa.util.InputOutput._
-import org.ini4j.Ini
 
+import sys.process._
 import scala.io.Source
 
 /**
@@ -21,15 +22,15 @@ object SampleLevelQC extends Worker[VCF, VCF] {
 
   implicit val name = new WorkerName("sample")
 
-  def apply(input: VCF)(implicit ini: Ini, sc: SparkContext): VCF = {
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     checkSex(input)
 
     mds(input)
 
-    val pheno = ini.get("general", "pheno")
+    val pheno = cnf.getString("sampleInfo.source")
     val newPheno = workerDir + "/" + pheno.split("/").last
     val samples = readColumn(pheno, "IID")
-    val removeCol = ini.get("pheno", "remove")
+    val removeCol = cnf.getString("sampleInfo.filer")
     val remove =
       if (hasColumn(pheno, removeCol))
         readColumn(pheno, removeCol)
@@ -63,9 +64,9 @@ object SampleLevelQC extends Worker[VCF, VCF] {
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (ini.get("sample", "save") == "true")
+    if (cnf.getBoolean("sampleLevelQC.save") == true)
       try {
-        res.saveAsObjectFile("%s/3variant" format (ini.get("general", "project")))
+        res.saveAsObjectFile(workerDir)
       } catch {
         case e: Exception => {println("step2: save failed"); System.exit(1)}
       }
@@ -73,7 +74,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
   }
 
   /** Check the concordance of the genetic sex and recorded sex */
-  def checkSex(vars: VCF)(implicit ini: Ini) {
+  def checkSex(vars: VCF)(implicit cnf: Config) {
     /** Assume:
       *  1. genotype are cleaned before.
       *  2. only SNV
@@ -96,7 +97,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
     /** count for all the SNVs on allosomes */
     def count (vars: VCF): (Array[Pair], Array[Pair]) = {
       val pXY =
-        if (ini.get("general", "build") == "hg19")
+        if (cnf.getString("genotypeInput.genomeBuild") == "hg19")
           Hg19.pseudo
         else
           Hg38.pseudo
@@ -136,7 +137,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
 
     /** write the result into file */
     def write (res: (Array[Pair], Array[Pair])) {
-      val pheno = ini.get("general", "pheno")
+      val pheno = cnf.getString("sampleInfo.source")
       val fids = readColumn(pheno, "FID")
       val iids = readColumn(pheno, "IID")
       val sex = readColumn(pheno, "Sex")
@@ -157,18 +158,18 @@ object SampleLevelQC extends Worker[VCF, VCF] {
   }
 
   /** run the global ancestry analysis */
-  def mds (vars: VCF)(implicit ini: Ini) {
+  def mds (vars: VCF)(implicit cnf: Config) {
     /**
      * Assume:
      *     1. genotype are cleaned before
      *     2. only SNVs
      */
-    val pheno = ini.get("general", "pheno")
-    val mdsMaf = ini.get("sample", "mdsMaf").toDouble
+    val pheno = cnf.getString("sampleInfo.source")
+    val mdsMaf = cnf.getString("sampleLevelQC.mdsMaf").toDouble
     def mafFunc (m: Double): Boolean =
       if (m >= mdsMaf && m <= (1 - mdsMaf)) true else false
 
-    val snp = VariantLevelQC.miniQC(vars, ini, pheno, mafFunc)
+    val snp = VariantLevelQC.miniQC(vars, pheno, mafFunc)
     //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
     //println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
     val bed = snp map (s => Bed(s))

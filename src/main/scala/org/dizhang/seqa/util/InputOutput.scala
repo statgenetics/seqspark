@@ -4,16 +4,16 @@ import java.io.{File, FileWriter, PrintWriter}
 import com.typesafe.config.Config
 import org.apache.spark.rdd.RDD
 import Constant.{Gt, Pheno}
-import org.dizhang.seqa.ds.Variant
+import org.dizhang.seqa.ds.{SparseVariant, DenseVariant}
 import scala.io.Source
 
 /**
- * Created by zhangdi on 8/18/15.
+ * defines some input/output functions here
  */
 
 object InputOutput {
-  type RawVar = Variant[String]
-  type Var = Variant[Byte]
+  type RawVar = DenseVariant[String]
+  type Var = SparseVariant[Byte]
   type RawVCF = RDD[RawVar]
   type VCF = RDD[Var]
   type Pair = (Int, Int)
@@ -31,7 +31,7 @@ object InputOutput {
       val s = g.split(":")
       s(0)
     }
-    raw.map(v => v.transElem(make(_)).compress(Gt.conv(_)))
+    raw.map(v => v.toSparseVariant(Gt.ref).map(Gt.conv(_)))
   }
 
   def runtimeRootDir(implicit cnf: Config): String =

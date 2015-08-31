@@ -3,11 +3,11 @@ package org.dizhang.seqa.worker
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqa.ds.Variant
+import org.dizhang.seqa.ds.{DenseVariant}
 import org.dizhang.seqa.util.InputOutput._
 
 /**
- * Created by zhangdi on 8/18/15.
+ * Always read a dense variant from VCF
  */
 object ReadVCF extends Worker[String, RawVCF] {
   implicit val name = new WorkerName("readvcf")
@@ -26,7 +26,7 @@ object ReadVCF extends Worker[String, RawVCF] {
     val filterNot = genoInCnf.getString("filterNot")
     val filter = genoInCnf.getString("filter")
     val biAllelicSNV = genoInCnf.getString("biAllelicSNV")
-    val vars = raw filter (l => ! l.startsWith("#")) map (l => Variant(l))
+    val vars = raw filter (l => ! l.startsWith("#")) map (l => DenseVariant(l))
     val s1 =
       if (filterNot != null)
         vars filter (v => ! v.filter.matches(filterNot))

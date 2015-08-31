@@ -2,7 +2,7 @@ package org.dizhang.seqa.ds
 
 import scala.math.{max, min}
 
-@SerialVersionUID(8L)
+@SerialVersionUID(3L)
 class Region(c: Byte, s: Int, e: Int) extends Serializable {
   val chr: Byte = c
   val start: Int = s 

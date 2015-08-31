@@ -18,7 +18,7 @@ object Bed {
   def apply(): Bed = {
     new Bed(Array[Byte](), Array[Byte]())
   }
-  def apply(v: Variant[Byte]): Bed = {
+  def apply(v: SparseVariant[Byte]): Bed = {
     def make (g: Byte): Byte = {
       //val s = g split (":")
       g match {
@@ -37,8 +37,8 @@ object Bed {
         .map(_.toByte)
     val bed: Array[Byte] =
       for {
-        i <- Array[Int]() ++ (0 to v.geno.length/4)
-        four = 0 to 3 map (j => if (4 * i + j < v.geno.length) make(v.geno(4 * i + j)) else 0.toByte)
+        i <- Array[Int]() ++ (0 to v.length/4)
+        four = 0 to 3 map (j => if (4 * i + j < v.length) make(v(4 * i + j)) else 0.toByte)
       } yield
         four.zipWithIndex.map(a => a._1 << 2 * a._2).sum.toByte
     new Bed(bim, bed)

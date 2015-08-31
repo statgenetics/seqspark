@@ -2,7 +2,6 @@ package org.dizhang.seqa.worker
 
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
-import org.dizhang.seqa.ds.Variant
 import org.dizhang.seqa.util.Command
 import org.dizhang.seqa.util.InputOutput._
 import sys.process._
@@ -22,18 +21,20 @@ object Annotation extends Worker[VCF, VCF] {
     println(exitCode)
     val rawSites = workerDir + "/sites.raw.vcf"
     val annotatedSites = "sites.annotated"
-    writeRDD(input.map(_.meta().slice(0, 8).mkString("\t") + "\n"), rawSites)
+    writeRDD(input.map(_.meta.slice(0, 8).mkString("\t") + "\n"), rawSites)
     Command.annovar(rawSites, annotatedSites, workerDir)
     val annot = sc.broadcast(readAnnot(annotatedSites))
-    input.zipWithIndex().map{case (v, i: Long) => {
-      val meta = v.meta().clone()
+    input.zipWithIndex().map{
+      case (v, i: Long) => {
+      val meta = v.meta.clone()
       meta(7) =
         if (meta(7) == ".")
           annot.value(i.toInt)
         else
           "%s;%s" format (meta(7), annot.value(i.toInt))
-      Variant[Byte](meta, v.geno, v.flip)
-    }}
+      v.updateMeta(meta)
+      }
+    }
   }
 
   def readAnnot(sites: String)(implicit cnf: Config): Array[String] = {

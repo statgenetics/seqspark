@@ -1,7 +1,7 @@
 package org.dizhang.seqa
 
 import org.apache.spark.{SparkContext, SparkConf}
-import org.dizhang.seqa.ds.{Count, Bed}
+import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.worker.{ReadVCF, GenotypeLevelQC}
 import org.ini4j.Ini
@@ -117,7 +117,7 @@ object SeqA {
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqA-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Count[Pair]]))
+    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[Pair]]))
     implicit val sc: SparkContext = new SparkContext(scConf)
 
     val raw: RawVCF = ReadVCF(cnf.getString("genotypeInput.source"))
@@ -139,6 +139,9 @@ object SeqA {
       current = currentWorker(current)
     }
       */
+    implicit def make(b: Byte): String = {
+      util.Constant.Bt.conv(b)
+    }
 
     Option(cnf.getBoolean("save")) match {
       case Some(x) => writeRDD(last.map(v => v.toString), "%s/%s-%s.vcf" format (resultsDir, project, dirs(s.last)))

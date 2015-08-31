@@ -5,7 +5,7 @@ import java.io.{File, PrintWriter}
 import com.typesafe.config.Config
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.SparkContext
-import org.dizhang.seqa.ds.Count
+import org.dizhang.seqa.ds.Counter
 import org.dizhang.seqa.util.Constant
 import Constant.{Bt, Gt}
 import org.dizhang.seqa.util.InputOutput._
@@ -14,6 +14,7 @@ import sys.process._
 /**
  * Created by zhangdi on 8/18/15.
  */
+
 object GenotypeLevelQC extends Worker[RawVCF, VCF] {
 
   implicit val name = new WorkerName("genotypeLevelQC")
@@ -29,19 +30,19 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
     val gqIdx = gtFormat("GQ")
-    def make(g: String): String = {
+    def make(g: String): Byte = {
       val s = g.split(":")
       if (s.length == 1)
-        g
+        Gt.conv(g)
       else if (s(gtIdx) == Gt.mis)
-        Gt.mis
+        Bt.mis
       else if (s(gdIdx).toInt >= gdLower && s(gdIdx).toInt <= gdUpper && s(gqIdx).toDouble >= gq)
-        s(gtIdx)
+        Gt.conv(s(gtIdx))
       else
-        Gt.mis
+        Bt.mis
     }
 
-    val res = input.map(v => v.transElem(make(_)).compress(Gt.conv(_)))
+    val res = input.map(v => v.map(make(_)).toSparseVariant(Bt.ref))
     //res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
@@ -76,7 +77,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: RawVCF)(implicit cnf: Config) {
+  def statGdGq(vars: RawVCF)(implicit cnf: Config, sc: SparkContext) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
     val phenoFile = cnf.getString("sampleInfo.source")
@@ -85,6 +86,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))
+    val broadCastBatchIdx = sc.broadcast(batchIdx)
     val gtFormat = cnf.getString("genotypeLevelQC.format").split(":").zipWithIndex.toMap
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
@@ -99,9 +101,12 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
       }
     }
 
+    def keyFunc(i: Int): Int =
+      broadCastBatchIdx.value(i)
+
     def count(vars: RawVCF): Bcnt = {
-      val all = vars map (v => Count[String, Cnt](v, make).collapseByBatch(batchIdx))
-      val res = all reduce ((a, b) => Count.addByBatch[Cnt](a, b))
+      val all = vars map (v => v.toCounter(make, Gt.mis).reduceByKey(keyFunc))
+      val res = all reduce ((a, b) => Counter.addByKey(a, b))
       res
     }
 

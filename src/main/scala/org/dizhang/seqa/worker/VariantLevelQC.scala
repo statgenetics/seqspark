@@ -3,7 +3,6 @@ package org.dizhang.seqa.worker
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqa.ds.Count
 import org.dizhang.seqa.util.InputOutput._
 
 import scala.io.Source
@@ -52,20 +51,23 @@ object VariantLevelQC extends Worker[VCF, VCF] {
     rare
   }
 
-  def miniQC(vars: VCF, pheno: String, mafFunc: Double => Boolean)(implicit cnf: Config): VCF = {
+  def miniQC(vars: VCF, pheno: String, mafFunc: Double => Boolean)(implicit cnf: Config, sc: SparkContext): VCF = {
     //val pheno = ini.get("general", "pheno")
     val batchCol = cnf.getString("sampleInfo.batch")
     val batchStr = readColumn(pheno, batchCol)
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))
+    val broadCastBatchIdx = sc.broadcast(batchIdx)
+    def keyFunc(i: Int): Int = broadCastBatchIdx.value(i)
+
     val batch = batchIdx
     val misRate = cnf.getString("variantLevelQC.batchMissing").toDouble
 
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {
       //println("!!! var: %s-%d cnt.length %d" format(v.chr, v.pos, v.cnt.length))
-      val cntB = Count[Byte, Pair](v, GenotypeLevelQC.makeCallRate).collapseByBatch(batch)
+      val cntB = v.toCounter(GenotypeLevelQC.makeCallRate).reduceByKey(keyFunc)
       val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
       if (min._1/min._2.toDouble < (1 - misRate)) {
         //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
@@ -78,9 +80,9 @@ object VariantLevelQC extends Worker[VCF, VCF] {
 
     /** if maf is high enough and not a batch-specific snv */
     def mafP (v: Var): Boolean = {
-      val cnt = Count[Byte, Pair](v, GenotypeLevelQC.makeMaf)
-      val cntA = cnt.collapse
-      val cntB = cnt.collapseByBatch(batch)
+      val cnt = v.toCounter(GenotypeLevelQC.makeMaf)
+      val cntA = cnt.reduce
+      val cntB = cnt.reduceByKey(keyFunc)
       val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)
       val maf = cntA._1/cntA._2.toDouble
       val bSpec =

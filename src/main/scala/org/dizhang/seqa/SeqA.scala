@@ -4,7 +4,6 @@ import org.apache.spark.{SparkContext, SparkConf}
 import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.worker.{ReadVCF, GenotypeLevelQC}
-import org.ini4j.Ini
 import com.typesafe.config.{ConfigFactory, Config}
 import java.io.File
 import worker._
@@ -25,7 +24,7 @@ object SeqA {
     val userConfFile = new File(args(0))
     require(userConfFile.exists())
     try {
-      implicit val ini = new Ini(userConfFile)
+      //implicit val ini = new Ini(userConfFile)
 
       implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load())
 

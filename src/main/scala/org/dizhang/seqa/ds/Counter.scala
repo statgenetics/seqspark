@@ -1,12 +1,15 @@
 package org.dizhang.seqa.ds
 
+import breeze.linalg.DenseVector
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.dizhang.seqa.ds.Counter.CounterElementSemiGroup
-import scala.reflect.ClassTag
+//import collection.mutable.{IndexedSeq, Map}
+//import scala.collection.mutable
 
 /**
  * This class borrows a lot from the AlgeBird AdaptiveVector
  */
+
 object Counter {
   object CounterElementSemiGroup {
     type IMap = Int2IntOpenHashMap
@@ -128,7 +131,7 @@ object Counter {
 
   def fromMap[A](m: Map[Int, A], default: A, size: Int): Counter[A] = {
     if (m.size == 0)
-      fill[A](0)(default)
+      fill[A](size)(default)
     else {
       val maxIdx = m.keys.max
       require(maxIdx < size)
@@ -176,9 +179,15 @@ sealed trait Counter[A] extends Serializable {
 
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
     require(this.length == that.length)
-    val newElems = for (i <- 0 until length) yield sg.op(this(i), that(i))
+    val newElems: IndexedSeq[A] = for (i <- IndexedSeq( 0 until length : _*)) yield sg.op(this(i), that(i))
     Counter.fromIndexedSeq(newElems, sg.op(this.default, that.default))
   }
+
+  def toDenseVector(make: A => Double): DenseVector[Double] = {
+    DenseVector((0 until size).map(i => make(this(i))).toArray)
+  }
+
+  def toMap: Map[Int, A]
 
   /**
   def collapse(implicit sg: Counter.CounterElementSemiGroup[A]): A
@@ -208,6 +217,11 @@ case class DenseCounter[A](elems: IndexedSeq[A], val default: A)
       c => c.map(x => x._1).reduce((a, b) => sg.op(a, b))
     ).map(identity)
   }
+
+  def toMap = elems.view.zipWithIndex.filter( _._1 != default ).map( _.swap ).toMap
+
+
+
 }
 
 case class SparseCounter[A](elems: Map[Int, A], val default: A, val size: Int)
@@ -225,13 +239,16 @@ case class SparseCounter[A](elems: Map[Int, A], val default: A, val size: Int)
     val dense: Map[B, A] = elems.groupBy(x => keyFunc(x._1)).mapValues(
       c => c.map(x => x._2).reduce((a, b) => sg.op(a, b))
     ).map(identity)
-    val denseSizes: Map[B, Int] = elems.groupBy(x => keyFunc(x._1)).mapValues(_.size)
-    val sizes: Map[B, Int] = (0 until size).groupBy(keyFunc(_)).mapValues(_.size)
+    val denseSizes: Map[B, Int] = elems.groupBy(x => keyFunc(x._1)).mapValues(_.size).map(identity)
+    val sizes: Map[B, Int] = (0 until size).groupBy(keyFunc(_)).mapValues(_.size).map(identity)
     val sparseSizes: Map[B, Int] =
       for ((k, s) <- sizes) yield k -> (s - denseSizes.getOrElse(k, 0))
     val sparse = sparseSizes.map(x => x._1 -> sg.pow(default, x._2))
     dense ++ (for ((k, v) <- sparse) yield k -> sg.op(v, dense.getOrElse(k, sg.zero)))
   }
+
+  def toMap = elems
+
 }
 
 

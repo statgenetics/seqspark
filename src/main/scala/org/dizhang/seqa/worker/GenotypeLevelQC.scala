@@ -76,6 +76,13 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     }
   }
 
+  def getMaf (p: Pair): Double = {
+    if (2 * p._1 <= p._2)
+      p._1.toDouble / p._2
+    else
+      1.0 - (p._1.toDouble / p._2)
+  }
+
   /** compute by GD, GQ */
   def statGdGq(vars: RawVCF)(implicit cnf: Config, sc: SparkContext) {
     type Cnt = Int2IntOpenHashMap

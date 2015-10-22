@@ -11,7 +11,8 @@ object Worker {
   val slaves = Map[String, Worker[VCF, VCF]](
     "sample" -> SampleLevelQC,
     "variant" -> VariantLevelQC,
-    "annotation" -> Annotation)
+    "annotation" -> Annotation
+  )
 
   def recurSlaves(input: VCF, sl: List[String])(implicit cnf: Config, sc: SparkContext): VCF = {
     if (sl.tail == Nil)
@@ -21,7 +22,7 @@ object Worker {
   }
 }
 
-/** An abstract class that only contains a run method*/
+/** An abstract class that only contains a run method */
 trait Worker[A, B] {
   val name: WorkerName
   def apply(input: A)(implicit cnf: Config, sc: SparkContext): B

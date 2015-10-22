@@ -1,6 +1,5 @@
 package org.dizhang.seqa.util
 
-import org.ini4j._
 import scala.sys.process._
 import com.typesafe.config.Config
 /**

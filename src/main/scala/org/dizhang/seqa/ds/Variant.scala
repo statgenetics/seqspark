@@ -40,7 +40,7 @@ trait Variant[A] extends Serializable {
     s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.mkString('\t'.toString)}\n"
   }
 
-  def meta: Array[String]
+  val meta: Array[String]
 
   def site: String = {
     s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t.\n"
@@ -68,6 +68,11 @@ trait Variant[A] extends Serializable {
       (for {item <- this.info.split(";")
             s = item.split("=")}
         yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+  }
+
+  def addInfo(key: String, value: String): Unit = {
+    require(! this.parseInfo.contains(key))
+    this.meta(7) = s"${info};${key}=${value}"
   }
 
   def parseFormat: Array[String] = {

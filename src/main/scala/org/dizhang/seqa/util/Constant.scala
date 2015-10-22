@@ -10,6 +10,7 @@ object Constant {
 
   object Pheno {
     val delim = "\t"
+    val mis = "NA"
   }
 
   object Bt {

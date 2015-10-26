@@ -59,8 +59,8 @@ object Association extends Worker[VCF, Unit] {
     for (tr <- traits.toArray) {
       if (tr == "Control") {
         val y = readColumn(sampleInfo, "Control")
-        if (cnf.getBoolean("association.permutation") == false)
-          output.map
+        //if (cnf.getBoolean("association.permutation") == false)
+          //output.map
 
       }
     }

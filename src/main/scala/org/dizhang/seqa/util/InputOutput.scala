@@ -72,7 +72,7 @@ object InputOutput {
   def writeArray(file: String, data: Array[String]) {
     val pw = new PrintWriter(new File(file))
     data foreach (d => pw.write(d + "\n"))
-    pw.close
+    pw.close()
   }
 
   def writeAny(file: String, data: String): Unit = {
@@ -94,7 +94,7 @@ object InputOutput {
     val fw = new FileWriter(file)
     if (head != "")
       fw.write(head)
-    data.foreach(v => Unit) //for compute
+    data.foreach(v => Unit) //force compute
     val iterator = data.toLocalIterator
     while (iterator.hasNext) {
       val cur = iterator.next()

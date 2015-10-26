@@ -88,6 +88,20 @@ object Region {
     }
     apply(c, s, e)
   }
+  def apply(pattern: String): Region = {
+    val onlyChr = """(?:chr)?(\d+)""".r
+    val start = """(?:chr)?(\d+):(\d+)-""".r
+    val end = """(?:chr)?(\d+):-(\d+)""".r
+    val full = """(?:chr)?(\d+):(\d+)-(\d+)""".r
+    pattern match {
+      case onlyChr(chr) => Region(chr, 0, Int.MaxValue)
+      case start(chr, s) => Region(chr, s.toInt, Int.MaxValue)
+      case end(chr, e) => Region(chr, 0, e.toInt)
+      case full(chr, s, e) => Region(chr, s.toInt, e.toInt)
+      case _ => Region("27", 0, 0)
+    }
+  }
+
   /**
     * def collapse(regs: List[Region]): List[Region] = {
     * }

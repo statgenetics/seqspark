@@ -5,7 +5,7 @@ import org.apache.spark.SparkContext
 import org.dizhang.seqa.util.InputOutput._
 
 /**
- * Created by zhangdi on 8/18/15.
+ * Pipeline worker
  */
 object Worker {
   val slaves = Map[String, Worker[VCF, VCF]](

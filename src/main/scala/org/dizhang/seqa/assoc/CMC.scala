@@ -4,6 +4,7 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.stat.{LogisticRegression, LinearRegression}
 import org.dizhang.seqa.util.Constant._
+import Unphased._
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.ds._
 import com.typesafe.config.Config

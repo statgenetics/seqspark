@@ -6,8 +6,7 @@ import com.typesafe.config.Config
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.ds.Counter
-import org.dizhang.seqa.util.Constant
-import Constant.{Bt, Gt}
+import org.dizhang.seqa.util.Constant.Unphased._
 import org.dizhang.seqa.util.InputOutput._
 import sys.process._
 
@@ -20,6 +19,7 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
   implicit val name = new WorkerName("genotypeLevelQC")
 
   def apply(input: RawVCF)(implicit cnf: Config, sc: SparkContext): VCF = {
+
     statGdGq(input)
     val genoCnf : Config = cnf.getConfig(name.toString)
     val gd = genoCnf.getIntList("gd")

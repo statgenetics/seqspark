@@ -9,7 +9,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.Constant
-import Constant.{Bt, Hg19, Hg38}
+import Constant.{Unphased, Hg19, Hg38}
+import Unphased.Bt
 import org.dizhang.seqa.util.InputOutput._
 
 import sys.process._

@@ -3,7 +3,7 @@ package org.dizhang.seqa
 import org.apache.spark.{SparkContext, SparkConf}
 import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.InputOutput._
-import org.dizhang.seqa.worker.{ReadVCF, GenotypeLevelQC}
+import org.dizhang.seqa.worker.{Import, GenotypeLevelQC}
 import com.typesafe.config.{ConfigFactory, Config}
 import java.io.File
 import worker._
@@ -119,7 +119,7 @@ object SeqA {
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[Pair]]))
     implicit val sc: SparkContext = new SparkContext(scConf)
 
-    val raw: RawVCF = ReadVCF(cnf.getString("genotypeInput.source"))
+    val raw: RawVCF = Import(cnf.getString("genotypeInput.source"))
 
     println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
     val current: VCF =

@@ -9,7 +9,7 @@ import java.io.File
 import worker._
 
 /**
- * Created by zhangdi on 8/18/15.
+ * Main function
  */
 
 object SeqA {
@@ -64,6 +64,7 @@ object SeqA {
                 |                     Annotate the variants using annovar.
                 |                 5: Association test
                 |                     Run rare variant association test
+                |                 6: Export data
                 |"""
 
     if (args.length == 0 || args.length > 2) {
@@ -103,7 +104,7 @@ object SeqA {
     val project = cnf.getString("project")
 
     /** determine the input */
-    val dirs = List("readvcf", "genotype", "sample", "variant", "annotation", "association")
+    val dirs = List("readvcf", "genotype", "sample", "variant", "annotation", "association", "export")
     val rangeP = """(\d+)-(\d+)""".r
     val listP = """(\d+)(,\d+)+""".r
     val singleP = """(\d+)""".r

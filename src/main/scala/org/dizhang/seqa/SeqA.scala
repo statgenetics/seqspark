@@ -71,9 +71,9 @@ object SeqA {
       println(usage)
       false
     } else if (args.length == 2) {
-      val p1 = """([1-4])""".r
-      val p2 = """([1-4])-([1-4])""".r
-      val p3 = """([1-4])(,[1-4])+""".r
+      val p1 = """([1-6])""".r
+      val p2 = """([1-6])-([1-6])""".r
+      val p3 = """([1-6])(,[1-6])+""".r
       args(1) match {
         case p1(s) => true
         case p2(s1, s2) if (s2.toInt >= s1.toInt) => true

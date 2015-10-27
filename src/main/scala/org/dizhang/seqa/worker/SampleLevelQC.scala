@@ -17,7 +17,7 @@ import sys.process._
 import scala.io.Source
 
 /**
- * Created by zhangdi on 8/18/15.
+ * Sample level QC
  */
 object SampleLevelQC extends Worker[VCF, VCF] {
 

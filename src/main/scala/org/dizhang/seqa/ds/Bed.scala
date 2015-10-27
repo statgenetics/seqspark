@@ -1,6 +1,7 @@
 package org.dizhang.seqa.ds
 
 import org.dizhang.seqa.util.Constant
+import Constant.Unphased._
 
 @SerialVersionUID(4L)
 class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {

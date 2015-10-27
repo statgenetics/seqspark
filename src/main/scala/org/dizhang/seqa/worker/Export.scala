@@ -13,7 +13,8 @@ import org.dizhang.seqa.util.InputOutput._
  * Export genotype data
  */
 
-object Export extends Worker[VCF, Unit] {
+object Export extends Worker[VCF, VCF] {
+
   implicit val name = new WorkerName("expot")
   type Buffer = Array[Byte]
 
@@ -42,7 +43,7 @@ object Export extends Worker[VCF, Unit] {
       (snp, geno)
     }
 
-    def apply(input: VCF): Unit = {
+    def apply(input: VCF)(implicit cnf: Config): Unit = {
       val hm = input.map(v => variantToHapMix(v))
       val bufSize = 4 * 1024 * 1024
       val fout1 = new FileOutputStream("%s/hapmix.snp" format workerDir)
@@ -69,7 +70,7 @@ object Export extends Worker[VCF, Unit] {
   }
 
 
-  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): Unit = {
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     val phenoFile = cnf.getString("sampleInfo.source")
     val samplesCol = cnf.getString("export.samples")
     val samples: Array[Boolean] = readColumn(phenoFile, samplesCol).map(x => if (x == "1") true else false)
@@ -77,6 +78,7 @@ object Export extends Worker[VCF, Unit] {
     val output = input.filter(v => selectVariant(v, regions)).map(v => v.select(samples))
     if (cnf.getString("export.type") == "hapmix")
       HapMix(input)
+    input
   }
 
 }

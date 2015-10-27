@@ -3,7 +3,8 @@ package org.dizhang.seqa.util
 import java.io.{File, FileWriter, PrintWriter}
 import com.typesafe.config.Config
 import org.apache.spark.rdd.RDD
-import Constant.{Gt, Pheno}
+import Constant._
+import Unphased._
 import org.dizhang.seqa.ds.{SparseVariant, DenseVariant}
 import scala.io.Source
 

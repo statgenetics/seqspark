@@ -15,7 +15,7 @@ import scala.collection.JavaConverters._
 /**
  * CMC method for rare variant association
  */
-
+/**
 object demo {
   val variants = Array(Array("0/0"))
   def maf(v: Array[String]) = 0.0
@@ -40,6 +40,7 @@ object demo {
       (0 until v1.length)
         .map(i => compose(v1(i), v2(i))))
 }
+*/
 
 object CMC {
   /** Implement (Auer et al. 2013) to make mean imputation on missing genotypes */
@@ -77,7 +78,7 @@ object CMC {
     i.map(v => {
       val maf: Double = getMaf(v.toCounter(makeMaf).reduce)
       v.toCounter(makeWithNaAdjust(_, maf))
-    }).reduce((a, b) => a.++(b)(AdderWithNaAdjust).toDenseVector(x => x))
+    }).reduce((a, b) => a.++(b)(AdderWithNaAdjust)).toDenseVector(x => x)
   }
 }
 

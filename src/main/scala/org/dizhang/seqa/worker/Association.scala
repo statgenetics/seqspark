@@ -32,15 +32,16 @@ object show {
 
 }
 
-object Association extends Worker[VCF, Unit] {
+object Association extends Worker[VCF, VCF] {
+
   implicit val name = new WorkerName("association")
 
-  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): Unit = {
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
 
     /** mute the netlib-java info level logging */
     val flogger = logging.Logger.getLogger("com.github.fommil")
     flogger.setLevel(logging.Level.WARNING)
-
+    input
   }
 
 

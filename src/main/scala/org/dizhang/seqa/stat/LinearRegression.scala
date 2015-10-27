@@ -31,7 +31,8 @@ class LinearRegression(y: DenseVector[Double], x: DenseVector[Double], cov: Opt[
           inv(r1) * (q1.t * y)
         }
         val dof = x.length - xMat.cols
-        val sse = y.t * (DenseMatrix.eye (x.length) - xMat * estimates)
+        //val sse = y.t * (DenseMatrix.eye[Double](x.length) - xMat * estimates)
+        val sse = y.t * y - estimates.t * xMat.t * y
         val mse = sse / dof
         val covCoef = mse * inv (xMat.t * xMat)
         val sdBeta = sqrt (diag (covCoef) )

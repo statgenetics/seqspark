@@ -139,7 +139,7 @@ object SeqA {
     }
       */
     implicit def make(b: Byte): String = {
-      util.Constant.Bt.conv(b)
+      util.Constant.Unphased.Bt.conv(b)
     }
 
     Option(cnf.getBoolean("save")) match {

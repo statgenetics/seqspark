@@ -8,12 +8,14 @@ import org.dizhang.seqa.util.InputOutput._
  * Pipeline worker
  */
 object Worker {
+
   val slaves = Map[String, Worker[VCF, VCF]](
     "sample" -> SampleLevelQC,
     "variant" -> VariantLevelQC,
-    "annotation" -> Annotation
+    "annotation" -> Annotation,
+    "association" -> Association,
+    "export" -> Export
   )
-
   def recurSlaves(input: VCF, sl: List[String])(implicit cnf: Config, sc: SparkContext): VCF = {
     if (sl.tail == Nil)
       slaves(sl.head)(input)

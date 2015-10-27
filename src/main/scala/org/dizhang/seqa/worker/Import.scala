@@ -10,6 +10,7 @@ import org.dizhang.seqa.util.InputOutput._
  * Always read a dense variant from VCF
  */
 object Import extends Worker[String, RawVCF] {
+
   implicit val name = new WorkerName("readvcf")
 
   def apply(input: String)(implicit cnf: Config, sc: SparkContext): RawVCF = {

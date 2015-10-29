@@ -1,13 +1,16 @@
 package org.dizhang.seqa.worker
 
-import java.io.{BufferedOutputStream, BufferedInputStream, FileOutputStream}
+import java.io.{IOException, BufferedOutputStream, BufferedInputStream, FileOutputStream}
 
 import com.typesafe.config.Config
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.ds.{Region, Variant}
 import org.dizhang.seqa.util.Constant._
+import Unphased._
 import org.dizhang.seqa.util.InputOutput._
+import org.dizhang.seqa.ds
+import sys.process._
 
 /**
  * Export genotype data
@@ -15,7 +18,7 @@ import org.dizhang.seqa.util.InputOutput._
 
 object Export extends Worker[VCF, VCF] {
 
-  implicit val name = new WorkerName("expot")
+  implicit val name = new WorkerName("export")
   type Buffer = Array[Byte]
 
   def selectVariant(v: Variant[Byte], rs: Array[Region]): Boolean = {
@@ -27,57 +30,61 @@ object Export extends Worker[VCF, VCF] {
   }
 
   object HapMix {
-    def variantToHapMix(v: Variant[Byte]): (Buffer, Buffer) = {
-      val snp = s"${v.id} ${v.chr} ${v.pos.toFloat / 1e6 } ${v.pos} ${v.ref} ${v.alt}\n".getBytes()
-      val flip = v.flip.getOrElse(false)
-      implicit def make(b: Byte): String = {
-        val x = if (flip) b else Phased.Bt.flip(b)
-        x match {
-          case Phased.Bt.ref => "00"
-          case Phased.Bt.het1 => "01"
-          case Phased.Bt.het2 => "10"
-          case Phased.Bt.mut => "11"
-        }
+
+    def makePhased(b: Byte): String = {
+      b match {
+        case Bt.ref => "00"
+        case Bt.het1 => "01"
+        case Bt.het2 => "10"
+        case Bt.mut => "11"
+        case Bt.mis => "99"
       }
-      val geno = v.geno.mkString("") + "\n" getBytes()
-      (snp, geno)
+    }
+
+    def makeUnPhased(b: Byte): String = {
+      b match {
+        case Bt.ref => "0"
+        case Bt.het1 => "1"
+        case Bt.het2 => "1"
+        case Bt.mut => "2"
+        case Bt.mis => "9"
+      }
     }
 
     def apply(input: VCF)(implicit cnf: Config): Unit = {
-      val hm = input.map(v => variantToHapMix(v))
-      val bufSize = 4 * 1024 * 1024
-      val fout1 = new FileOutputStream("%s/hapmix.snp" format workerDir)
-      val fout2 = new FileOutputStream("%s/hapmix.geno" format workerDir)
-      val out1 = new BufferedOutputStream(fout1, bufSize)
-      val out2 = new BufferedOutputStream(fout2, bufSize)
-      val bzOut1 = new BZip2CompressorOutputStream(out1)
-      val bzOut2 = new BZip2CompressorOutputStream(out2)
-      hm.cache()
-      hm.foreach(_ => Unit)
-      val iterator = hm.toLocalIterator
-      while (iterator.hasNext) {
-        val cur = iterator.next()
-        bzOut1.write(cur._1)
-        bzOut2.write(cur._2)
+      val hm =
+        if (cnf.getBoolean("export.phased"))
+          input.map(v => ds.HapMix(v)(makePhased))
+        else
+          input.map(v => ds.HapMix(v)(makeUnPhased))
+      val res = hm.mapPartitions{
+          p => val x = p.reduce((a, b) => ds.HapMix.add(a, b))
+          List((compress(x.snp), compress(x.geno))).toIterator
+      }.collect()
+      val snpFile = workerDir + "/hapmix.snp.bz2"
+      val genoFile = workerDir + "/hapmix.geno.bz2"
+      val fout1 = new FileOutputStream(snpFile)
+      val fout2 = new FileOutputStream(genoFile)
+      try {
+        res.foreach {o => fout1.write(o._1); fout2.write(o._2)}
+      } catch {
+        case ioe: IOException => throw ioe
+        case e: Exception => throw e
+      } finally {
+        fout1.close()
+        fout2.close()
       }
-      bzOut1.close()
-      bzOut2.close()
-      out1.close()
-      out2.close()
-      fout1.close()
-      fout2.close()
     }
   }
-
 
   def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     val phenoFile = cnf.getString("sampleInfo.source")
     val samplesCol = cnf.getString("export.samples")
     val samples: Array[Boolean] = readColumn(phenoFile, samplesCol).map(x => if (x == "1") true else false)
     val regions = cnf.getString("export.variants").split(",").map(p => Region(p))
-    val output = input.filter(v => selectVariant(v, regions)).map(v => v.select(samples))
+    val output = input.filter(v => selectVariant(v, regions)).map(v => v.select(samples)).repartition(input.partitions.length)
     if (cnf.getString("export.type") == "hapmix")
-      HapMix(input)
+      HapMix(output)
     input
   }
 

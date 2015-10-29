@@ -8,7 +8,7 @@ import org.dizhang.seqa.util.InputOutput._
 import scala.io.Source
 
 /**
- * Created by zhangdi on 8/18/15.
+ * Variant level QC
  */
 
 object VariantLevelQC extends Worker[VCF, VCF] {
@@ -67,7 +67,7 @@ object VariantLevelQC extends Worker[VCF, VCF] {
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {
       //println("!!! var: %s-%d cnt.length %d" format(v.chr, v.pos, v.cnt.length))
-      val cntB = v.toCounter(GenotypeLevelQC.makeCallRate).reduceByKey(keyFunc)
+      val cntB = v.toCounter(GenotypeLevelQC.makeCallRate, (1, 1)).reduceByKey(keyFunc)
       val min = cntB.values reduce ((a, b) => if (a._1/a._2 < b._1/b._2) a else b)
       if (min._1/min._2.toDouble < (1 - misRate)) {
         //println("min call rate for %s-%d is (%f %f)" format(v.chr, v.pos, min._1, min._2))
@@ -80,7 +80,7 @@ object VariantLevelQC extends Worker[VCF, VCF] {
 
     /** if maf is high enough and not a batch-specific snv */
     def mafP (v: Var): Boolean = {
-      val cnt = v.toCounter(GenotypeLevelQC.makeMaf)
+      val cnt = v.toCounter(GenotypeLevelQC.makeMaf, (0, 2))
       val cntA = cnt.reduce
       val cntB = cnt.reduceByKey(keyFunc)
       val max = cntB.values reduce ((a, b) => if (a._1 > b._1) a else b)

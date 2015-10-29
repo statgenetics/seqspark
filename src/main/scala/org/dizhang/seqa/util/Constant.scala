@@ -13,48 +13,19 @@ object Constant {
     val mis = "NA"
   }
 
-  object Unphased {
-    object Bt {
-      val mis: Byte = -9
-      val ref: Byte = 0
-      val het: Byte = 1
-      val mut: Byte = 3
-      def conv(g: Byte): String = {
-        g match {
-          case `mis` => Gt.mis
-          case `het` => Gt.het
-          case `mut` => Gt.mut
-          case `ref` => Gt.ref
-          case _ => Gt.mis
-        }
-      }
-      def flip(g: Byte): Byte = {
-        g match {
-          case `ref` => mut
-          case `mut` => ref
-          case _ => g
-        }
-      }
-    }
-
-    object Gt {
-      val mis = "./."
-      val ref = "0/0"
-      val het = "0/1"
-      val mut = "1/1"
-      def conv(g: String): Byte = {
-        g match {
-          case `mis` => Bt.mis
-          case `het` => Bt.het
-          case `mut` => Bt.mut
-          case `ref` => Bt.ref
-          case _ => Bt.mis
-        }
-      }
-    }
+  implicit class Genotype(val value: String) extends AnyVal {
+    import Unphased._
+    def gt = value.split(":")(0).replace('|', '/')
+    def bt = Gt.conv(gt)
   }
 
-  object Phased {
+  implicit class InnerGenotype(val value: Byte) extends AnyVal {
+    import Unphased._
+    def isHet = value == Bt.het1 || value == Bt.het2
+    def isHom = value == Bt.ref || value == Bt.mut
+  }
+
+  object Unphased {
     object Bt {
       val mis: Byte = -9
       val ref: Byte = 0
@@ -83,11 +54,11 @@ object Constant {
     }
 
     object Gt {
-      val mis = ".|."
-      val ref = "0|0"
-      val het1 = "0|1"
-      val het2 = "1|0"
-      val mut = "1|1"
+      val mis = "./."
+      val ref = "0/0"
+      val het1 = "0/1"
+      val het2 = "1/0"
+      val mut = "1/1"
       def conv(g: String): Byte = {
         g match {
           case `mis` => Bt.mis

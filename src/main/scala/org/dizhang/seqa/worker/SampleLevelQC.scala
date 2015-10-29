@@ -9,8 +9,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.Constant
-import Constant.{Unphased, Hg19, Hg38}
-import Unphased.Bt
+import Constant._
+import Unphased._
 import org.dizhang.seqa.util.InputOutput._
 
 import sys.process._
@@ -39,12 +39,12 @@ object SampleLevelQC extends Worker[VCF, VCF] {
         Array.fill(samples.length)("0")
 
     /** save new pheno file after remove bad samples */
-    val phenoArray = Source.fromFile(pheno).getLines.toArray
+    val phenoArray = Source.fromFile(pheno).getLines().toArray
     val header = phenoArray(0)
     val newPhenoArray =
       for {
-        i <- (0 until remove.length).toArray
-        if (remove(i) != "1")
+        i <- remove.indices.toArray
+        if remove(i) != "1"
       } yield phenoArray(i + 1)
     writeArray(newPheno, header +: newPhenoArray)
 
@@ -53,12 +53,12 @@ object SampleLevelQC extends Worker[VCF, VCF] {
         .filter(p => p._1 == "1")
         .map(p => p._2 -> Bt.mis)
         .toMap
-
-    val res = input.map(v => v.update(maskMap))
+    val indicator = sc.broadcast(remove map (x => if (x == "1") false else true))
+    val res = input.map(v => v.select(indicator.value))
     res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (cnf.getBoolean("sampleLevelQC.save") == true)
+    if (cnf.getBoolean("sampleLevelQC.save"))
       try {
         res.saveAsObjectFile(workerDir)
       } catch {
@@ -74,11 +74,12 @@ object SampleLevelQC extends Worker[VCF, VCF] {
       *  2. only SNV
       * */
 
+
     /** count heterozygosity rate */
     def makex (g: Byte): Pair = {
       if (g == Bt.mis)
         (0, 0)
-      else if (g == Bt.het)
+      else if (g.isHet)
         (1, 1)
       else
         (0, 1)
@@ -98,17 +99,17 @@ object SampleLevelQC extends Worker[VCF, VCF] {
       val allo = vars
         .filter (v => v.chr == "X" || v.chr == "Y")
         .filter (v => pXY forall (r => ! r.contains(v.chr, v.pos.toInt - 1)) )
-      allo.cache
+      allo.cache()
       //println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
       val emp: Counter[Pair] = Counter.fill[Pair](vars.take(1).length)((0, 0))
       val xHetRate =
-        if (xVars.isEmpty)
+        if (xVars.isEmpty())
           emp
         else {
           xVars
-            .map(v => v.toCounter(makex))
+            .map(v => v.toCounter(makex, (0, 1)))
             .reduce((a, b) => a ++ b)
           //peek(tmp)
           //val testVar = xVars.takeSample(false, 100)
@@ -120,11 +121,11 @@ object SampleLevelQC extends Worker[VCF, VCF] {
           //tmp.map(c => c.cnt).reduce((a, b) => Counter.addGeno[Pair](a, b))
         }
       val yCallRate =
-        if (yVars.isEmpty)
+        if (yVars.isEmpty())
           emp
         else
           yVars
-            .map (v => v.toCounter(makey))
+            .map (v => v.toCounter(makey, (1, 1)))
             .reduce ((a, b) => a ++ b)
       (xHetRate, yCallRate)
     }
@@ -143,10 +144,10 @@ object SampleLevelQC extends Worker[VCF, VCF] {
       pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
       val x: Counter[Pair] = res._1
       val y: Counter[Pair] = res._2
-      for (i <- 0 until iids.length) {
+      for (i <- iids.indices) {
         pw.write("%s,%s,%s,%d,%d,%d,%d\n" format (fids(i), iids(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
       }
-      pw.close
+      pw.close()
     }
     write(count(vars))
   }

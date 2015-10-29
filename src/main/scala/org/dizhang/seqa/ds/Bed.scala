@@ -15,17 +15,18 @@ class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
 }
 
 object Bed {
-  import Constant._
   def apply(): Bed = {
     new Bed(Array[Byte](), Array[Byte]())
   }
-  def apply(v: SparseVariant[Byte]): Bed = {
-    def make (g: Byte): Byte = {
+
+  def apply(v: Variant[Byte]): Bed = {
+    def makeBed (g: Byte): Byte = {
       //val s = g split (":")
       g match {
         case Bt.mis => 1.toByte
         case Bt.ref => 0.toByte
-        case Bt.het => 2.toByte
+        case Bt.het1 => 2.toByte
+        case Bt.het2 => 2.toByte
         case Bt.mut => 3.toByte
         case _ => 1.toByte
       }
@@ -39,12 +40,12 @@ object Bed {
     val bed: Array[Byte] =
       for {
         i <- Array[Int]() ++ (0 to v.length/4)
-        four = 0 to 3 map (j => if (4 * i + j < v.length) make(v(4 * i + j)) else 0.toByte)
+        four = 0 to 3 map (j => if (4 * i + j < v.length) makeBed(v(4 * i + j)) else 0.toByte)
       } yield
         four.zipWithIndex.map(a => a._1 << 2 * a._2).sum.toByte
     new Bed(bim, bed)
   }
-  def add(a: Bed, b: Bed): Bed = {
+
+  def add(a: Bed, b: Bed): Bed =
     new Bed(a.bim ++ b.bim, a.bed ++ b.bed)
-  }
 }

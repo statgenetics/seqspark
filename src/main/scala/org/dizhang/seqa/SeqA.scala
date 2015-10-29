@@ -129,7 +129,11 @@ object SeqA {
       else
         raw
 
-    val last = Worker.recurSlaves(current, s.tail.map(dirs(_)))
+    val last =
+      if (s(0) == 1)
+        Worker.recurSlaves(current, s.tail.map(dirs(_)))
+      else
+        Worker.recurSlaves(current, s.map(dirs(_)))
 
     /**
     for (i <- s.slice(2, s.length - 1)) {

@@ -116,13 +116,14 @@ object Counter {
   /** Start define some functions for Counter */
 
   val THRESHOLD = 0.25
+  val MINIMIUM = 10000
   def fill[A](size: Int)(sparseValue: A): Counter[A] = SparseCounter[A](Map.empty[Int, A], sparseValue, size)
   def fromIndexedSeq[A](iseq: IndexedSeq[A], default: A): Counter[A] = {
-    if (iseq.size == 0) {
+    if (iseq.isEmpty) {
       fill[A](0)(default)
     } else {
       val denseSize = iseq.count( _ != default)
-      if (denseSize < iseq.size * THRESHOLD)
+      if (iseq.size >= MINIMIUM && denseSize < iseq.size * THRESHOLD)
         SparseCounter(toMap(iseq, default), default, iseq.size)
       else
         DenseCounter(iseq, default)
@@ -130,13 +131,13 @@ object Counter {
   }
 
   def fromMap[A](m: Map[Int, A], default: A, size: Int): Counter[A] = {
-    if (m.size == 0)
+    if (m.isEmpty)
       fill[A](size)(default)
     else {
       val maxIdx = m.keys.max
       require(maxIdx < size)
       val denseSize = m.count(_._2 != default)
-      if (denseSize < size * THRESHOLD)
+      if (size >= MINIMIUM && denseSize < size * THRESHOLD)
         SparseCounter(m, default, size)
       else
         DenseCounter(toIndexedSeq(m, default, size), default)
@@ -147,8 +148,8 @@ object Counter {
     iseq.view.zipWithIndex.filter(_._1 != default).map(_.swap).toMap
 
   def toIndexedSeq[A](m: Map[Int, A], default: A, size: Int): IndexedSeq[A] = {
-    import scala.collection.mutable.Buffer
-    val buf = Buffer.fill[A](size)(default)
+    import scala.collection.mutable
+    val buf = mutable.Buffer.fill[A](size)(default)
     m.foreach { case (idx, v) => buf(idx) = v }
     Vector(buf: _*)
   }
@@ -206,7 +207,7 @@ sealed trait Counter[A] extends Serializable {
     */
 }
 
-case class DenseCounter[A](elems: IndexedSeq[A], val default: A)
+case class DenseCounter[A](elems: IndexedSeq[A], default: A)
   extends Counter[A] {
   def apply(i: Int) = elems(i)
   def size = elems.length
@@ -220,11 +221,9 @@ case class DenseCounter[A](elems: IndexedSeq[A], val default: A)
 
   def toMap = elems.view.zipWithIndex.filter( _._1 != default ).map( _.swap ).toMap
 
-
-
 }
 
-case class SparseCounter[A](elems: Map[Int, A], val default: A, val size: Int)
+case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
   extends Counter[A] {
   def apply(i: Int) = {
     require(i < size)
@@ -237,7 +236,7 @@ case class SparseCounter[A](elems: Map[Int, A], val default: A, val size: Int)
   }
   def reduceByKey[B](keyFunc: Int => B)(implicit sg: CounterElementSemiGroup[A]): Map[B, A] = {
     val dense: Map[B, A] = elems.groupBy(x => keyFunc(x._1)).mapValues(
-      c => c.map(x => x._2).reduce((a, b) => sg.op(a, b))
+      c => c.values.reduce((a, b) => sg.op(a, b))
     ).map(identity)
     val denseSizes: Map[B, Int] = elems.groupBy(x => keyFunc(x._1)).mapValues(_.size).map(identity)
     val sizes: Map[B, Int] = (0 until size).groupBy(keyFunc(_)).mapValues(_.size).map(identity)

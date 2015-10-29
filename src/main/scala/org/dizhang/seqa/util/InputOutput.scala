@@ -1,20 +1,19 @@
 package org.dizhang.seqa.util
 
-import java.io.{File, FileWriter, PrintWriter}
+import java.io._
 import com.typesafe.config.Config
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
 import Constant._
-import Unphased._
-import org.dizhang.seqa.ds.{SparseVariant, DenseVariant}
+import org.dizhang.seqa.ds.Variant
 import scala.io.Source
-
 /**
  * defines some input/output functions here
  */
 
 object InputOutput {
-  type RawVar = DenseVariant[String]
-  type Var = SparseVariant[Byte]
+  type RawVar = Variant[String]
+  type Var = Variant[Byte]
   type RawVCF = RDD[RawVar]
   type VCF = RDD[Var]
   type Pair = (Int, Int)
@@ -27,13 +26,9 @@ object InputOutput {
 
   /** If RDD[Variant[Byte]\] is required but RDD[Variant[String]\]
     * is provided, convert it implicitly */
-  implicit def naivelyConvertRawVcfToVcf(raw: RawVCF): VCF = {
-    def make(g: String): String = {
-      val s = g.split(":")
-      s(0)
-    }
-    raw.map(v => v.toSparseVariant(Gt.ref).map(Gt.conv(_)))
-  }
+  implicit def naivelyConvertRawVcfToVcf(raw: RawVCF)(implicit cnf: Config): VCF =
+    raw.map(v => v.map(g => g.bt))
+
 
   def runtimeRootDir(implicit cnf: Config): String =
     cnf.getString("runtimeRootDir")
@@ -108,4 +103,18 @@ object InputOutput {
     println("There are %s records like this:" format(dat.count()))
     println(dat.takeSample(false,1)(0))
   }
+
+  def compress(text: String): Array[Byte] = {
+    val baos = new ByteArrayOutputStream()
+    try {
+      val out = new BZip2CompressorOutputStream(baos)
+      out.write(text.getBytes())
+      out.close()
+    } catch {
+      case ioe: IOException => throw ioe
+      case e: Exception => throw e
+    }
+    baos.toByteArray
+  }
+
 }

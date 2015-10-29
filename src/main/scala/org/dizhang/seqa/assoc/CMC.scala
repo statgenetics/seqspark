@@ -76,8 +76,8 @@ object CMC {
 
   def collapse(i: Iterable[Var]): DenseVector[Double] = {
     i.map(v => {
-      val maf: Double = getMaf(v.toCounter(makeMaf).reduce)
-      v.toCounter(makeWithNaAdjust(_, maf))
+      val maf: Double = getMaf(v.toCounter(makeMaf, (0, 2)).reduce)
+      v.toCounter(makeWithNaAdjust(_, maf), 0.0)
     }).reduce((a, b) => a.++(b)(AdderWithNaAdjust)).toDenseVector(x => x)
   }
 }

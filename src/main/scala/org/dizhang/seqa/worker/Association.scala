@@ -51,7 +51,7 @@ object Association extends Worker[VCF, VCF] {
     def make(b: Byte): Int = b.toInt
     val output = vars
       .filter(v => filter.contains(v.parseInfo("ANNO").split(":").last))
-      .map(v => (v.parseInfo(group), v.toCounter(make)))
+      .map(v => (v.parseInfo(group), v.toCounter(make, 0)))
       .reduceByKey((a, b) => a ++ b)
       .map(x => (x._1, x._2.toDenseVector(x => if (x > 0) 1.0 else 0.0)))
     output.persist(StorageLevel.MEMORY_AND_DISK_SER)

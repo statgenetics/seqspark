@@ -49,11 +49,11 @@ object GenotypeLevelQC extends Worker[RawVCF, VCF] {
     //res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (genoCnf.getString("save") == "true")
+    if (genoCnf.getBoolean("save"))
       try {
-        res.saveAsObjectFile(workerDir)
+        res.saveAsObjectFile(saveDir)
       } catch {
-        case e: Exception => {println("step1: save failed"); System.exit(1)}
+        case e: Exception => {println("Genotype level QC: save failed"); System.exit(1)}
       }
     res
   }

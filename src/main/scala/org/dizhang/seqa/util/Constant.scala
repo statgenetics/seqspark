@@ -23,6 +23,8 @@ object Constant {
     import Unphased._
     def isHet = value == Bt.het1 || value == Bt.het2
     def isHom = value == Bt.ref || value == Bt.mut
+    def toPhased = Bt.conv(value)
+    def toUnPhased = toPhased.replace('/', '|')
   }
 
   object Unphased {

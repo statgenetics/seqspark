@@ -4,8 +4,7 @@ import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.util.InputOutput._
-
-import scala.io.Source
+import org.dizhang.seqa.ds.Counter._
 
 /**
  * Variant level QC
@@ -20,8 +19,10 @@ object VariantLevelQC extends Worker[VCF, VCF] {
     def mafFunc (m: Double): Boolean =
       if (m < rareMaf || m > (1 - rareMaf)) true else false
 
-    val newPheno = "%s/%s/%s" format(resultsDir, SampleLevelQC.name, cnf.getString("sampleInfo.source").split("/").last)
-    val afterQC = miniQC(input, newPheno, mafFunc)
+    val newPheno = cnf.getString("sampleInfo.source")
+//      "%s/%s/%s" format(resultsDir, SampleLevelQC.name, cnf.getString("sampleInfo.source").split("/").last)
+    val rare = miniQC(input, newPheno, mafFunc)
+    /**
     val targetFile = cnf.getString("variantLevelQC.target")
     val select: Boolean = Option(targetFile) match {
       case Some(f) => true
@@ -39,14 +40,14 @@ object VariantLevelQC extends Worker[VCF, VCF] {
         afterQC.filter(v => vMap.contains("%s-%s".format(v.chr, v.pos)) && vMap("%s-%s".format(v.chr, v.pos)) == (v.ref + v.alt))
       } else
         afterQC
-
+    */
     rare.persist(StorageLevel.MEMORY_AND_DISK_SER)
     /** save is very time-consuming and resource-demanding */
-    if (cnf.getString("save") == "true")
+    if (cnf.getBoolean("variantLevelQC.save"))
       try {
-        rare.saveAsTextFile(workerDir)
+        rare.saveAsTextFile(saveDir)
       } catch {
-        case e: Exception => {println("step3: save failed"); System.exit(1)}
+        case e: Exception => {println("Variant level QC: save failed"); System.exit(1)}
       }
     rare
   }

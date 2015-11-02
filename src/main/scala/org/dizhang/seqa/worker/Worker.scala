@@ -3,11 +3,13 @@ package org.dizhang.seqa.worker
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.dizhang.seqa.util.InputOutput._
+import org.slf4j.{LoggerFactory, Logger}
 
 /**
  * Pipeline worker
  */
 object Worker {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   val slaves = Map[String, Worker[VCF, VCF]](
     "sample" -> SampleLevelQC,

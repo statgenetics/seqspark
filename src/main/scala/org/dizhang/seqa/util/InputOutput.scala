@@ -29,20 +29,27 @@ object InputOutput {
   implicit def naivelyConvertRawVcfToVcf(raw: RawVCF)(implicit cnf: Config): VCF =
     raw.map(v => v.map(g => g.bt))
 
-
-  def runtimeRootDir(implicit cnf: Config): String =
-    cnf.getString("runtimeRootDir")
+  def localWorkingDir(implicit cnf: Config): String =
+    cnf.getString("localWorkingDir")
 
   def resultsDir(implicit cnf: Config): String = {
-    "%s/results" format runtimeRootDir
+    "%s/results" format localWorkingDir
   }
 
   def workerDir(implicit cnf: Config, name: WorkerName): String = {
     "%s/%s" format (resultsDir, name)
   }
 
+  def saveDir(implicit cnf: Config, name: WorkerName): String = {
+    "%s/%s" format (cnf.getString("hdfsWorkingDir"), name)
+  }
+
   def sitesFile(implicit cnf: Config, name: WorkerName): String = {
     "%s/sites.raw.vcf" format workerDir
+  }
+
+  def sampleSize(file: String): Int = {
+    Source.fromFile(file).getLines().length - 1
   }
 
   def readColumn (file: String, col: String): Array[String] = {

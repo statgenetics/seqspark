@@ -26,7 +26,7 @@ object SeqA {
     try {
       //implicit val ini = new Ini(userConfFile)
 
-      implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load())
+      implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load().getConfig("seqa"))
 
       val modules = if (args.length == 2) args(1) else "1-4"
       checkConf
@@ -147,10 +147,6 @@ object SeqA {
       util.Constant.Unphased.Bt.conv(b)
     }
 
-    Option(cnf.getBoolean("save")) match {
-      case Some(x) => writeRDD(last.map(v => v.toString), "%s/%s-%s.vcf" format (resultsDir, project, dirs(s.last)))
-      case None => {println("No need to save VCF.")}
-    }
   }
 
 

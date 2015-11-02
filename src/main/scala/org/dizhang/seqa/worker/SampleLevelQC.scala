@@ -60,9 +60,9 @@ object SampleLevelQC extends Worker[VCF, VCF] {
     /** save is very time-consuming and resource-demanding */
     if (cnf.getBoolean("sampleLevelQC.save"))
       try {
-        res.saveAsObjectFile(workerDir)
+        res.saveAsObjectFile(saveDir)
       } catch {
-        case e: Exception => {println("step2: save failed"); System.exit(1)}
+        case e: Exception => {println("Sample level QC: save failed"); System.exit(1)}
       }
     res
   }
@@ -103,7 +103,7 @@ object SampleLevelQC extends Worker[VCF, VCF] {
       //println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
-      val emp: Counter[Pair] = Counter.fill[Pair](vars.take(1).length)((0, 0))
+      val emp: Counter[Pair] = Counter.fill[Pair](sampleSize(cnf.getString("sampleInfo.source")))((0, 0))
       val xHetRate =
         if (xVars.isEmpty())
           emp
@@ -133,9 +133,9 @@ object SampleLevelQC extends Worker[VCF, VCF] {
     /** write the result into file */
     def write (res: (Counter[Pair], Counter[Pair])) {
       val pheno = cnf.getString("sampleInfo.source")
-      val fids = readColumn(pheno, "FID")
-      val iids = readColumn(pheno, "IID")
-      val sex = readColumn(pheno, "Sex")
+      val fids = readColumn(pheno, "fid")
+      val iids = readColumn(pheno, "iid")
+      val sex = readColumn(pheno, "sex")
       val prefDir = workerDir
       val exitCode = "mkdir -p %s".format(prefDir).!
       println(exitCode)

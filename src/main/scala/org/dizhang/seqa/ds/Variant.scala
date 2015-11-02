@@ -89,7 +89,6 @@ sealed trait Variant[A] extends Serializable {
   def filter: String = meta(6)
   def info: String = meta(7)
   def format: String = meta(8)
-  //def flip: Option[Boolean]
 
   def geno(implicit make: A => String): IndexedSeq[String] =
     Variant.toIndexedSeq(this.map(g => make(g)))
@@ -123,7 +122,7 @@ sealed trait Variant[A] extends Serializable {
   var meta: Array[String]
 
   def site: String = {
-    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t.\n"
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t."
   }
 
   def isTi: Boolean = {

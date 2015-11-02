@@ -12,7 +12,7 @@ import org.dizhang.seqa.util.Constant._
  */
 object Import extends Worker[String, RawVCF] {
 
-  implicit val name = new WorkerName("readvcf")
+  implicit val name = new WorkerName("import")
 
   def apply(input: String)(implicit cnf: Config, sc: SparkContext): RawVCF = {
     val raw = sc.textFile(input)
@@ -46,11 +46,11 @@ object Import extends Worker[String, RawVCF] {
       else
         s2
     /** save is very time-consuming and resource-demanding */
-    if (cnf.getBoolean("save"))
+    if (genoInCnf.getBoolean("save"))
       try {
-        s3.saveAsObjectFile(workerDir)
+        s3.saveAsObjectFile(saveDir)
       } catch {
-        case e: Exception => {println("step1: save failed"); System.exit(1)}
+        case e: Exception => {println("Import: save failed"); System.exit(1)}
       }
     s3
   }

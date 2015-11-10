@@ -3,13 +3,8 @@ package org.dizhang.seqa.stat
 import breeze.linalg._
 import breeze.numerics._
 import breeze.optimize.{DiffFunction, LBFGS}
-import breeze.stats.distributions.Gaussian
+import breeze.stats.distributions.{Gaussian}
 import org.dizhang.seqa.util.Opt
-
-object LogisticRegression {
-  val y = breeze.linalg.DenseVector(new breeze.stats.distributions.Bernoulli(0.5).sample(100).map(if (_) 1.0 else 0.0).toArray)
-  val x = breeze.linalg.DenseVector(breeze.stats.distributions.Gaussian(0.0, 1.0).sample(100).toArray)
-}
 
 /**
  * Implement the logistic assoc with breeze
@@ -42,7 +37,7 @@ class LogisticRegression(y: DenseVector[Double], x: DenseVector[Double], cov: Op
   /** beta contains p elements (variable numbers plus 1 intercept)
     * g [n]: probability of n samples
     * */
-  val cost = new DiffFunction[Vector[Double]] {
+  lazy val cost = new DiffFunction[Vector[Double]] {
     def calculate(beta: Vector[Double]) = {
       val num = x.length
       val g = sigmoid(xMat * beta)

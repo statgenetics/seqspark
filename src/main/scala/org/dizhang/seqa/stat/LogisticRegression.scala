@@ -41,8 +41,9 @@ class LogisticRegression(val response: DenseVector[Double], val independents: De
       /** deviance: -2 * sum(y*log(g) + (1 - y)*log(1 - g)) */
       val value: Double = -2.0 * (response.t * log(g) + (ones - response).t * log(ones - g))
 
-      /** gradient on beta: -2 * sum(x * (y*(1 - g) - (1-y)g)) */
-      val gradient: Vector[Double] = -2.0 * (xs.t * (response.:*(ones - g) - g.:*(ones - response)))
+      /** gradient on beta: -2 * sum(x * (y - g)) */
+      //val gradient: Vector[Double] = -2.0 * (xs.t * (response.:*(ones - g) - g.:*(ones - response)))
+      val gradient: Vector[Double] = -2.0 * (xs.t * (response - g))
 
       (value, gradient)
     }

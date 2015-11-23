@@ -9,6 +9,7 @@ import breeze.linalg._
 @SerialVersionUID(6L)
 class LinearRegression(response: DenseVector[Double], independents: DenseMatrix[Double])
   extends Serializable {
+
   lazy val ones = DenseVector.ones[Double](response.length)
 
   lazy val xs = DenseMatrix.horzcat(ones.toDenseMatrix.t, independents)

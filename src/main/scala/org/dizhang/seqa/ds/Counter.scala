@@ -188,6 +188,13 @@ sealed trait Counter[A] extends Serializable {
     DenseVector((0 until size).map(i => make(this(i))).toArray)
   }
 
+  def toIndexedSeq = this match {
+    case DenseCounter(e, _) => e
+    case SparseCounter(e, d, s) => Counter.toIndexedSeq(e, d, s)
+  }
+
+  def toArray = this.toIndexedSeq.toArray
+
   def toMap: Map[Int, A]
 
   /**

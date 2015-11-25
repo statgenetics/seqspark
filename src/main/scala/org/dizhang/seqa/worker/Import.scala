@@ -26,7 +26,7 @@ object Import extends Worker[String, RawVCF] {
   def makeVariants(raw: RDD[String])(implicit cnf: Config): RawVCF = {
     val genoInCnf = cnf.getConfig("genotypeInput")
     val biAllelicSNV = genoInCnf.getString("biAllelicSNV")
-    val default = Unphased.Gt.ref
+    val default = UnPhased.Gt.ref
     val vars = raw filter (l => ! l.startsWith("#")) map (l => Variant.fromString(l, default))
     val s1 =
       if (genoInCnf.hasPath("filterNot")) {

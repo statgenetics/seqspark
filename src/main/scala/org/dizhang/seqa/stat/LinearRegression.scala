@@ -6,9 +6,9 @@ import breeze.linalg._
   * Linear regression mode for quantitative traits
   * Use the QR method to compute the coefficients
   */
-@SerialVersionUID(6L)
+//@SerialVersionUID(6L)
 class LinearRegression(response: DenseVector[Double], independents: DenseMatrix[Double])
-  extends Serializable {
+  extends Regression {
 
   lazy val ones = DenseVector.ones[Double](response.length)
 

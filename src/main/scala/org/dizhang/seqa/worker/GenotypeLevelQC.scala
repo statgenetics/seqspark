@@ -17,7 +17,7 @@ import sys.process._
 
 object GenotypeLevelQC extends Worker[RawVCF, VCF] {
 
-  import Unphased._
+  import UnPhased._
   implicit val name = new WorkerName("genotypeLevelQC")
 
   def apply(input: RawVCF)(implicit cnf: Config, sc: SparkContext): VCF = {

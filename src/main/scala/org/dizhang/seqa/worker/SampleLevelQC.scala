@@ -10,7 +10,7 @@ import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.ds.{Counter, Bed}
 import org.dizhang.seqa.util.Constant
 import Constant._
-import Unphased._
+import UnPhased._
 import org.dizhang.seqa.util.InputOutput._
 
 import sys.process._

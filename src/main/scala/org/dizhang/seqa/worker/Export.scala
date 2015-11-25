@@ -8,7 +8,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqa.ds.{Region, Variant}
 import org.dizhang.seqa.util.Constant._
-import Unphased._
+import UnPhased._
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.ds
 import sys.process._

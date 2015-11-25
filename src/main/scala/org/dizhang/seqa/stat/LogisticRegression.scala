@@ -8,9 +8,9 @@ import breeze.optimize.{DiffFunction, LBFGS}
   * Implement the logistic assoc with breeze
   * Use the LBFGS optimization method
   */
-@SerialVersionUID(5L)
+
 class LogisticRegression(val response: DenseVector[Double], val independents: DenseMatrix[Double])
-  extends Serializable {
+  extends Regression {
 
   /**
    * response: response variable

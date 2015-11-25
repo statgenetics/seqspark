@@ -4,7 +4,7 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqa.stat.{LogisticRegression, LinearRegression}
 import org.dizhang.seqa.util.Constant._
-import Unphased._
+import UnPhased._
 import org.dizhang.seqa.util.InputOutput._
 import org.dizhang.seqa.ds._
 import com.typesafe.config.Config
@@ -42,7 +42,7 @@ object demo {
 }
 */
 
-object CMC {
+object AssocTest {
   /** Implement (Auer et al. 2013) to make mean imputation on missing genotypes */
   def makeWithNaAdjust(x: Byte, m: Double): Double = {
     if (x == Bt.mis)
@@ -82,7 +82,7 @@ object CMC {
   }
 }
 
-class CMC(input: VCF)(implicit val cnf: Config, sc: SparkContext) extends Assoc {
+class AssocTest(input: VCF)(implicit val cnf: Config, sc: SparkContext) extends Assoc {
 
   def runTrait(t: String, funcVars: VCF): Unit = {
     val ped = cnf.getString("sampleInfo.source")
@@ -97,7 +97,7 @@ class CMC(input: VCF)(implicit val cnf: Config, sc: SparkContext) extends Assoc 
       val xsWithStrKeys = funcVars
         .map(v => (v.parseInfo("ANNO"), v.select(indicator)))
         .groupByKey()
-        .map(x => (x._1, CMC.collapse(x._2)))
+        .map(x => (x._1, AssocTest.collapse(x._2)))
         .sortByKey()
       xsWithStrKeys.cache()
       val xs = xsWithStrKeys.zipWithUniqueId().map(x => (x._2.toInt, x._1._2))

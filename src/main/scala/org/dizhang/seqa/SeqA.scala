@@ -144,7 +144,7 @@ object SeqA {
     }
       */
     implicit def make(b: Byte): String = {
-      util.Constant.Unphased.Bt.conv(b)
+      util.Constant.UnPhased.Bt.conv(b)
     }
 
   }

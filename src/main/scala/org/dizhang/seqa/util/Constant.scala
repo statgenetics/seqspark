@@ -13,21 +13,26 @@ object Constant {
     val mis = "NA"
   }
 
+  object Annotation {
+    val mafInfo = "SEQA_ANNO_MAF"
+    val weightInfo = "SEQA_ANNO_WEIGHT"
+  }
+
   implicit class Genotype(val value: String) extends AnyVal {
-    import Unphased._
+    import UnPhased._
     def gt = value.split(":")(0).replace('|', '/')
     def bt = Gt.conv(gt)
   }
 
   implicit class InnerGenotype(val value: Byte) extends AnyVal {
-    import Unphased._
+    import UnPhased._
     def isHet = value == Bt.het1 || value == Bt.het2
     def isHom = value == Bt.ref || value == Bt.mut
     def toPhased = Bt.conv(value)
     def toUnPhased = toPhased.replace('/', '|')
   }
 
-  object Unphased {
+  object UnPhased {
     object Bt {
       val mis: Byte = -9
       val ref: Byte = 0

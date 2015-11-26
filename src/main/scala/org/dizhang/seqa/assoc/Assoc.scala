@@ -17,10 +17,11 @@ import scala.annotation.tailrec
 
 abstract class Assoc {
 
-  val cnf: Config
 
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  /**
+  val cnf: Config
   def prepareCov(ped: String, t: String, covList: List[String], indicator: Array[Boolean]): Option[DenseMatrix[Double]] = {
 
     def checkedCov(cl: List[String]): List[String] = {
@@ -49,5 +50,5 @@ abstract class Assoc {
     } else
       Some(labelsFunc(getCov(cc.head).toDenseMatrix.t, cc.tail))
   }
-
+  */
 }

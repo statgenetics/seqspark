@@ -54,6 +54,17 @@ sealed trait ScoreTest {
     /** single side */
     dis.cdf(- abs(t))
   }
+
+  def summary: TestResult =
+    new TestResult {
+      override val estimate: Option[DenseVector[Double]] = None
+
+      override val stdErr: Option[DenseVector[Double]] = None
+
+      override val pValue: DenseVector[Double] = pValue
+
+      override val statistic: DenseVector[Double] = statistic
+    }
 }
 
 case class BinaryNoCovUniScoreTest(y: DenseVector[Double], x: DenseVector[Double]) extends ScoreTest {
@@ -88,7 +99,7 @@ case class BinaryCovMultiScoreTest(y: DenseVector[Double],
   lazy val v = 1
   lazy val n = y.length
   lazy val k = cov.cols + 1
-  lazy val s = x.cols + 1
+  lazy val s = x.cols
   lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
   lazy val mp: DenseVector[Double] = estimates
   lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
@@ -99,7 +110,7 @@ case class BinaryCovMultiScoreTest(y: DenseVector[Double],
   lazy val vVec: DenseVector[Double] = tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat)
   lazy val tVec = uVec :/ pow(vVec, 0.5)
   lazy val tMax = max(tVec)
-  override lazy val pValue = {
+  override lazy val statistic = {
     val tmp = MyMatrix[N, N](diag(y - mp)) * (MyMatrix[N, S](x) - MyMatrix[N, K](xs) * tmp2.t * tmp1.t)
     val covU = (tmp.t * tmp).mat
     val dU = diag(pow(diag(covU), 0.5))
@@ -107,8 +118,9 @@ case class BinaryCovMultiScoreTest(y: DenseVector[Double],
     val tMaxVec = DenseVector.fill(covT.mat.cols)(this.tMax)
     val t2 = y.length * (MyMatrix[S, One](tMaxVec).t * MyMatrix.inverse(covT) * MyMatrix[S, One](tMaxVec)).mat(0, 0)
     val f = (y.length - covU.cols)/(covU.cols * (y.length - 1)) * t2
-    1 - new FDistribution(covU.cols, y.length - covU.cols).cdf(f)
+    f
   }
+  override lazy val pValue = 1 - new FDistribution(s, n - s).cdf(statistic)
 }
 
 case class QuantNoCovUniScoreTest(y: DenseVector[Double], x: DenseVector[Double]) extends ScoreTest {
@@ -154,7 +166,7 @@ case class QuantCovMultiScoreTest(y: DenseVector[Double],
   lazy val vVec = vy * (tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat))
   lazy val tVec = uVec :/ pow(vVec, 0.5)
   lazy val tMax = max(tVec)
-  override lazy val pValue = {
+  override lazy val statistic = {
     val tmp = MyMatrix[N, N](diag(y - my)) * (MyMatrix[N, S](x) - MyMatrix[N, K](xs) * tmp2.t * tmp1.t)
     val covU = (tmp.t * tmp).mat
     val dU = diag(pow(diag(covU), 0.5))
@@ -162,6 +174,7 @@ case class QuantCovMultiScoreTest(y: DenseVector[Double],
     val tMaxVec = DenseVector.fill(s)(this.tMax)
     val t2 = n * (MyMatrix[S, One](tMaxVec).t * MyMatrix.inverse(covT) * MyMatrix[S, One](tMaxVec)).mat(0, 0)
     val f = (n - s)/(s * (n - 1)) * t2
-    1 - new FDistribution(s, n - s).cdf(f)
+    f
   }
+  override lazy val pValue = 1 - new FDistribution(s, n - s).cdf(statistic)
 }

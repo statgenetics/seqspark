@@ -25,13 +25,15 @@ object Constant {
         }
         val coding = "coding"
         val weight = "weight"
+        val permutation = "permutation"
+        val test = "test"
       }
       val `trait` = s"$association.trait"
       object Trait {
         val list = s"$`trait`.list"
       }
       object SomeTrait {
-        val `type` = "type"
+        val binary = "binary"
         val covariates = "covariates"
       }
     }
@@ -59,6 +61,11 @@ object Constant {
           val wss = "wss"
           val erec = "erec"
           val annotation = "annotation"
+        }
+        object Test {
+          val score = "score"
+          val lrt = "lrt"
+          val wald = "wald"
         }
       }
       object SomeTrait {

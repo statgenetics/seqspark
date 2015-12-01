@@ -6,6 +6,7 @@ import com.typesafe.config.Config
 import org.dizhang.seqa.ds.Counter
 import org.dizhang.seqa.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqa.util.Constant
+import org.dizhang.seqa.util.Constant.UnPhased
 import org.dizhang.seqa.util.Constant.UnPhased.Bt
 import org.dizhang.seqa.util.InputOutput.Var
 import org.dizhang.seqa.worker.GenotypeLevelQC.{getMaf, makeMaf}
@@ -66,6 +67,7 @@ object Encode {
 
   def apply(vars: Iterable[Var], sampleSize: Int, config: Config): Encode = {
     config.getString(ConfigPathMethod.coding) match {
+      case ConfigValueMethod.Coding.single => DefaultSingle(vars, sampleSize, config)
       case ConfigValueMethod.Coding.cmc => DefaultCMC(vars, sampleSize, config)
       case ConfigValueMethod.Coding.brv => SimpleBRV(vars, sampleSize, config)
       case _ => DefaultCMC(vars, sampleSize, config)
@@ -74,6 +76,7 @@ object Encode {
 
   def apply(vars: Iterable[Var], sampleSize: Int, controls: Array[Boolean], config: Config): Encode = {
     config.getString(ConfigPathMethod.coding) match {
+      case ConfigValueMethod.Coding.single => ControlsMafSingle(vars, sampleSize, controls, config)
       case ConfigValueMethod.Coding.cmc => ControlsMafCMC(vars, sampleSize, controls, config)
       case ConfigValueMethod.Coding.brv => ControlsMafSimpleBRV(vars, sampleSize, controls, config)
       case _ => ControlsMafCMC(vars, sampleSize, controls, config)
@@ -96,9 +99,6 @@ object Encode {
             config: Config): Encode = {
     ControlsMafErecBRV(vars, sampleSize, controls, y, cov, config)
   }
-
-
-
 }
 
 sealed trait Encode {
@@ -107,36 +107,59 @@ sealed trait Encode {
   def sampleSize: Int
   def config: Config
   lazy val fixedCutoff: Double = config.getDouble(ConfigPathMethod.Maf.cutoff)
-  def thresholds: Array[Double] = {
+  def thresholds: Option[Array[Double]] = {
     val n = sampleSize
     /** this is to make sure 90% call rate sites is considered the same with the 100% cr ones
       * (with 1 - 4 minor alleles. anyway 5 is indistinguishable.
       * Because 5.0/0.9n - 5.0/n == 5.0/n - 4.0/0.9n */
     val tol = 4.0/(9 * n)
-    val sortedMaf = maf.sorted
-    sortedMaf.map(c => Array(c)).reduce((a, b) =>
-      if (a(-1) + tol >= b(0))
-        a.slice(0, a.length - 1) ++ b
-      else
-        a ++ b)
+    val sortedMaf = maf.filter(m => m < fixedCutoff).sorted
+    if (sortedMaf.isEmpty)
+      None
+    else
+      Some(sortedMaf.map(c => Array(c)).reduce((a, b) =>
+        if (a(-1) + tol >= b(0))
+          a.slice(0, a.length - 1) ++ b
+        else
+          a ++ b))
   }
-  def getFixed(cutoff: Double): DenseVector[Double]
-  def getVT = {
-    DenseVector.horzcat(thresholds.map(c => this.getFixed(c)): _*)
+  def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
+  def getVT: Option[DenseMatrix[Double]] = {
+    thresholds match {
+      case None => None
+      case Some(th) =>
+        Some(DenseVector.horzcat(th.map(c => this.getFixed(c).get): _*))
+    }
   }
 }
 
 sealed trait Single extends Encode {
-  def getFixed(cutoff: Double = fixedCutoff): DenseVector[Double] = {
-    vars.zip(maf)
+  def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]] = {
+    val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
+    if (tmp.isEmpty)
+      None
+    else {
+      val res = tmp.reduce((a, b) => a)
+      Some(DenseVector(res._1.map{
+        case UnPhased.Bt.ref => 0.0
+        case UnPhased.Bt.het1 => 1.0
+        case UnPhased.Bt.het2 => 1.0
+        case UnPhased.Bt.mut => 2.0
+        case _ => 2.0 * res._2
+      }.toArray))
+    }
   }
 }
 
 sealed trait CMC extends Encode {
-  def getFixed(cutoff: Double = fixedCutoff): DenseVector[Double] =
-    vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-      v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
-    ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)
+  def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]] = {
+    if (maf.forall(_ >= cutoff))
+      None
+    else
+      Some(vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
+        v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
+      ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x))
+  }
 }
 
 sealed trait BRV extends Encode {
@@ -147,11 +170,14 @@ sealed trait BRV extends Encode {
 
   def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
 
-  def getFixed(cutoff: Double = fixedCutoff): DenseVector[Double] = {
+  def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]] = {
     val genotype = this.getGenotype(cutoff)
-    weight(cutoff) match {
-      case None => genotype * DenseVector.fill(genotype.size)(1.0)
-      case Some(w) => genotype * w}}
+    if (maf.forall(_ >= cutoff))
+      None
+    else
+      weight(cutoff) match {
+        case None => Some(genotype * DenseVector.fill(genotype.size)(1.0))
+        case Some(w) => Some(genotype * w)}}
 }
 
 
@@ -207,6 +233,15 @@ sealed trait LearnedWeight extends BRV {
     Some(beta(1 to n))
   }
 }
+
+case class DefaultSingle(vars: Iterable[Var],
+                         sampleSize: Int,
+                         config: Config) extends Encode with Single with PooledOrAnnotationMaf
+
+case class ControlsMafSingle(vars: Iterable[Var],
+                             sampleSize: Int,
+                             controls: Array[Boolean],
+                             config: Config) extends Encode with Single with ControlsMaf
 
 case class DefaultCMC(vars: Iterable[Var],
                       sampleSize: Int,

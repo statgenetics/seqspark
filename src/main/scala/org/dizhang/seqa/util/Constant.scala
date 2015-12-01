@@ -8,14 +8,89 @@ import org.dizhang.seqa.ds.Region
 
 object Constant {
 
-  object Pheno {
-    val delim = "\t"
-    val mis = "NA"
+  object ConfigPath {
+    val association = "association"
+    object Association {
+      val method = s"$association.method"
+      object Method {
+        val list = s"$method.list"
+      }
+      object SomeMethod {
+        /** relative path */
+        val maf = "maf"
+        object Maf {
+          val source = s"$maf.source"
+          val cutoff = s"$maf.cutoff"
+          val fixed = s"$maf.fixed"
+        }
+        val coding = "coding"
+        val weight = "weight"
+      }
+      val `trait` = s"$association.trait"
+      object Trait {
+        val list = s"$`trait`.list"
+      }
+      object SomeTrait {
+        val `type` = "type"
+        val covariates = "covariates"
+      }
+    }
+
   }
 
-  object Annotation {
-    val mafInfo = "SEQA_ANNO_MAF"
-    val weightInfo = "SEQA_ANNO_WEIGHT"
+  object ConfigValue {
+    object Association {
+      object SomeMethod {
+        object Coding {
+          val cmc = "collapse"
+          val brv = "burden"
+          val single = "single"
+        }
+        object Maf {
+          object Source {
+            val pooled = "pooled"
+            val controls = "controls"
+            val annotation = "annotation"
+          }
+        }
+        object Weight {
+          val none = "none"
+          val equal = "equal"
+          val wss = "wss"
+          val erec = "erec"
+          val annotation = "annotation"
+        }
+      }
+      object SomeTrait {
+        object Type {
+          val binary = "binary"
+          val quant = "quant"
+        }
+      }
+    }
+  }
+
+  object Pheno {
+    object Header {
+      val fid = "fid"
+      val iid = "iid"
+      val pid = "pid"
+      val mid = "mid"
+      val sex = "sex"
+      val control = "control"
+      val pca = "pca"
+    }
+    val delim = "\t"
+    val mis = "NA"
+
+  }
+
+  object Variant {
+    object InfoKey {
+      val maf = "SEQA_ANNO_MAF"
+      val weight = "SEQA_ANNO_WEIGHT"
+      val gene = "SEQA_GENE"
+    }
   }
 
   implicit class Genotype(val value: String) extends AnyVal {

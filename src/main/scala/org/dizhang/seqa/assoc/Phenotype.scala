@@ -36,9 +36,9 @@ class Phenotype(val dataFrame: DataFrame) {
   def makeTrait(field: String): DenseVector[Double] = {
     DenseVector(this(field).filter(x => x.isDefined).map(x => x.get))
   }
-  def makeCov(y: String, cov: String)(implicit sc: SparkContext): DenseMatrix[Double] = {
+  def makeCov(y: String, cov: Array[String])(implicit sc: SparkContext): DenseMatrix[Double] = {
     val indicator = sc.broadcast(this.indicate(y))
-    val mat = cov.split(Pheno.delim).map{ c =>
+    val mat = cov.map{ c =>
       val ao = this(c).zip(indicator.value).filter(p => p._2).map(p => p._1)
       val av = mean(ao.filter(p => p.isDefined).map(_.get))
       ao.map{case None => av; case Some(d) => d}

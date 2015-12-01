@@ -162,6 +162,10 @@ sealed trait Variant[A] extends Serializable {
     this.meta = ma
     this
   }
+
+  def toIndexedSeq = Variant.toIndexedSeq(this)
+
+  def toArray = this.toIndexedSeq.toArray
 }
 
 /**

@@ -1,19 +1,18 @@
 package org.dizhang.seqa.stat
 
-import breeze.linalg.{DenseVector, DenseMatrix}
 
 /**
  * Hold regression result
  */
 trait TestResult {
 
-  def estimate: Option[DenseVector[Double]]
+  def estimate: Option[Double]
 
-  def stdErr: Option[DenseVector[Double]]
+  def stdErr: Option[Double]
 
-  def statistic: DenseVector[Double]
+  def statistic: Double
 
-  def pValue: DenseVector[Double]
+  def pValue: Double
 
   override def toString = estimate match {
     case None => s",,$statistic,$pValue"

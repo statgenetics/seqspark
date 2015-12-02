@@ -5,6 +5,7 @@ import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
 import breeze.stats.distributions.{FDistribution, Gaussian}
+import org.dizhang.seqa.assoc.Encode.{VT, Fixed, Coding}
 import org.dizhang.seqa.ds.MyMatrix
 import org.dizhang.seqa.stat.ScoreTest._
 
@@ -20,6 +21,17 @@ object ScoreTest {
   class S //number of schemes (weight or maf cutoff)
 
   def ones(n: Int) = DenseVector.ones(n)
+
+  def apply(binaryTrait: Boolean,
+            y: DenseVector[Double],
+            x: Coding,
+            cov: Option[DenseMatrix[Double]] = None,
+            estimates: Option[DenseVector[Double]] = None): ScoreTest = {
+    x match {
+      case Fixed(c) => apply(binaryTrait, y, c, cov, estimates)
+      case VT(c) => apply(binaryTrait, y, c, cov.get, estimates.get)
+    }
+  }
 
   def apply(binary: Boolean,
             y: DenseVector[Double],
@@ -44,7 +56,7 @@ object ScoreTest {
   }
 }
 
-sealed trait ScoreTest {
+sealed trait ScoreTest extends HypoTest {
   val u: Double
   val v: Double
   lazy val t = u / pow(v, 0.5)
@@ -57,13 +69,13 @@ sealed trait ScoreTest {
 
   def summary: TestResult =
     new TestResult {
-      override val estimate: Option[DenseVector[Double]] = None
+      override val estimate: Option[Double] = None
 
-      override val stdErr: Option[DenseVector[Double]] = None
+      override val stdErr: Option[Double] = None
 
-      override val pValue: DenseVector[Double] = pValue
+      override val pValue: Double = pValue
 
-      override val statistic: DenseVector[Double] = statistic
+      override val statistic: Double = statistic
     }
 }
 

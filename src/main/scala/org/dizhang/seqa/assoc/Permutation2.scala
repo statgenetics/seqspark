@@ -12,7 +12,7 @@ import scala.annotation.tailrec
  * Permutation framework
  */
 
-object Permutation {
+object Permutation2 {
   type PValue = Array[PairInt]
 
   def merge(p1: PValue, p2: PValue): PValue =
@@ -34,10 +34,10 @@ object Permutation {
   }
 }
 
-class Permutation(y: DenseVector[Double],
-                  xs: RDD[(Int, DenseVector[Double])],
-                  cov: Opt[DenseMatrix[Double]] = None)
-                 (implicit sc: SparkContext)
+class Permutation2(y: DenseVector[Double],
+                   xs: RDD[(Int, DenseVector[Double])],
+                   cov: Opt[DenseMatrix[Double]] = None)
+                  (implicit sc: SparkContext)
   extends Serializable {
 
   /** parameters for adaptive permutation */
@@ -62,7 +62,7 @@ class Permutation(y: DenseVector[Double],
       var testCnt = math.pow(factor, i).toInt
       if (testCnt >= b)
         testCnt = b - sum(0 to i map (x => math.pow(factor, x).toInt * r * factor))
-      val curStatistic = Permutation.expand(cur, factor, i)
+      val curStatistic = Permutation2.expand(cur, factor, i)
         .map(x => {
           val model = new LinearRegression(shuffle(y), x._2, cov)
           val summary = model.summary
@@ -72,8 +72,8 @@ class Permutation(y: DenseVector[Double],
           else
             (0, 1)
           (x._1, cnt)})
-        .aggregate(Array.fill(m)(PairInt.zero))(Permutation.addInPlace, Permutation.merge)
-      accum = Permutation.merge(accum, curStatistic)
+        .aggregate(Array.fill(m)(PairInt.zero))(Permutation2.addInPlace, Permutation2.merge)
+      accum = Permutation2.merge(accum, curStatistic)
       cur = cur.filter(x => accum(x._1)._1 < r)
     }
     val pvalues = accum.map(x => x._1.toDouble / x._2)

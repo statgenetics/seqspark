@@ -1,129 +1,125 @@
 package org.dizhang.seqa.assoc
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqa.stat.{LogisticRegression, LinearRegression}
-import org.dizhang.seqa.util.Constant._
-import UnPhased._
-import org.dizhang.seqa.util.InputOutput._
-import org.dizhang.seqa.ds._
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
-import org.dizhang.seqa.worker.GenotypeLevelQC.{makeMaf, getMaf}
-import scala.collection.JavaConverters._
+import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.rdd.RDD
+import org.dizhang.seqa.assoc.Encode.{Fixed, VT}
+import org.dizhang.seqa.stat._
+import org.dizhang.seqa.util.Constant
+import org.dizhang.seqa.util.Constant.{UnPhased, Pheno}
+import org.dizhang.seqa.util.InputOutput.VCF
+import org.dizhang.seqa.worker.GenotypeLevelQC.{getMaf, makeMaf}
+import collection.JavaConverters._
+import AssocTest._
 
 /**
- * CMC method for rare variant association
- */
-/**
-object demo {
-  val variants = Array(Array("0/0"))
-  def maf(v: Array[String]) = 0.0
-  /** Scala code to compute CMC coding
-    * suppose variants is a collection
-    * of Array of genotypes, maf  */
-  def cmc(g: String, maf: Double) =
-    g match {
-      case "./." =>
-        1.0 - math.pow(1.0 - maf, 2)
-      case "0/0" => 0.0
-      case _ => 1.0
-    }
-  def compose(p: Double, q: Double) =
-    if (p == 0.0 || q == 0.0)
-      1.0
-    else
-      1.0 - (1.0 - p) * (1.0 - q)
-  val c = variants
-    .map(v => v.map(g => cmc(g, maf(v))))
-    .reduce((v1, v2) =>
-      (0 until v1.length)
-        .map(i => compose(v1(i), v2(i))))
-}
-*/
-
+  * asymptotic test
+  */
 object AssocTest {
-  /** Implement (Auer et al. 2013) to make mean imputation on missing genotypes */
-  def makeWithNaAdjust(x: Byte, m: Double): Double = {
-    if (x == Bt.mis)
-      1.0 - math.pow(1.0 - m, 2)
-    else
-      x.toDouble
+  /** constants */
+  val CPSomeTrait = Constant.ConfigPath.Association.SomeTrait
+  val CPTrait = Constant.ConfigPath.Association.`trait`
+  val CPTraitList = Constant.ConfigPath.Association.Trait.list
+  val CPSomeMethod = Constant.ConfigPath.Association.SomeMethod
+  val CPMethod = Constant.ConfigPath.Association.method
+  val CPMethodList = Constant.ConfigPath.Association.Method.list
+  val CVSomeTrait = Constant.ConfigValue.Association.SomeTrait
+  val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
+
+  def encode(currentGenotype: VCF,
+             y: Broadcast[DenseVector[Double]],
+             cov: Broadcast[Option[DenseMatrix[Double]]],
+             controls: Broadcast[Array[Boolean]],
+             methodConfig: Config)(implicit sc: SparkContext): RDD[(String, Encode.Coding)] = {
+
+    /** this is quite tricky
+      * some encoding methods require phenotype information
+      * e.g. to learning weight from data */
+    val sampleSize = y.value.length
+    val codingScheme = methodConfig.getString(CPSomeMethod.coding)
+    val annotated = codingScheme match {
+      case CVSomeMethod.Coding.single => currentGenotype.map(v => (v.pos, v)).groupByKey()
+      case _ => currentGenotype.map(v => (v.parseInfo(Constant.Variant.InfoKey.gene), v)).groupByKey()}
+
+    annotated.map(p => (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, methodConfig)))
+      .map(p => (p._1, p._2.getCoding))
+      .filter(p => p._2.isDefined)
+      .map(p => (p._1, p._2.get))}
+
+  def estimateCov(binaryTrait: Boolean,
+                  y: DenseVector[Double],
+                  cov: Option[DenseMatrix[Double]]): Option[DenseVector[Double]] = {
+    cov match {
+      case None => None
+      case Some(c) => Some(
+        if (binaryTrait)
+          new LogisticRegression(y, c).estimates
+        else
+          new LinearRegression(y, c).estimates)
+    }
   }
 
-  /** use op in this object to reduce CMC codings, in stead of the default plus function */
-  object AdderWithNaAdjust extends Counter.CounterElementSemiGroup[Double] {
-    def zero = 0.0
+  def permutationTest(coding: RDD[(String, Encode.Coding)],
+                      y: Broadcast[DenseVector[Double]],
+                      cov: Broadcast[Option[DenseMatrix[Double]]],
+                      binaryTrait: Boolean,
+                      test: String): RDD[(String, TestResult)] = {
 
-    def pow(x: Double, i: Int) = {
-      if (x == 1.0)
-        1.0
-      else if (x == 0.0)
-      /** Although it is a case of 'else', add this as fast compute for 0.0
-        * Nevertheless, this method 'pow' is not in use right now */
-        0.0
-      else
-        1.0 - math.pow(1.0 - x, i)
-    }
+  }
 
-    def op(a: Double, b: Double) = {
-      if (a == 1.0 || b == 1.0)
-        1.0
-      else
-        1.0 - (1.0 - a) * (1.0 - b)
+  def asymptoticTest(coding: RDD[(String, Encode.Coding)],
+                     y: Broadcast[DenseVector[Double]],
+                     cov: Broadcast[Option[DenseMatrix[Double]]],
+                     binaryTrait: Boolean,
+                     test: String): RDD[(String, TestResult)] = {
+
+    val covEstimates = estimateCov(binaryTrait, y.value, cov.value)
+    test match {
+      case CVSomeMethod.Test.score =>
+        coding.map(p => (p._1, ScoreTest(binaryTrait, y.value, p._2, cov.value, covEstimates).summary))
     }
   }
 
-  def collapse(i: Iterable[Var]): DenseVector[Double] = {
-    i.map(v => {
-      val maf: Double = getMaf(v.toCounter(makeMaf, (0, 2)).reduce)
-      v.toCounter(makeWithNaAdjust(_, maf), 0.0)
-    }).reduce((a, b) => a.++(b)(AdderWithNaAdjust)).toDenseVector(x => x)
+  def runTraitWithMethod(currentGenotype: VCF,
+                         currentTrait: (String, Broadcast[DenseVector[Double]]),
+                         cov: Broadcast[Option[DenseMatrix[Double]]],
+                         controls: Broadcast[Array[Boolean]],
+                         method: String)(implicit sc: SparkContext, config: Config): RDD[(String, TestResult)] = {
+    val methodConfig = config.getConfig(s"$CPMethod.$method")
+    val coding = encode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
+    val permutation = methodConfig.getBoolean(CPSomeMethod.permutation)
+    val test = methodConfig.getString(CPSomeMethod.test)
+    val binary = config.getBoolean(s"$CPTrait.${currentTrait._1}.${CPSomeTrait.binary}")
+
+    if (permutation) {
+      asymptoticTest(coding, currentTrait._2, cov, binary, test)
+    } else {
+      asymptoticTest(coding, currentTrait._2, cov, binary, test)
+    }
   }
 }
 
-class AssocTest(input: VCF)(implicit val cnf: Config, sc: SparkContext) extends Assoc {
-
-  def runTrait(t: String, funcVars: VCF): Unit = {
-    val ped = cnf.getString("sampleInfo.source")
-    if (hasColumn(ped, t)) {
-      logger.info(s"load trait $t from phenotype file $ped")
-      val yAll = readColumn(ped, t)
-      val indicator =  yAll.zipWithIndex.map(x => if (x._1 == "NA") false else true)
-      val y: DenseVector[Double] = DenseVector(yAll.zip(indicator).filter(x => x._2).map(_._1.toDouble))
-      val covList = cnf.getStringList(s"association.trait.$t.covariates").asScala.toList
-      val cov: Option[DenseMatrix[Double]] = prepareCov(ped, t, covList, indicator)
-      val annot =  cnf.getStringList("association.filter").asScala.toArray
-      val xsWithStrKeys = funcVars
-        .map(v => (v.parseInfo("ANNO"), v.select(indicator)))
-        .groupByKey()
-        .map(x => (x._1, AssocTest.collapse(x._2)))
-        .sortByKey()
-      xsWithStrKeys.cache()
-      val xs = xsWithStrKeys.zipWithUniqueId().map(x => (x._2.toInt, x._1._2))
-
-      if (cnf.getBoolean(s"association.permutation"))
-        xs.map(x => {
-          val traitType = cnf.getString(s"association.trait.$t.type")
-          if (traitType == "binary")
-            new LogisticRegression(y, x._2, cov).summary
-          else
-            new LinearRegression(y, x._2, cov).summary
-        })
-      else
-        new Permutation(y, xs, cov)
+class AssocTest(genotype: VCF, phenotype: Phenotype)(implicit config: Config, sc: SparkContext) extends Assoc {
+  def runTrait(traitName: String) = {
+    try {
+      logger.info(s"load trait $traitName from phenotype database")
+      val currentTrait = (traitName, sc.broadcast(phenotype.makeTrait(traitName)))
+      val methods = config.getStringList(CPMethodList).asScala.toArray
+      val indicator = sc.broadcast(phenotype.indicate(traitName))
+      val controls = sc.broadcast(phenotype(Pheno.Header.control).zip(indicator.value)
+        .filter(p => p._2).map(p => if (p._1.get == 1.0) true else false))
+      val currentGenotype = genotype.map(v => v.select(indicator.value))
+      val ConfigPathCov = s"$CPTrait.$traitName.${CPSomeTrait.covariates}"
+      val currentCov = sc.broadcast(
+        if (config.hasPath(ConfigPathCov))
+          Some(phenotype.makeCov(traitName, config.getStringList(ConfigPathCov).asScala.toArray))
+        else
+          None)
+      methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m))
+    } catch {
+      case e: Exception => logger.warn(e.getStackTrace.toString)
     }
-    else
-      logger.warn(s"no such trait $t in phenotype file $ped. Do nothing.")
   }
-
-  def run {
-    val group = "ANNO"
-    val filter = cnf.getStringList("association.filter")
-    val funcVars = input.filter(v => filter.contains(v.parseInfo(group).split(":").last))
-    funcVars.persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val traits = cnf.getStringList("association.trait.list").asScala.toList
-    traits.foreach(t => runTrait(t, funcVars))
-  }
-
 }

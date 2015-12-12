@@ -28,7 +28,7 @@ class LogisticRegression(val response: DenseVector[Double], val independents: De
     * z contains n elements (samples), is the result of xs * beta
     */
   def sigmoid(z: DenseVector[Double]): DenseVector[Double] =
-    ones :/ (exp(-1.0 * z) + 1.0)
+    ones :/ (exp(-1.0 * z) + ones)
 
   /** beta contains p elements (variable numbers plus 1 intercept)
     * g [n]: probability of n samples

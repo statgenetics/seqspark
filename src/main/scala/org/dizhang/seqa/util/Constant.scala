@@ -7,6 +7,17 @@ import org.dizhang.seqa.ds.Region
  */
 
 object Constant {
+  object Permutation {
+    val alpha = 0.05
+    def max(sites: Int) = 2000 * sites - 100
+    def min(sites: Int) = sites match {
+      case x if x == 1 => 115
+      case x if x <= 5 => 120
+      case _ => 121
+    }
+    val base = 10
+
+  }
 
   object ConfigPath {
     val association = "association"

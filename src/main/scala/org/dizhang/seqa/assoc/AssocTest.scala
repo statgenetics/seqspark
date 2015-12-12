@@ -28,11 +28,15 @@ object AssocTest {
   val CVSomeTrait = Constant.ConfigValue.Association.SomeTrait
   val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
 
-  def encode(currentGenotype: VCF,
+  val Permu = Constant.Permutation
+
+
+
+  def makeEncode(currentGenotype: VCF,
              y: Broadcast[DenseVector[Double]],
              cov: Broadcast[Option[DenseMatrix[Double]]],
              controls: Broadcast[Array[Boolean]],
-             methodConfig: Config)(implicit sc: SparkContext): RDD[(String, Encode.Coding)] = {
+             methodConfig: Config)(implicit sc: SparkContext): RDD[(String, Encode)] = {
 
     /** this is quite tricky
       * some encoding methods require phenotype information
@@ -44,11 +48,10 @@ object AssocTest {
       case _ => currentGenotype.map(v => (v.parseInfo(Constant.Variant.InfoKey.gene), v)).groupByKey()}
 
     annotated.map(p => (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, methodConfig)))
-      .map(p => (p._1, p._2.getCoding))
       .filter(p => p._2.isDefined)
-      .map(p => (p._1, p._2.get))}
+  }
 
-  def estimateCov(binaryTrait: Boolean,
+  def adjustForCov(binaryTrait: Boolean,
                   y: DenseVector[Double],
                   cov: Option[DenseMatrix[Double]]): Option[DenseVector[Double]] = {
     cov match {
@@ -61,24 +64,41 @@ object AssocTest {
     }
   }
 
-  def permutationTest(coding: RDD[(String, Encode.Coding)],
+  def computePCount()
+
+  def permutationTest(encode: RDD[(String, Encode)],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
-                      test: String): RDD[(String, TestResult)] = {
+                      controls: Broadcast[Array[Boolean]],
+                      methodConfig: Config): RDD[(String, TestResult)] = {
+    val estimates = adjustForCov(binaryTrait, y.value, cov.value)
+    val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, CVSomeMethod.Test.score).collect()
+    val asymptoticStatistic = asymptoticRes.map(x => x._2.statistic)
+    val sites = encode.count().toInt
+    val max = Permu.max(sites)
+    val min = Permu.min(sites)
+    val alpha = Permu.alpha
+    val base = Permu.base
+    val batchSize = base * min
+    val loops = math.round(math.log(sites)/math.log(base)).toInt
+    for (i <- 0 to loops) {
+      var maxThisLoop = math.pow(base, i).toInt
 
+    }
   }
 
-  def asymptoticTest(coding: RDD[(String, Encode.Coding)],
+  def asymptoticTest(encode: RDD[(String, Encode)],
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
                      test: String): RDD[(String, TestResult)] = {
 
-    val covEstimates = estimateCov(binaryTrait, y.value, cov.value)
+    val coding = encode.map(p => (p._1, p._2.getCoding.get))
+    val estimates = adjustForCov(binaryTrait, y.value, cov.value)
     test match {
       case CVSomeMethod.Test.score =>
-        coding.map(p => (p._1, ScoreTest(binaryTrait, y.value, p._2, cov.value, covEstimates).summary))
+        coding.map(p => (p._1, ScoreTest(binaryTrait, y.value, p._2, cov.value, estimates).summary))
     }
   }
 
@@ -88,15 +108,15 @@ object AssocTest {
                          controls: Broadcast[Array[Boolean]],
                          method: String)(implicit sc: SparkContext, config: Config): RDD[(String, TestResult)] = {
     val methodConfig = config.getConfig(s"$CPMethod.$method")
-    val coding = encode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
+    val encode = makeEncode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
     val permutation = methodConfig.getBoolean(CPSomeMethod.permutation)
     val test = methodConfig.getString(CPSomeMethod.test)
     val binary = config.getBoolean(s"$CPTrait.${currentTrait._1}.${CPSomeTrait.binary}")
 
     if (permutation) {
-      asymptoticTest(coding, currentTrait._2, cov, binary, test)
+      asymptoticTest(encode, currentTrait._2, cov, binary, test)
     } else {
-      asymptoticTest(coding, currentTrait._2, cov, binary, test)
+      asymptoticTest(encode, currentTrait._2, cov, binary, test)
     }
   }
 }

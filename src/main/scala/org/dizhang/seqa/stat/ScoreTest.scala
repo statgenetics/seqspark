@@ -12,7 +12,11 @@ import org.dizhang.seqa.stat.ScoreTest._
 
 /**
   * Score test for regression
+  * Why some case classes take estimates as input, instead of computing one?
+  * some tests share the same estimates, so we can compute it once and pass
+  * it to all the ScoreTests
   */
+
 object ScoreTest {
   /** the following three classes are fake dimensions */
   class One //1
@@ -79,7 +83,8 @@ sealed trait ScoreTest extends HypoTest {
     }
 }
 
-case class BinaryNoCovUniScoreTest(y: DenseVector[Double], x: DenseVector[Double]) extends ScoreTest {
+case class BinaryNoCovUniScoreTest(y: DenseVector[Double],
+                                   x: DenseVector[Double]) extends ScoreTest {
   lazy val p: Double = mean(y)
   lazy val n: Int = y.length
   lazy val u: Double = y.map(_ - p).t * x
@@ -166,7 +171,6 @@ case class QuantCovMultiScoreTest(y: DenseVector[Double],
   lazy val u = 0
   lazy val v = 0
   lazy val n = y.length
-  //lazy val k = cov.cols + 1
   lazy val s = x.cols
   lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
   lazy val my: DenseVector[Double] = estimates

@@ -12,6 +12,7 @@ class LinearRegression(response: DenseVector[Double], independents: DenseMatrix[
 
   lazy val ones = DenseVector.ones[Double](response.length)
 
+  /** n x (k + 1) */
   lazy val xs = DenseMatrix.horzcat(ones.toDenseMatrix.t, independents)
 
   lazy val coefficients = {
@@ -21,6 +22,6 @@ class LinearRegression(response: DenseVector[Double], independents: DenseMatrix[
     inv(r1) * (q1.t * response)
   }
 
-  lazy val estimates = independents * coefficients
+  lazy val estimates = xs * coefficients
 
 }

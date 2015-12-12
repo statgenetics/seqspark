@@ -166,12 +166,14 @@ sealed trait Encode {
     else
       this.getVT
   }
+  def isDefined: Boolean
 }
 
 sealed trait Single extends Encode {
+  def isDefined = maf.exists(_ >= fixedCutoff)
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
     val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
-    if (tmp.isEmpty)
+    if (! this.isDefined)
       None
     else {
       val res = tmp.reduce((a, b) => a)
@@ -188,16 +190,18 @@ sealed trait Single extends Encode {
 
 sealed trait CMC extends Encode {
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-    if (maf.forall(_ >= cutoff))
+    if (! this.isDefined)
       None
     else
       Some(Fixed(vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
         v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
       ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)))
   }
+  def isDefined = maf.exists(_ < fixedCutoff)
 }
 
 sealed trait BRV extends Encode {
+  def isDefined = maf.exists(_ < fixedCutoff)
   def getGenotype(cutoff: Double = fixedCutoff): DenseMatrix[Double] = {
     val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
       v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
@@ -207,14 +211,13 @@ sealed trait BRV extends Encode {
 
   def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]] = {
     val genotype = this.getGenotype(cutoff)
-    if (maf.forall(_ >= cutoff))
+    if (! this.isDefined)
       None
     else
       weight(cutoff) match {
         case None => Some(genotype * DenseVector.fill(genotype.size)(1.0))
         case Some(w) => Some(genotype * w)}}
 }
-
 
 sealed trait PooledOrAnnotationMaf extends Encode {
   def maf = {

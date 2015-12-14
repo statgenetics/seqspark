@@ -20,6 +20,11 @@ object Constant {
   }
 
   object ConfigPath {
+    val sampleInfo = "sampleInfo"
+    object SampleInfo {
+      val source = "source"
+    }
+
     val association = "association"
     object Association {
       val method = s"$association.method"

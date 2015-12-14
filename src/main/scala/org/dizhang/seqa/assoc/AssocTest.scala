@@ -5,12 +5,10 @@ import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqa.assoc.Encode.{Fixed, VT}
 import org.dizhang.seqa.stat._
 import org.dizhang.seqa.util.Constant
-import org.dizhang.seqa.util.Constant.{UnPhased, Pheno}
+import org.dizhang.seqa.util.Constant.Pheno
 import org.dizhang.seqa.util.InputOutput.VCF
-import org.dizhang.seqa.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import collection.JavaConverters._
 import AssocTest._
 import org.dizhang.seqa.ds.Counter._
@@ -30,8 +28,6 @@ object AssocTest {
   val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
   val IntPair = CounterElementSemiGroup.PairInt
   val Permu = Constant.Permutation
-
-
 
   def makeEncode(currentGenotype: VCF,
              y: Broadcast[DenseVector[Double]],
@@ -87,10 +83,10 @@ object AssocTest {
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
-                      methodConfig: Config)(implicit sc: SparkContext): Map[String, (Int, Int)] = {
+                      methodConfig: Config)(implicit sc: SparkContext): Map[String, TestResult] = {
     val estimates = adjustForCov(binaryTrait, y.value, cov.value)
-    val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, CVSomeMethod.Test.score).collect()
-    val asymptoticStatistic = sc.broadcast(asymptoticRes.map(x => x._1 -> x._2.statistic).toMap)
+    val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, CVSomeMethod.Test.score)
+    val asymptoticStatistic = sc.broadcast(asymptoticRes.map(x => x._1 -> x._2.statistic))
     val sites = encode.count().toInt
     val max = Permu.max(sites)
     val min = Permu.min(sites)
@@ -98,7 +94,7 @@ object AssocTest {
     val batchSize = min * base
     val loops = math.round(math.log(sites)/math.log(base)).toInt
     var curEncode = encode
-    var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)).toMap)
+    var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
     for (i <- 0 to loops) {
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
@@ -121,20 +117,21 @@ object AssocTest {
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
     }
-    pCount.value
+    pCount.value.map(x => (x._1, TestResult(None, None, x._2._2.toDouble, x._2._1.toDouble/x._2._2)))
   }
 
   def asymptoticTest(encode: RDD[(String, Encode)],
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
-                     test: String): RDD[(String, TestResult)] = {
+                     test: String): Map[String, TestResult] = {
 
     val coding = encode.map(p => (p._1, p._2.getCoding.get))
     val estimates = adjustForCov(binaryTrait, y.value, cov.value)
     test match {
       case CVSomeMethod.Test.score =>
         coding.map(p => (p._1, ScoreTest(binaryTrait, y.value, p._2, cov.value, estimates).summary))
+          .collect().toMap
     }
   }
 
@@ -155,9 +152,13 @@ object AssocTest {
       asymptoticTest(encode, currentTrait._2, cov, binary, test)
     }
   }
+
 }
 
-class AssocTest(genotype: VCF, phenotype: Phenotype)(implicit config: Config, sc: SparkContext) extends Assoc {
+class AssocTest(genotype: VCF,
+                phenotype: Phenotype)
+               (implicit config: Config,
+                sc: SparkContext) extends Assoc {
   def run: Unit = {
     val traits = config.getStringList(CPTraitList).asScala.toArray
     traits.foreach{

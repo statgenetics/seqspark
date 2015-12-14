@@ -4,6 +4,24 @@ package org.dizhang.seqa.stat
 /**
  * Hold regression result
  */
+
+object TestResult {
+  def apply(est: Option[Double],
+            std: Option[Double],
+            sta: Double,
+            pVa: Double): TestResult = {
+    new TestResult {
+      override def estimate: Option[Double] = est
+
+      override def stdErr: Option[Double] = std
+
+      override def pValue: Double = pVa
+
+      override def statistic: Double = sta
+    }
+  }
+}
+
 trait TestResult {
 
   def estimate: Option[Double]

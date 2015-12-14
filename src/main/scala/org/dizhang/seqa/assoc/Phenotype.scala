@@ -13,7 +13,7 @@ import scala.io.Source
   * Phenotype is a SparkSQL database
   */
 object Phenotype {
-  def apply(file: String)(implicit sc: SparkContext): Unit = {
+  def apply(file: String)(implicit sc: SparkContext): Phenotype = {
     val sqlContext = new SQLContext(sc)
     val scheme =
       StructType(

@@ -6,7 +6,7 @@ import breeze.numerics._
 import breeze.stats._
 import breeze.stats.distributions.{FDistribution, Gaussian}
 import org.dizhang.seqa.assoc.Encode.{VT, Fixed, Coding}
-import org.dizhang.seqa.ds.MyMatrix
+import org.dizhang.seqa.ds.SafeMatrix
 import org.dizhang.seqa.stat.ScoreTest._
 
 
@@ -101,8 +101,8 @@ case class BinaryCovUniScoreTest(y: DenseVector[Double],
   lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
   lazy val u: Double = (y - mp).t * x
   lazy val v: Double = {
-    val tmp1 = MyMatrix[N, One](vp :* x).t * MyMatrix[N, K](xs)
-    val tmp2 = MyMatrix.inverse(MyMatrix[K, N](xs.t) * MyMatrix[N, N](diag(vp)) * MyMatrix[N, K](xs))
+    val tmp1 = SafeMatrix[N, One](vp :* x).t * SafeMatrix[N, K](xs)
+    val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs))
     sum(vp :* x :* x) - (tmp1 * tmp2 * tmp1.t).mat(0,0)
   }
 }
@@ -120,20 +120,20 @@ case class BinaryCovMultiScoreTest(y: DenseVector[Double],
   lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
   lazy val mp: DenseVector[Double] = estimates
   lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
-  lazy val uVec: DenseVector[Double] = (MyMatrix[N, S](x).t * MyMatrix[N, One](y - mp)).mat(::, 0)
-  lazy val tmp0 = MyMatrix[N, One](vp).t * MyMatrix[N, S](x :* x)
-  lazy val tmp1 = MyMatrix[N, S](x).t * MyMatrix[N, N](diag(vp)) * MyMatrix[N, K](xs)
-  lazy val tmp2 = MyMatrix.inverse(MyMatrix[K, N](xs.t) * MyMatrix[N, N](diag(vp)) * MyMatrix[N, K](xs))
+  lazy val uVec: DenseVector[Double] = (SafeMatrix[N, S](x).t * SafeMatrix[N, One](y - mp)).mat(::, 0)
+  lazy val tmp0 = SafeMatrix[N, One](vp).t * SafeMatrix[N, S](x :* x)
+  lazy val tmp1 = SafeMatrix[N, S](x).t * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs)
+  lazy val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs))
   lazy val vVec: DenseVector[Double] = tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat)
   lazy val tVec = uVec :/ pow(vVec, 0.5)
   lazy val tMax = max(tVec)
   override lazy val statistic = {
-    val tmp = MyMatrix[N, N](diag(y - mp)) * (MyMatrix[N, S](x) - MyMatrix[N, K](xs) * tmp2.t * tmp1.t)
+    val tmp = SafeMatrix[N, N](diag(y - mp)) * (SafeMatrix[N, S](x) - SafeMatrix[N, K](xs) * tmp2.t * tmp1.t)
     val covU = (tmp.t * tmp).mat
     val dU = diag(pow(diag(covU), 0.5))
-    val covT = MyMatrix[S, S](dU) * MyMatrix[S, S](covU) * MyMatrix[S, S](dU)
+    val covT = SafeMatrix[S, S](dU) * SafeMatrix[S, S](covU) * SafeMatrix[S, S](dU)
     val tMaxVec = DenseVector.fill(covT.mat.cols)(this.tMax)
-    val t2 = y.length * (MyMatrix[S, One](tMaxVec).t * MyMatrix.inverse(covT) * MyMatrix[S, One](tMaxVec)).mat(0, 0)
+    val t2 = y.length * (SafeMatrix[S, One](tMaxVec).t * SafeMatrix.inverse(covT) * SafeMatrix[S, One](tMaxVec)).mat(0, 0)
     val f = (y.length - covU.cols)/(covU.cols * (y.length - 1)) * t2
     f
   }
@@ -158,8 +158,8 @@ case class QuantCovUniScoreTest(y: DenseVector[Double],
   lazy val vy: Double = 1/n * pow(norm(y - my), 2)
   lazy val u: Double = (y - my).t * x
   lazy val v: Double = {
-    val tmp1 = MyMatrix[N, One](x).t * MyMatrix[N, K](xs)
-    val tmp2 = MyMatrix.inverse(MyMatrix[K, N](xs.t) * MyMatrix[N, K](xs))
+    val tmp1 = SafeMatrix[N, One](x).t * SafeMatrix[N, K](xs)
+    val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, K](xs))
     vy * (pow(norm(x), 2) - (tmp1 * tmp2 * tmp1.t).mat(0, 0))
   }
 }
@@ -175,20 +175,20 @@ case class QuantCovMultiScoreTest(y: DenseVector[Double],
   lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
   lazy val my: DenseVector[Double] = estimates
   lazy val vy: Double = 1/n * pow(norm(y - my), 2)
-  lazy val uVec: DenseVector[Double] = (MyMatrix[N, S](x).t * MyMatrix[N, One](y - my)).mat(::, 0)
-  private lazy val tmp0 = MyMatrix[N, One](DenseVector.fill(n)(1.0)).t * MyMatrix[N, S](x :* x)
-  private lazy val tmp1 = MyMatrix[N, S](x).t * MyMatrix[N, K](xs)
-  private lazy val tmp2 = MyMatrix.inverse(MyMatrix[K, N](xs.t) * MyMatrix[N, K](xs))
+  lazy val uVec: DenseVector[Double] = (SafeMatrix[N, S](x).t * SafeMatrix[N, One](y - my)).mat(::, 0)
+  private lazy val tmp0 = SafeMatrix[N, One](DenseVector.fill(n)(1.0)).t * SafeMatrix[N, S](x :* x)
+  private lazy val tmp1 = SafeMatrix[N, S](x).t * SafeMatrix[N, K](xs)
+  private lazy val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, K](xs))
   lazy val vVec = vy * (tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat))
   lazy val tVec = uVec :/ pow(vVec, 0.5)
   lazy val tMax = max(tVec)
   override lazy val statistic = {
-    val tmp = MyMatrix[N, N](diag(y - my)) * (MyMatrix[N, S](x) - MyMatrix[N, K](xs) * tmp2.t * tmp1.t)
+    val tmp = SafeMatrix[N, N](diag(y - my)) * (SafeMatrix[N, S](x) - SafeMatrix[N, K](xs) * tmp2.t * tmp1.t)
     val covU = (tmp.t * tmp).mat
     val dU = diag(pow(diag(covU), 0.5))
-    val covT = MyMatrix[S, S](dU) * MyMatrix[S, S](covU) * MyMatrix[S, S](dU)
+    val covT = SafeMatrix[S, S](dU) * SafeMatrix[S, S](covU) * SafeMatrix[S, S](dU)
     val tMaxVec = DenseVector.fill(s)(this.tMax)
-    val t2 = n * (MyMatrix[S, One](tMaxVec).t * MyMatrix.inverse(covT) * MyMatrix[S, One](tMaxVec)).mat(0, 0)
+    val t2 = n * (SafeMatrix[S, One](tMaxVec).t * SafeMatrix.inverse(covT) * SafeMatrix[S, One](tMaxVec)).mat(0, 0)
     val f = (n - s)/(s * (n - 1)) * t2
     f
   }

@@ -79,7 +79,7 @@ object Resampling {
 
 }
 
-sealed trait Resampling {
+sealed trait Resampling extends HypoTest {
   def refStatistic: Double
   def min: Int
   def max: Int

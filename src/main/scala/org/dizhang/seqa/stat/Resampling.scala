@@ -36,7 +36,7 @@ object Resampling {
   }
 
 
-    def apply(ref: Double,
+  def apply(ref: Double,
             min: Int,
             max: Int,
             x: Coding,

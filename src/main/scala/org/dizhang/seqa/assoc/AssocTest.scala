@@ -15,8 +15,6 @@ import collection.JavaConverters._
 import AssocTest._
 import org.dizhang.seqa.ds.Counter._
 
-import scala.annotation.tailrec
-
 /**
   * asymptotic test
   */
@@ -144,7 +142,7 @@ object AssocTest {
                          currentTrait: (String, Broadcast[DenseVector[Double]]),
                          cov: Broadcast[Option[DenseMatrix[Double]]],
                          controls: Broadcast[Array[Boolean]],
-                         method: String)(implicit sc: SparkContext, config: Config): RDD[(String, TestResult)] = {
+                         method: String)(implicit sc: SparkContext, config: Config): Unit = {
     val methodConfig = config.getConfig(s"$CPMethod.$method")
     val encode = makeEncode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
     val permutation = methodConfig.getBoolean(CPSomeMethod.permutation)
@@ -152,7 +150,7 @@ object AssocTest {
     val binary = config.getBoolean(s"$CPTrait.${currentTrait._1}.${CPSomeTrait.binary}")
 
     if (permutation) {
-      asymptoticTest(encode, currentTrait._2, cov, binary, test)
+      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
     } else {
       asymptoticTest(encode, currentTrait._2, cov, binary, test)
     }
@@ -160,6 +158,13 @@ object AssocTest {
 }
 
 class AssocTest(genotype: VCF, phenotype: Phenotype)(implicit config: Config, sc: SparkContext) extends Assoc {
+  def run: Unit = {
+    val traits = config.getStringList(CPTraitList).asScala.toArray
+    traits.foreach{
+      t => runTrait(t)
+    }
+  }
+
   def runTrait(traitName: String) = {
     try {
       logger.info(s"load trait $traitName from phenotype database")

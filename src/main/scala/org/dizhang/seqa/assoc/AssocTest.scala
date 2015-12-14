@@ -1,6 +1,6 @@
 package org.dizhang.seqa.assoc
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.{sum, DenseMatrix, DenseVector}
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
@@ -13,6 +13,9 @@ import org.dizhang.seqa.util.InputOutput.VCF
 import org.dizhang.seqa.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import collection.JavaConverters._
 import AssocTest._
+import org.dizhang.seqa.ds.Counter._
+
+import scala.annotation.tailrec
 
 /**
   * asymptotic test
@@ -27,7 +30,7 @@ object AssocTest {
   val CPMethodList = Constant.ConfigPath.Association.Method.list
   val CVSomeTrait = Constant.ConfigValue.Association.SomeTrait
   val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
-
+  val IntPair = CounterElementSemiGroup.PairInt
   val Permu = Constant.Permutation
 
 
@@ -64,28 +67,63 @@ object AssocTest {
     }
   }
 
-  def computePCount()
+  def maxThisLoop(base: Int, i: Int, max: Int, bs: Int): Int = {
+    val thisLoopLimit = math.pow(base, i).toInt * bs
+    val partialSum = sum(0 to i map(x => math.pow(base, x).toInt)) * bs
+    if (partialSum + thisLoopLimit > max)
+      max - partialSum
+    else
+      thisLoopLimit
+  }
+
+  def expand(data: RDD[(String, Encode)], cur: Int, target: Int): RDD[(String, Encode)] = {
+    if (target == cur)
+      data
+    else
+      data.map(x => Array.fill(math.ceil(target/cur).toInt)(x)).flatMap(x => x)
+  }
+
 
   def permutationTest(encode: RDD[(String, Encode)],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
-                      methodConfig: Config): RDD[(String, TestResult)] = {
+                      methodConfig: Config)(implicit sc: SparkContext): Map[String, (Int, Int)] = {
     val estimates = adjustForCov(binaryTrait, y.value, cov.value)
     val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, CVSomeMethod.Test.score).collect()
-    val asymptoticStatistic = asymptoticRes.map(x => x._2.statistic)
+    val asymptoticStatistic = sc.broadcast(asymptoticRes.map(x => x._1 -> x._2.statistic).toMap)
     val sites = encode.count().toInt
     val max = Permu.max(sites)
     val min = Permu.min(sites)
-    val alpha = Permu.alpha
     val base = Permu.base
-    val batchSize = base * min
+    val batchSize = min * base
     val loops = math.round(math.log(sites)/math.log(base)).toInt
+    var curEncode = encode
+    var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)).toMap)
     for (i <- 0 to loops) {
-      var maxThisLoop = math.pow(base, i).toInt
-
+      val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
+      val curMax = maxThisLoop(base, i, max, batchSize)
+      curEncode = expand(curEncode, lastMax, curMax)
+      val curPCount = curEncode
+        .map{x =>
+          val ref = asymptoticStatistic.value(x._1)
+          val model = Resampling(ref,
+            min - pCount.value(x._1)._1,
+            batchSize,
+            x._2, y.value,
+            cov.value,
+            estimates,
+            Option(controls.value),
+            Option(methodConfig),
+            binaryTrait)
+          (x._1, model.pCount)}
+        .reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap
+      pCount = sc.broadcast(for ((k, v) <- pCount.value)
+        yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
+      curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
     }
+    pCount.value
   }
 
   def asymptoticTest(encode: RDD[(String, Encode)],

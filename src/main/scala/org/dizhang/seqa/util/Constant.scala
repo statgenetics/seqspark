@@ -46,7 +46,7 @@ object Constant {
       }
       val `trait` = s"$association.trait"
       object Trait {
-        val list = s"$`trait`.list"
+        val list = s"${`trait`}.list"
       }
       object SomeTrait {
         val binary = "binary"
@@ -139,6 +139,7 @@ object Constant {
       val C = Value("C")
       val A = Value("A")
       val G = Value("G")
+      val N = Value("N")
     }
     object AminoAcid extends Enumeration {
       type AminoAcid = Value
@@ -172,6 +173,7 @@ object Constant {
             V, V, V, V, A, A, A, A, D, D, E, E, G, G, G, G)
     }
     def translate(codon: String): AminoAcid.AminoAcid = {
+      require(codon.forall(_ != 'N'), "cannot translate codon containing N")
       val num = codon.map {
         case 'T' => 0
         case 'C' => 1

@@ -9,7 +9,5 @@ object Gene {
 
 }
 
-trait Gene {
-  val name: String
-  val locations: Array[Location]
-}
+class Gene(val name: String,
+           val mRNAs: Array[mRNA])

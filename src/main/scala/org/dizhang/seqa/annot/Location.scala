@@ -21,10 +21,11 @@ object Location {
   val upDownStreamRange = 2000
 }
 
-class Location(val strand: Strand.Strand ,
+class Location(val geneName: String,
+               val mRNAName: String,
+               val strand: Strand.Strand,
                val exons: Array[Region],
-               val cds: Region,
-               val seq: String) extends Region {
+               val cds: Region) extends Region {
 
   def chr = cds.chr
   def start = exons(0).start
@@ -73,7 +74,7 @@ class Location(val strand: Strand.Strand ,
     }
   }
 
-  def codon(p: Single, alt: Option[Nucleotide] = None): String = {
+  def codon(p: Single, seq: mRNA, alt: Option[Nucleotide] = None): String = {
     /** find the exon that contains the point */
     val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
     val idx =
@@ -87,16 +88,16 @@ class Location(val strand: Strand.Strand ,
         end - intronsLen - p.pos
       }
     (idx % 3, alt) match {
-      case (0, None) => seq.slice(idx, idx + 2)
-      case (1, None) => seq.slice(idx - 1, idx + 1)
-      case (_, None) => seq.slice(idx - 2, idx)
+      case (0, None) => s"${seq(idx)}${seq(idx + 1)}${seq(idx + 2)}"
+      case (1, None) => s"${seq(idx - 1)}${seq(idx)}${seq(idx + 1)}"
+      case (_, None) => s"${seq(idx - 2)}${seq(idx - 1)}${seq(idx)}"
       case (0, Some(n)) => s"$n${seq(idx + 1)}${seq(idx + 2)}"
       case (1, Some(n)) => s"${seq(idx - 1)}$n${seq(idx + 1)}"
       case (_, Some(n)) => s"${seq(idx - 2)}${seq(idx - 1)}$n"
     }
   }
 
-  def annotate(p: Single, alt: Option[Nucleotide] = None): feature.Feature = {
+  def annotate(p: Single, seq: Option[mRNA] = None, alt: Option[Nucleotide] = None): feature.Feature = {
     import AminoAcid._
     if (p overlap upstream) {
       feature.Upstream
@@ -105,11 +106,11 @@ class Location(val strand: Strand.Strand ,
     } else if (p overlap this) {
       if (exons.exists(e => p overlap e)) {
         if (p overlap cds) {
-          alt match {
+          seq match {
             case None => feature.CDS
-            case Some(n) =>
-              val o = translate(codon(p))
-              val a = translate(codon(p, alt))
+            case Some(s) =>
+              val o = translate(codon(p, s))
+              val a = translate(codon(p, s, alt))
               if (o == a) {
                 feature.Synonymous
               } else if (o == Stop && a != Stop) {

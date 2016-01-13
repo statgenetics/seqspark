@@ -24,7 +24,7 @@ object Export extends Worker[VCF, VCF] {
 
   def selectVariant(v: Variant[Byte], rs: Array[Region]): Boolean = {
     for (r <- rs) {
-      if (r.contains(v.chr, v.pos.toInt))
+      if (r overlap Region(v.chr, v.pos.toInt))
         return true
     }
     false

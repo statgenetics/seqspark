@@ -116,6 +116,73 @@ object Constant {
     }
   }
 
+  object Annotation {
+    object Feature extends Enumeration {
+      type Feature = Value
+      val InterGenic = Value("InterGenic")
+      val Upstream = Value("Upstream")
+      val Downstream = Value("Downstream")
+      val UTR5 = Value("5-UTR")
+      val UTR3 = Value("3-UTR")
+      val CDS = Value("CDS")
+      val Intronic = Value("Intronic")
+      val Exonic = Value("Exonic")
+      val Synonymous = Value("Synonymous")
+      val NonSynonymous = Value("NonSynonymous")
+      val StopGain = Value("StopGain")
+      val StopLoss = Value("StopLoss")
+      val SpliceSite = Value("SpliceSite")
+    }
+    object Nucleotide extends Enumeration {
+      type Nucleotide = Value
+      val T = Value("T")
+      val C = Value("C")
+      val A = Value("A")
+      val G = Value("G")
+    }
+    object AminoAcid extends Enumeration {
+      type AminoAcid = Value
+      val F = Value("F")
+      val L = Value("L")
+      val S = Value("S")
+      val Y = Value("Y")
+      val Stop = Value("Stop")
+      val C = Value("C")
+      val W = Value("W")
+      val P = Value("P")
+      val H = Value("H")
+      val Q = Value("Q")
+      val R = Value("R")
+      val I = Value("I")
+      val M = Value("M")
+      val T = Value("T")
+      val N = Value("N")
+      val K = Value("K")
+      val V = Value("V")
+      val A = Value("A")
+      val D = Value("D")
+      val E = Value("E")
+      val G = Value("G")
+    }
+    val codeTable: Array[AminoAcid.AminoAcid] = {
+      import AminoAcid._
+      Array(F, F, L, L, S, S, S, S, T, T, Stop, Stop, C, C, Stop, W,
+            L, L, L, L, P, P, P, P, H, H, Q, Q, R, R, R, R,
+            I, I, I, M, T, T, T, T, N, N, K, K, S, S, R, R,
+            V, V, V, V, A, A, A, A, D, D, E, E, G, G, G, G)
+    }
+    def translate(codon: String): AminoAcid.AminoAcid = {
+      val num = codon.map {
+        case 'T' => 0
+        case 'C' => 1
+        case 'A' => 2
+        case 'G' => 3
+      }
+      val idx = num(0) * 16 + num(1) * 4 + num(2)
+      codeTable(idx)
+    }
+  }
+
   implicit class Genotype(val value: String) extends AnyVal {
     import UnPhased._
     def gt = value.split(":")(0).replace('|', '/')
@@ -187,7 +254,7 @@ object Constant {
       * url:
       * http://www.ncbi.nlm.nih.gov/projects/genome/assembly/grc/human/
       */
-    val mhc = Region(6.toByte, 28477796, 33448353)
+    val mhc = Region("6", 28477796, 33448353)
   }
 
   object Hg38 {
@@ -195,6 +262,6 @@ object Constant {
     val pseudoX = List(Region("X", 10000, 2781478), Region("X", 155701382, 156030894))
     val pseudoY = List(Region("Y", 10000, 2781478), Region("Y", 56887902, 57217414))
     val pseudo = pseudoX ::: pseudoY
-    val mhc = Region(6.toByte, 28510119, 33480576)
+    val mhc = Region("6", 28510119, 33480576)
   }
 }

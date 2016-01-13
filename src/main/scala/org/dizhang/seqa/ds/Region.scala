@@ -1,5 +1,7 @@
 package org.dizhang.seqa.ds
 
+import breeze.linalg.{max, min}
+
 /**
   * Region on chromosome
   * position is 0-based and the interval is half open half closed
@@ -21,6 +23,9 @@ trait Region extends Serializable {
 
   def mid = start + length/2
 
+  def overlap(that: Region): Boolean = {
+    this.chr == that.chr && min(this.end, that.end) > max(this.start, that.start)
+  }
 }
 
 case class Single(chr: Byte, pos: Int) extends Region {
@@ -30,7 +35,7 @@ case class Single(chr: Byte, pos: Int) extends Region {
 
 case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
-case class Gene(chr: Byte, start: Int, end: Int, name: String) extends Region
+case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 
 object Region {
 
@@ -75,15 +80,20 @@ object Region {
       }
     }
   }
-  def apply(c: String, p: Int): Region = Single(c.byte, p)
+  def apply(c: Byte, p: Int): Region = Single(c, p)
+  def apply(c: String, p: Int): Region = apply(c, p)
   def apply(c: String, s: Int, e: Int): Region = {
+    apply(c.toByte, s, e)
+  }
+  def apply(c: Byte, s: Int, e: Int): Region = {
     require(e > s, "end must be larger than start.")
     if (e - s > 1)
-      Interval(c.byte, s, e)
+      Interval(c, s, e)
     else
-      Single(c.byte, s)
+      Single(c, s)
   }
-  def apply(c: String, s: Int, e: Int, n: String): Region = Gene(c.byte, s, e, n)
+
+  def apply(c: String, s: Int, e: Int, n: String): Region = Named(c.byte, s, e, n)
 
   def apply(pattern: String): Region = {
     val onlyChr = """(?:chr)?(\d+)""".r
@@ -99,6 +109,7 @@ object Region {
     }
   }
 
+/**
   def apply[A](vars: Iterable[Variant[A]], n: Option[String] = None): Region = {
     val r = vars.map(v => Region(v.chr, v.pos.toInt - 1, v.pos.toInt))
       .reduce((a, b) => )
@@ -107,7 +118,7 @@ object Region {
       case Some(s) =>
     }
   }
-
+*/
   /**
     * def collapse(regs: List[Region]): List[Region] = {
     * }

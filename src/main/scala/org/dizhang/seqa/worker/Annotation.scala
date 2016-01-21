@@ -2,10 +2,13 @@ package org.dizhang.seqa.worker
 
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqa.ds.Variant
-import org.dizhang.seqa.util.Command
+import org.dizhang.seqa.annot.{Location, RefGene}
+import org.dizhang.seqa.ds.{Region, Single, Variant}
+import org.dizhang.seqa.util.{Constant, Command}
 import org.dizhang.seqa.util.InputOutput._
+import scala.collection.immutable.TreeSet
 import sys.process._
 
 import scala.io.Source
@@ -18,6 +21,49 @@ object Annotation extends Worker[VCF, VCF] {
 
   implicit val name = new WorkerName("annotation")
 
+  val CP = Constant.ConfigPath.Annotation
+  val CV = Constant.ConfigValue.Annotation
+
+  type Genes = Map[String, TreeSet[Location]]
+  def addGenes(a: Genes, b: Genes): Genes = {
+    a ++ (for ((k, v) <- b) yield k -> (v ++ a.getOrElse(k, TreeSet[Location]())))
+  }
+
+  def lookupGene(v: Var, dict: Broadcast[RefGene]): Array[(RefGene, Var)] = {
+    /** the argument RefGene is the whole set of all genes involved
+      * the output RefGene each represents a single gene
+      * */
+    val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}")
+    val all = dict.value.loci.filter(l => l overlap point)
+      .map(l => Map(l.geneName -> TreeSet(l)))
+      .reduce((a, b) => addGenes(a, b))
+    all.toArray.map{
+      case (g, t) =>
+        (new RefGene(dict.value.build, t, t.map(l => l.mRNAName).map(n => (n, dict.value.seq(n))).toMap), v)
+    }
+  }
+
+  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
+    logger.info("start annotation")
+    try {
+      val exitCode = s"mkdir -p $workerDir".!
+      logger.info(s"workerDir '$workerDir' created successfully")
+    } catch {
+      case e: Exception =>
+        logger.error(s"failed to create workerDir '$workerDir', exit")
+        System.exit(1)
+    }
+    val build = cnf.getString(CP.RefGene.build)
+    val coordFile = cnf.getString(CP.RefGene.coord)
+    val seqFile = cnf.getString(CP.RefGene.seq)
+    val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
+    input.map(v => lookupGene(v, refGene)).flatMap(x => x)
+
+
+  }
+/**
+  * use annovar, deprecated
+  *
   def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): VCF = {
     val exitCode = ("mkdir -p %s" format workerDir).!
     println(exitCode)
@@ -96,4 +142,5 @@ object Annotation extends Worker[VCF, VCF] {
       else
         "ANNO=%s;GROUP=%s" format (a, b)}
   }
+  */
 }

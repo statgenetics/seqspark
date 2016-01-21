@@ -54,9 +54,32 @@ object Constant {
       }
     }
 
+    val annotation = "annotation"
+    object Annotation {
+      val refGene = s"$annotation.refGene"
+      object RefGene {
+        val build = s"$refGene.build"
+        val coord = s"$refGene.coord"
+        val seq = s"$refGene.seq"
+      }
+      val maf = s"$annotation.maf"
+      object Maf {
+        val source = s"$maf.source"
+        val tag = s"$maf.tag"
+        val an = s"$maf.an"
+        val ac = s"$maf.ac"
+      }
+    }
   }
 
   object ConfigValue {
+    object Annotation {
+      object Build extends Enumeration {
+        type Build = Value
+        val hg19 = Value("hg19")
+        val hg38 = Value("hg38")
+      }
+    }
     object Association {
       object SomeMethod {
         object Coding {

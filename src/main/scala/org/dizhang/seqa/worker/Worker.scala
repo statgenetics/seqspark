@@ -9,7 +9,7 @@ import org.slf4j.{LoggerFactory, Logger}
  * Pipeline worker
  */
 object Worker {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
 
   val slaves = Map[String, Worker[VCF, VCF]](
     "sample" -> SampleLevelQC,
@@ -28,6 +28,7 @@ object Worker {
 
 /** An abstract class that only contains a run method */
 trait Worker[A, B] {
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val name: WorkerName
   def apply(input: A)(implicit cnf: Config, sc: SparkContext): B
 }

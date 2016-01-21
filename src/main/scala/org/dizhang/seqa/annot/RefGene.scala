@@ -3,7 +3,7 @@ package org.dizhang.seqa.annot
 
 import org.dizhang.seqa.ds.Region
 
-import scala.collection.immutable.{TreeSet}
+import scala.collection.immutable.TreeSet
 import scala.io.Source
 
 /**
@@ -37,11 +37,14 @@ object RefGene {
       'N' -> 0,
       'n' -> 0
     )
-    for (i <- 0 to len%4) yield {
+    val seq = (for (i <- 0 to len%4) yield {
       val first = m(rawSeq(4*i)) << 6
       val second = if (4*i + 1 < len) m(rawSeq(4*i + 1)) << 4 else 0
-      val
-    }
+      val third = if (4*i + 2 < len) m(rawSeq(4*i + 2)) << 2 else 0
+      val forth = if (4*i + 3 < len) m(rawSeq(4*i + 3)) else 0
+      (first + second + third + forth).toByte
+    }).toArray
+    new mRNA(name, len, seq, na)
   }
 
   def apply(build: String, coordFile: String, seqFile: String): RefGene = {
@@ -64,6 +67,7 @@ object RefGene {
     new RefGene(build, loci, seq)
   }
 }
+
 class RefGene(val build: String,
               val loci: TreeSet[Location],
               val seq: Map[String, mRNA])

@@ -19,6 +19,7 @@ object Location {
     val Negative = Value("-")
   }
   val upDownStreamRange = 2000
+
 }
 
 class Location(val geneName: String,

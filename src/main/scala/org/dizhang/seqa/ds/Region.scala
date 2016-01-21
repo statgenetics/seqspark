@@ -39,6 +39,19 @@ case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 
 object Region {
 
+  implicit object RegionOrdering extends Ordering[Region] {
+    def compare(x: Region, y: Region): Int = {
+      if (x.chr != y.chr) {
+        x.chr compare y.chr
+      } else if (x.start != y.start) {
+        x.start compare y.start
+      } else {
+        x.end compare y.end
+      }
+    }
+  }
+
+  /**
   implicit object StartOrdering extends Ordering[Region] {
     def compare(a: Region, b: Region): Int = {
       if (a.chr != b.chr)
@@ -65,8 +78,8 @@ object Region {
         a.end compare b.end
     }
   }
-
-  implicit class Chromosome(self: String) extends AnyVal {
+    */
+  implicit class Chromosome(val self: String) extends AnyVal {
     def byte: Byte = {
       val num = """(\d+)""".r
       self match {

@@ -1,13 +1,15 @@
 package org.dizhang.seqa.annot
 
-import org.dizhang.seqa.util.Constant.Annotation._
-
 /**
-  * Gene
+  * Gene contains mRNAs and Locations
   */
-object Gene {
+@SerialVersionUID(102L)
+class Gene(val name: String,
+           val mRNA: Array[mRNA],
+           val loci: Array[Location]) extends Serializable {
 
 }
 
-class Gene(val name: String,
-           val mRNAs: Array[mRNA])
+object Gene {
+
+}

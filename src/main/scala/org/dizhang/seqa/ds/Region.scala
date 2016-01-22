@@ -26,6 +26,22 @@ trait Region extends Serializable {
   def overlap(that: Region): Boolean = {
     this.chr == that.chr && min(this.end, that.end) > max(this.start, that.start)
   }
+
+  def <(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
+    if (ordering.compare(this, that) == -1) true else false
+  }
+
+  def <=(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
+    if (this < that || this == that) true else false
+  }
+  def >(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
+    if (that < this) true else false
+  }
+
+  def >=(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
+    if (! (this < that)) true else false
+  }
+
 }
 
 case class Single(chr: Byte, pos: Int) extends Region {
@@ -52,32 +68,32 @@ object Region {
   }
 
   /**
-  implicit object StartOrdering extends Ordering[Region] {
-    def compare(a: Region, b: Region): Int = {
-      if (a.chr != b.chr)
-        a.chr compare b.chr
-      else
-        a.start compare b.start
-    }
-  }
+    * implicit object StartOrdering extends Ordering[Region] {
+    * def compare(a: Region, b: Region): Int = {
+    * if (a.chr != b.chr)
+    * a.chr compare b.chr
+    * else
+    * a.start compare b.start
+    * }
+    * }
 
-  implicit object MidOrdering extends Ordering[Region] {
-    def compare(a: Region, b: Region): Int = {
-      if (a.chr != b.chr)
-        a.chr compare b.chr
-      else
-        a.mid compare b.mid
-    }
-  }
+    * implicit object MidOrdering extends Ordering[Region] {
+    * def compare(a: Region, b: Region): Int = {
+    * if (a.chr != b.chr)
+    * a.chr compare b.chr
+    * else
+    * a.mid compare b.mid
+    * }
+    * }
 
-  implicit object EndOrdering extends Ordering[Region] {
-    def compare(a: Region, b: Region): Int = {
-      if (a.chr != b.chr)
-        a.chr compare b.chr
-      else
-        a.end compare b.end
-    }
-  }
+    * implicit object EndOrdering extends Ordering[Region] {
+    * def compare(a: Region, b: Region): Int = {
+    * if (a.chr != b.chr)
+    * a.chr compare b.chr
+    * else
+    * a.end compare b.end
+    * }
+    * }
     */
   implicit class Chromosome(val self: String) extends AnyVal {
     def byte: Byte = {
@@ -123,14 +139,14 @@ object Region {
   }
 
 /**
-  def apply[A](vars: Iterable[Variant[A]], n: Option[String] = None): Region = {
-    val r = vars.map(v => Region(v.chr, v.pos.toInt - 1, v.pos.toInt))
-      .reduce((a, b) => )
-    n match {
-      case None => r
-      case Some(s) =>
-    }
-  }
+  * def apply[A](vars: Iterable[Variant[A]], n: Option[String] = None): Region = {
+  * val r = vars.map(v => Region(v.chr, v.pos.toInt - 1, v.pos.toInt))
+  * .reduce((a, b) => )
+  * n match {
+  * case None => r
+  * case Some(s) =>
+  * }
+  * }
 */
   /**
     * def collapse(regs: List[Region]): List[Region] = {

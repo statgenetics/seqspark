@@ -9,6 +9,7 @@ import org.dizhang.seqa.stat._
 import org.dizhang.seqa.util.Constant
 import org.dizhang.seqa.util.Constant.Pheno
 import org.dizhang.seqa.util.InputOutput.VCF
+import org.dizhang.seqa.worker.Annotation
 import collection.JavaConverters._
 import AssocTest._
 import org.dizhang.seqa.ds.Counter._
@@ -28,6 +29,8 @@ object AssocTest {
   val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
   val IntPair = CounterElementSemiGroup.PairInt
   val Permu = Constant.Permutation
+  val F = Constant.Annotation.Feature
+  val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
 
   def makeEncode(currentGenotype: VCF,
              y: Broadcast[DenseVector[Double]],
@@ -41,11 +44,15 @@ object AssocTest {
     val sampleSize = y.value.length
     val codingScheme = methodConfig.getString(CPSomeMethod.coding)
     val annotated = codingScheme match {
-      case CVSomeMethod.Coding.single => currentGenotype.map(v => (v.pos, v)).groupByKey()
-      case _ => currentGenotype.map(v => (v.parseInfo(Constant.Variant.InfoKey.gene), v)).groupByKey()}
+      case CVSomeMethod.Coding.single =>
+        currentGenotype.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
+      case _ => Annotation(currentGenotype)
+        .filter(x => FuncF.contains(x._2._1))
+        .map(x => (x._1, x._2._2)).groupByKey()}
 
-    annotated.map(p => (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, methodConfig)))
-      .filter(p => p._2.isDefined)
+    annotated.map(p =>
+      (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, methodConfig))
+    ).filter(p => p._2.isDefined)
   }
 
   def adjustForCov(binaryTrait: Boolean,
@@ -152,14 +159,13 @@ object AssocTest {
       asymptoticTest(encode, currentTrait._2, cov, binary, test)
     }
   }
-
 }
 
 class AssocTest(genotype: VCF,
                 phenotype: Phenotype)
                (implicit config: Config,
                 sc: SparkContext) extends Assoc {
-  def run: Unit = {
+  def run(): Unit = {
     val traits = config.getStringList(CPTraitList).asScala.toArray
     traits.foreach{
       t => runTrait(t)

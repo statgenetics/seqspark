@@ -27,8 +27,7 @@ object Association extends Worker[VCF, VCF] {
     val phenoFile = cnf.getString(CPPheno)
     val phenotype = Phenotype(phenoFile)
     val assoc = new AssocTest(input, phenotype)
-    assoc.run
+    assoc.run()
     input
-
   }
 }

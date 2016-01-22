@@ -50,9 +50,10 @@ object RefGene {
   def apply(build: String, coordFile: String, seqFile: String): RefGene = {
     val locIter = Source.fromFile(coordFile).getLines()
     val header = locIter.next().split("\t")
-    val loci = locIter.map(l => TreeSet(makeLocation(l, header))).reduce((a, b) => a ++ b)
+    val loci = IntervalTree(locIter.map(l => makeLocation(l, header)))
     val seqIter = Source.fromFile(seqFile).getLines()
     val seqName = """>(NM_\d+).\d""".r
+
     val seq = seqIter.map{
       case seqName(n) => Array((n + "\t", ""))
       case l => Array(("", l))
@@ -64,10 +65,11 @@ object RefGene {
         a ++ b.slice(1, b.length)
       }
     }.map(s => (s._1, makeSeq(s._1, s._2))).toMap
+
     new RefGene(build, loci, seq)
   }
 }
 
 class RefGene(val build: String,
-              val loci: TreeSet[Location],
+              val loci: IntervalTree[Location],
               val seq: Map[String, mRNA])

@@ -16,6 +16,7 @@ object InputOutput {
   type Var = Variant[Byte]
   type RawVCF = RDD[RawVar]
   type VCF = RDD[Var]
+  type AnnoVCF = RDD[(String, (Constant.Annotation.Feature.Feature, Var))]
   type Pair = (Int, Int)
 
   /** Give Worker Object a name

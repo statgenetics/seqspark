@@ -142,19 +142,19 @@ object Constant {
   object Annotation {
     object Feature extends Enumeration {
       type Feature = Value
-      val InterGenic = Value("InterGenic")
-      val Upstream = Value("Upstream")
-      val Downstream = Value("Downstream")
-      val UTR5 = Value("5-UTR")
-      val UTR3 = Value("3-UTR")
-      val CDS = Value("CDS")
-      val Intronic = Value("Intronic")
-      val Exonic = Value("Exonic")
-      val Synonymous = Value("Synonymous")
-      val NonSynonymous = Value("NonSynonymous")
       val StopGain = Value("StopGain")
       val StopLoss = Value("StopLoss")
       val SpliceSite = Value("SpliceSite")
+      val NonSynonymous = Value("NonSynonymous")
+      val Synonymous = Value("Synonymous")
+      val CDS = Value("CDS")
+      val Exonic = Value("Exonic")
+      val UTR5 = Value("5-UTR")
+      val UTR3 = Value("3-UTR")
+      val Intronic = Value("Intronic")
+      val Upstream = Value("Upstream")
+      val Downstream = Value("Downstream")
+      val InterGenic = Value("InterGenic")
     }
     object Nucleotide extends Enumeration {
       type Nucleotide = Value

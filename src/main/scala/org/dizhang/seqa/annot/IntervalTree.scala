@@ -56,7 +56,7 @@ object IntervalTree {
   def insert[A <: Region](tree: IntervalTree[A], item: A)(implicit ordering: Ordering[A]): IntervalTree[A] = {
     def _insert(_it: IntervalTree[A], _x: A): IntervalTree[A] = {
       _it match {
-        case Leaf => Node(_x, R, Leaf, Leaf, right(_x))
+        case Leaf() => Node(_x, R, Leaf(), Leaf(), right(_x))
         case Node(y, c, a, b, m) => ordering.compare(_x, y) match {
           case -1 => balance(Node(y, c, _insert(a, _x), b, max(m, right(_x))))
           case 0 => _it
@@ -90,7 +90,7 @@ object IntervalTree {
     def lookupRegion(trees: List[IntervalTree[A]], x: Region, accum: List[A]): List[A] = {
       trees match {
         case Nil => accum
-        case Leaf :: rs => lookupRegion(rs, x, accum)
+        case Leaf() :: rs => lookupRegion(rs, x, accum)
         case Node(d, _, l, r, m) :: rs =>
           if (m < left(x)) {
             lookupRegion(rs, x, accum)
@@ -105,6 +105,17 @@ object IntervalTree {
     }
     lookupRegion(List(tree), item, Nil)
   }
+  def apply[A <: Region](iter: Iterator[A]): IntervalTree[A] = {
+    def rec(i: Iterator[A], acc: IntervalTree[A]): IntervalTree[A] = {
+      if (i.hasNext) {
+        val cur = i.next()
+        rec(i, insert(acc, cur))
+      } else {
+        acc
+      }
+    }
+    rec(iter, Leaf())
+  }
 }
 
 sealed trait IntervalTree[A <: Region] {
@@ -112,7 +123,7 @@ sealed trait IntervalTree[A <: Region] {
   def max: Single
 }
 
-case object Leaf extends IntervalTree[Nothing] {
+case class Leaf[A <: Region]() extends IntervalTree[A] {
   val color = Color.black
   val max = leftest
 }

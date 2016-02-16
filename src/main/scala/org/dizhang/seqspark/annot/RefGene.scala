@@ -2,8 +2,6 @@ package org.dizhang.seqspark.annot
 
 
 import org.dizhang.seqspark.ds.Region
-
-import scala.collection.immutable.TreeSet
 import scala.io.Source
 
 /**

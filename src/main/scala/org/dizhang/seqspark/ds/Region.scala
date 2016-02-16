@@ -41,7 +41,6 @@ trait Region extends Serializable {
   def >=(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
     if (! (this < that)) true else false
   }
-
 }
 
 case class Single(chr: Byte, pos: Int) extends Region {

@@ -16,13 +16,21 @@ object Import extends Worker[String, Genotype] {
 
   def apply(input: String)(implicit cnf: Config, sc: SparkContext): Genotype = {
     val raw = sc.textFile(input)
-    StringGenotype(makeVariants(raw))
+    val build = cnf.getString("import.build")
+    val source = cnf.getString("import.type")
+    StringGenotype(makeVariants(raw), cnf.getConfig(ConfigPath.`import`))
   }
 
   /** filter variants based on
     * 1. filter column in vcf
     * 2. only bi-allelic SNPs if biAllelicSNV is true in Conf
     */
+
+  def load(path: String, sc: SparkContext): Genotype = {
+    val data: Genotype = sc.objectFile(path).asInstanceOf[Genotype]
+    data
+  }
+
   def makeVariants(raw: RDD[String])(implicit cnf: Config): RawVCF = {
     val genoInCnf = cnf.getConfig("genotypeInput")
     val biAllelicSNV = genoInCnf.getString("biAllelicSNV")

@@ -26,7 +26,7 @@ object IntervalTree {
 
   def blacken[A <: Region](it: IntervalTree[A]): IntervalTree[A] = {
     it match {
-      case Leaf => it
+      case Leaf() => it
       case Node(x, c, a, b, m) => Node(x, B, a, b, m)
     }
   }
@@ -105,6 +105,7 @@ object IntervalTree {
     }
     lookupRegion(List(tree), item, Nil)
   }
+
   def apply[A <: Region](iter: Iterator[A]): IntervalTree[A] = {
     def rec(i: Iterator[A], acc: IntervalTree[A]): IntervalTree[A] = {
       if (i.hasNext) {

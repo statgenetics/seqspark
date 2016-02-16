@@ -98,6 +98,8 @@ class Location(val geneName: String,
     }
   }
 
+
+
   def annotate(p: Single, seq: Option[mRNA] = None, alt: Option[Nucleotide] = None): feature.Feature = {
     import AminoAcid._
     if (p overlap upstream) {

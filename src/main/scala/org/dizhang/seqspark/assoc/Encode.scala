@@ -25,8 +25,7 @@ object Encode {
   case class Fixed(coding: DenseVector[Double]) extends Coding
   case class VT(coding: DenseMatrix[Double]) extends Coding
 
-  def cmcMakeNaAdjust(x: Byte, maf: Double): Double =
-    x match {
+  def cmcMakeNaAdjust(x: Byte, maf: Double): Double = x match {
       case Bt.ref => 0.0
       case Bt.het1 => 1.0
       case Bt.het2 => 1.0
@@ -48,8 +47,7 @@ object Encode {
       else
         1.0 - (1.0 - a) * (1.0 - b)}
 
-  def brvMakeNaAdjust(x: Byte, maf: Double): Double =
-    x match {
+  def brvMakeNaAdjust(x: Byte, maf: Double): Double = x match {
       case Bt.ref => 0.0
       case Bt.het1 => 1.0
       case Bt.het2 => 1.0

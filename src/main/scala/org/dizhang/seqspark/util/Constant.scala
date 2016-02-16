@@ -70,6 +70,19 @@ object Constant {
         val ac = s"$maf.ac"
       }
     }
+
+    val `import` = "import"
+    object Import {
+      val build = s"${`import`}.build"
+      val `type` = s"${`import`}.type"
+      val source = s"${`import`}.source"
+      val filters = s"${`import`}.filters"
+      val phased = s"${`import`}.phased"
+      val alleles = s"${`import`}.alleles"
+      val snv = s"${`import`}.snv"
+      val indel = s"${`import`}.indel"
+      val save = s"${`import`}.save"
+    }
   }
 
   object ConfigValue {
@@ -112,6 +125,13 @@ object Constant {
           val binary = "binary"
           val quant = "quant"
         }
+      }
+    }
+    object Import {
+      object Type extends Enumeration {
+        type Type = Value
+        val vcf = Value("vcf")
+        val cache = Value("cache")
       }
     }
   }

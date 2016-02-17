@@ -2,11 +2,11 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseMatrix, shuffle, DenseVector}
 import breeze.stats.distributions.Bernoulli
-import com.typesafe.config.Config
 import org.dizhang.seqspark.assoc.Encode
 import org.dizhang.seqspark.assoc.Encode.Coding
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
 import org.dizhang.seqspark.util.InputOutput.Var
+import org.dizhang.seqspark.util.UserConfig.MethodConfig
 
 /**
   * resampling class
@@ -25,7 +25,7 @@ object Resampling {
             cov: Option[DenseMatrix[Double]],
             e: Option[DenseVector[Double]],
             controls: Option[Array[Boolean]],
-            config: Option[Config],
+            config: Option[MethodConfig],
             bt: Boolean): Resampling = {
     (config, controls) match {
       case (None, None) =>
@@ -63,7 +63,7 @@ object Resampling {
             cov: Option[DenseMatrix[Double]],
             e: Option[DenseVector[Double]],
             controls: Option[Array[Boolean]],
-            config: Config,
+            config: MethodConfig,
             bt: Boolean): Resampling = {
     (bt, cov) match {
       case (_, None) => new XRecodingYPermutation(ref, min, max, x, y, bt, controls, config)
@@ -115,7 +115,7 @@ sealed trait XFixed extends Resampling {
 sealed trait XRecoding extends Resampling {
   def x: Iterable[Var]
   def controls: Option[Array[Boolean]]
-  def config: Config
+  def config: MethodConfig
   def makeNewX(newY: DenseVector[Double]): Coding =
     Encode(x, newY.length, controls, Some(newY), cov, config).getCoding.get
 }
@@ -167,7 +167,7 @@ case class XRecodingYPermutation(refStatistic: Double,
                                  y: DenseVector[Double],
                                  binaryTrait: Boolean,
                                  controls: Option[Array[Boolean]],
-                                 config: Config) extends Resampling with YPermutation with XRecoding
+                                 config: MethodConfig) extends Resampling with YPermutation with XRecoding
 
 case class XFixedRPermutation(refStatistic: Double,
                               min: Int,
@@ -185,7 +185,7 @@ case class XRecodingRPermutation(refStatistic: Double,
                                  cov: Some[DenseMatrix[Double]],
                                  estimates: DenseVector[Double],
                                  controls: Option[Array[Boolean]],
-                                 config: Config) extends Resampling with RPermutation with XRecoding
+                                 config: MethodConfig) extends Resampling with RPermutation with XRecoding
 
 case class XFixedYBootstrap(refStatistic: Double,
                             min: Int,
@@ -203,4 +203,4 @@ case class XRecodingYBootstrap(refStatistic: Double,
                                cov: Some[DenseMatrix[Double]],
                                estimates: DenseVector[Double],
                                controls: Option[Array[Boolean]],
-                               config: Config) extends Resampling with YBootstrap with XRecoding
+                               config: MethodConfig) extends Resampling with YBootstrap with XRecoding

@@ -2,13 +2,13 @@ package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.numerics.pow
-import com.typesafe.config.Config
 import org.dizhang.seqspark.ds.Counter
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.Constant.UnPhased
 import org.dizhang.seqspark.util.Constant.UnPhased.Bt
 import org.dizhang.seqspark.util.InputOutput.Var
+import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import Encode._
 
@@ -18,8 +18,8 @@ import Encode._
 object Encode {
   /** constants values of the pathes and values of
     * the method config object*/
-  val CPMethod = Constant.ConfigPath.Association.SomeMethod
-  val CVMethod = Constant.ConfigValue.Association.SomeMethod
+  //val CPMethod = Constant.ConfigPath.Association.SomeMethod
+  //val CVMethod = Constant.ConfigValue.Association.SomeMethod
 
   trait Coding
   case class Fixed(coding: DenseVector[Double]) extends Coding
@@ -75,16 +75,16 @@ object Encode {
             controls: Option[Array[Boolean]] = None,
             y: Option[DenseVector[Double]],
             cov: Option[DenseMatrix[Double]],
-            config: Config): Encode = {
-    val codingScheme = config.getString(CPMethod.coding)
-    val mafSource = config.getString(CPMethod.Maf.source)
-    val weightMethod = config.getString(CPMethod.weight)
+            config: MethodConfig): Encode = {
+    val codingScheme = config.coding
+    val mafSource = config.mafSource
+    val weightMethod = config.weight
     (codingScheme, mafSource, weightMethod) match {
-      case (CVMethod.Coding.brv, CVMethod.Maf.Source.controls, CVMethod.Weight.erec) =>
+      case (CodingMethod.brv, MafSource.controls, WeightMethod.erec) =>
         apply(vars, sampleSize, controls.get, y.get, cov, config)
-      case (CVMethod.Coding.brv, _, CVMethod.Weight.erec) =>
+      case (CodingMethod.brv, _, WeightMethod.erec) =>
         apply(vars, sampleSize, y.get, cov, config)
-      case (_, CVMethod.Maf.Source.controls, _) =>
+      case (_, MafSource.controls, _) =>
         apply(vars, sampleSize, controls.get, config)
       case (_, _, _) =>
         apply(vars, sampleSize, config)
@@ -92,20 +92,20 @@ object Encode {
   }
 
 
-  def apply(vars: Iterable[Var], sampleSize: Int, config: Config): Encode = {
-    config.getString(CPMethod.coding) match {
-      case CVMethod.Coding.single => DefaultSingle(vars, sampleSize, config)
-      case CVMethod.Coding.cmc => DefaultCMC(vars, sampleSize, config)
-      case CVMethod.Coding.brv => SimpleBRV(vars, sampleSize, config)
+  def apply(vars: Iterable[Var], sampleSize: Int, config: MethodConfig): Encode = {
+    config.coding match {
+      case CodingMethod.single => DefaultSingle(vars, sampleSize, config)
+      case CodingMethod.cmc => DefaultCMC(vars, sampleSize, config)
+      case CodingMethod.brv => SimpleBRV(vars, sampleSize, config)
       case _ => DefaultCMC(vars, sampleSize, config)
     }
   }
 
-  def apply(vars: Iterable[Var], sampleSize: Int, controls: Array[Boolean], config: Config): Encode = {
-    config.getString(CPMethod.coding) match {
-      case CVMethod.Coding.single => ControlsMafSingle(vars, sampleSize, controls, config)
-      case CVMethod.Coding.cmc => ControlsMafCMC(vars, sampleSize, controls, config)
-      case CVMethod.Coding.brv => ControlsMafSimpleBRV(vars, sampleSize, controls, config)
+  def apply(vars: Iterable[Var], sampleSize: Int, controls: Array[Boolean], config: MethodConfig): Encode = {
+    config.coding match {
+      case CodingMethod.single => ControlsMafSingle(vars, sampleSize, controls, config)
+      case CodingMethod.cmc => ControlsMafCMC(vars, sampleSize, controls, config)
+      case CodingMethod.brv => ControlsMafSimpleBRV(vars, sampleSize, controls, config)
       case _ => ControlsMafCMC(vars, sampleSize, controls, config)
     }
   }
@@ -114,7 +114,7 @@ object Encode {
             sampleSize: Int,
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: Config): Encode = {
+            config: MethodConfig): Encode = {
     ErecBRV(vars, sampleSize, y, cov, config)
   }
 
@@ -123,7 +123,7 @@ object Encode {
             controls: Array[Boolean],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: Config): Encode = {
+            config: MethodConfig): Encode = {
     ControlsMafErecBRV(vars, sampleSize, controls, y, cov, config)
   }
 }
@@ -132,8 +132,8 @@ sealed trait Encode {
   def vars: Iterable[Var]
   def maf: Array[Double]
   def sampleSize: Int
-  def config: Config
-  lazy val fixedCutoff: Double = config.getDouble(CPMethod.Maf.cutoff)
+  def config: MethodConfig
+  lazy val fixedCutoff: Double = config.mafCutoff
   def thresholds: Option[Array[Double]] = {
     val n = sampleSize
     /** this is to make sure 90% call rate sites is considered the same with the 100% cr ones
@@ -159,7 +159,7 @@ sealed trait Encode {
     }
   }
   def getCoding: Option[Coding] = {
-    if (config.getBoolean(CPMethod.Maf.fixed))
+    if (config.mafFixed)
       this.getFixed()
     else
       this.getVT
@@ -219,10 +219,10 @@ sealed trait BRV extends Encode {
 
 sealed trait PooledOrAnnotationMaf extends Encode {
   def maf = {
-    config.getString(CPMethod.Maf.source) match {
-      case CVMethod.Maf.Source.annotation =>
+    config.mafSource match {
+      case MafSource.annotation =>
         vars.map(v => v.parseInfo(Constant.Variant.InfoKey.maf).toDouble).toArray
-      case CVMethod.Maf.Source.pooled =>
+      case MafSource.pooled =>
         vars.map (v => getMaf (v.toCounter (makeMaf, (0, 2) ).reduce) ).toArray
       case _ => vars.map (v => getMaf(v.toCounter(makeMaf, (0, 2)).reduce)).toArray
     }
@@ -236,12 +236,12 @@ sealed trait ControlsMaf extends Encode {
 
 sealed trait SimpleWeight extends BRV {
   def weight(cutoff: Double): Option[DenseVector[Double]] = {
-    config.getString(CPMethod.weight) match {
-      case CVMethod.Weight.equal => None
-      case CVMethod.Weight.annotation =>
+    config.weight match {
+      case WeightMethod.equal => None
+      case WeightMethod.annotation =>
         Some(DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
           .filter(v => v._2 < cutoff).map(_._1).toArray))
-      case CVMethod.Weight.wss =>
+      case WeightMethod.wss =>
         val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
         Some(pow(mafDV :* mafDV.map(1.0 - _), -0.5))
       case _ => None
@@ -272,41 +272,41 @@ sealed trait LearnedWeight extends BRV {
 
 case class DefaultSingle(vars: Iterable[Var],
                          sampleSize: Int,
-                         config: Config) extends Encode with Single with PooledOrAnnotationMaf
+                         config: MethodConfig) extends Encode with Single with PooledOrAnnotationMaf
 
 case class ControlsMafSingle(vars: Iterable[Var],
                              sampleSize: Int,
                              controls: Array[Boolean],
-                             config: Config) extends Encode with Single with ControlsMaf
+                             config: MethodConfig) extends Encode with Single with ControlsMaf
 
 case class DefaultCMC(vars: Iterable[Var],
                       sampleSize: Int,
-                      config: Config) extends Encode with CMC with PooledOrAnnotationMaf
+                      config: MethodConfig) extends Encode with CMC with PooledOrAnnotationMaf
 
 case class ControlsMafCMC(vars: Iterable[Var],
                           sampleSize: Int,
                           controls: Array[Boolean],
-                          config: Config) extends Encode with CMC with ControlsMaf
+                          config: MethodConfig) extends Encode with CMC with ControlsMaf
 
 case class SimpleBRV(vars: Iterable[Var],
                      sampleSize: Int,
-                     config: Config) extends Encode with BRV with PooledOrAnnotationMaf with SimpleWeight
+                     config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with SimpleWeight
 
 
 case class ControlsMafSimpleBRV(vars: Iterable[Var],
                           sampleSize: Int,
                           controls: Array[Boolean],
-                          config: Config) extends Encode with BRV with ControlsMaf with SimpleWeight
+                          config: MethodConfig) extends Encode with BRV with ControlsMaf with SimpleWeight
 
 case class ErecBRV(vars: Iterable[Var],
                    sampleSize: Int,
                    y: DenseVector[Double],
                    cov: Option[DenseMatrix[Double]],
-                   config: Config) extends Encode with BRV with PooledOrAnnotationMaf with LearnedWeight
+                   config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with LearnedWeight
 
 case class ControlsMafErecBRV(vars: Iterable[Var],
                               sampleSize: Int,
                               controls: Array[Boolean],
                               y: DenseVector[Double],
                               cov: Option[DenseMatrix[Double]],
-                              config: Config) extends Encode with BRV with ControlsMaf with LearnedWeight
+                              config: MethodConfig) extends Encode with BRV with ControlsMaf with LearnedWeight

@@ -1,4 +1,4 @@
-package org.dizhang.seqspark.assoc
+package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.stats._
@@ -24,11 +24,22 @@ object Phenotype {
     dataFrame.registerTempTable("sampleInfo")
     new Phenotype(dataFrame)
   }
+
+  def save(pheno: Phenotype, path: String): Unit = {
+    pheno.dataFrame.write.save(path)
+  }
+
 }
 
 class Phenotype(val dataFrame: DataFrame) {
   def apply(field: String): Array[Option[Double]] = {
     this.dataFrame.select(field).map{case null => None; case s => Some(s.toString.toDouble)}.collect()
+  }
+  def batch: Array[String] = {
+    this.dataFrame.select("batch").map{case null => "1"; case s => s.toString()}.collect()
+  }
+  def filter(field: String): Phenotype = {
+    new Phenotype(dataFrame.filter(s"$field == 1"))
   }
   def indicate(field: String): Array[Boolean] = {
     this.dataFrame.select(field).map{case null => false; case s => true}.collect()

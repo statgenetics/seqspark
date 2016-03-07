@@ -1,5 +1,6 @@
 package org.dizhang.seqspark.util
 
+import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.Region
 
 /**
@@ -19,123 +20,6 @@ object Constant {
 
   }
 
-  object ConfigPath {
-    val sampleInfo = "sampleInfo"
-    object SampleInfo {
-      val source = "source"
-    }
-
-    val association = "association"
-    object Association {
-      val method = s"$association.method"
-      object Method {
-        val list = s"$method.list"
-      }
-      object SomeMethod {
-        /** relative path */
-        val maf = "maf"
-        object Maf {
-          val source = s"$maf.source"
-          val cutoff = s"$maf.cutoff"
-          val fixed = s"$maf.fixed"
-        }
-        val coding = "coding"
-        val weight = "weight"
-        val permutation = "permutation"
-        val test = "test"
-      }
-      val `trait` = s"$association.trait"
-      object Trait {
-        val list = s"${`trait`}.list"
-      }
-      object SomeTrait {
-        val binary = "binary"
-        val covariates = "covariates"
-      }
-    }
-
-    val annotation = "annotation"
-    object Annotation {
-      val refGene = s"$annotation.refGene"
-      object RefGene {
-        val build = s"$refGene.build"
-        val coord = s"$refGene.coord"
-        val seq = s"$refGene.seq"
-      }
-      val maf = s"$annotation.maf"
-      object Maf {
-        val source = s"$maf.source"
-        val tag = s"$maf.tag"
-        val an = s"$maf.an"
-        val ac = s"$maf.ac"
-      }
-    }
-
-    val `import` = "import"
-    object Import {
-      val build = s"${`import`}.build"
-      val `type` = s"${`import`}.type"
-      val source = s"${`import`}.source"
-      val filters = s"${`import`}.filters"
-      val phased = s"${`import`}.phased"
-      val alleles = s"${`import`}.alleles"
-      val snv = s"${`import`}.snv"
-      val indel = s"${`import`}.indel"
-      val save = s"${`import`}.save"
-    }
-  }
-
-  object ConfigValue {
-    object Annotation {
-      object Build extends Enumeration {
-        type Build = Value
-        val hg19 = Value("hg19")
-        val hg38 = Value("hg38")
-      }
-    }
-    object Association {
-      object SomeMethod {
-        object Coding {
-          val cmc = "collapse"
-          val brv = "burden"
-          val single = "single"
-        }
-        object Maf {
-          object Source {
-            val pooled = "pooled"
-            val controls = "controls"
-            val annotation = "annotation"
-          }
-        }
-        object Weight {
-          val none = "none"
-          val equal = "equal"
-          val wss = "wss"
-          val erec = "erec"
-          val annotation = "annotation"
-        }
-        object Test {
-          val score = "score"
-          val lrt = "lrt"
-          val wald = "wald"
-        }
-      }
-      object SomeTrait {
-        object Type {
-          val binary = "binary"
-          val quant = "quant"
-        }
-      }
-    }
-    object Import {
-      object Type extends Enumeration {
-        type Type = Value
-        val vcf = Value("vcf")
-        val cache = Value("cache")
-      }
-    }
-  }
-
   object Pheno {
     object Header {
       val fid = "fid"
@@ -144,7 +28,8 @@ object Constant {
       val mid = "mid"
       val sex = "sex"
       val control = "control"
-      val pca = "pca"
+      val pcPrefix = "pc"
+      val batch = "batch"
     }
     val delim = "\t"
     val mis = "NA"
@@ -153,9 +38,10 @@ object Constant {
 
   object Variant {
     object InfoKey {
-      val maf = "SEQA_ANNO_MAF"
-      val weight = "SEQA_ANNO_WEIGHT"
-      val gene = "SEQA_GENE"
+      val maf = "SS_ANNO_MAF"
+      val weight = "SS_ANNO_WEIGHT"
+      val gene = "SS_GENE"
+      val func = "SS_FUNC"
     }
   }
 
@@ -165,7 +51,9 @@ object Constant {
       val StopGain = Value("StopGain")
       val StopLoss = Value("StopLoss")
       val SpliceSite = Value("SpliceSite")
+      val FrameShiftIndel = Value("FrameShiftIndel")
       val NonSynonymous = Value("NonSynonymous")
+      val NonFrameShiftIndel = Value("NonFrameShiftIndel")
       val Synonymous = Value("Synonymous")
       val CDS = Value("CDS")
       val Exonic = Value("Exonic")
@@ -175,6 +63,7 @@ object Constant {
       val Upstream = Value("Upstream")
       val Downstream = Value("Downstream")
       val InterGenic = Value("InterGenic")
+      val CNV = Value("CNV")
     }
     object Nucleotide extends Enumeration {
       type Nucleotide = Value
@@ -216,7 +105,8 @@ object Constant {
             V, V, V, V, A, A, A, A, D, D, E, E, G, G, G, G)
     }
     def translate(codon: String): AminoAcid.AminoAcid = {
-      require(codon.forall(_ != 'N'), "cannot translate codon containing N")
+      require(codon.forall(_ != 'N') && codon.length == 3,
+        "cannot translate codon containing N or length not equal to 3")
       val num = codon.map {
         case 'T' => 0
         case 'C' => 1
@@ -294,7 +184,7 @@ object Constant {
     //val chr1 = Region("1", 0, 248956421)
     val pseudoX = List(Region("X", 60000, 2699519), Region("X", 154931043, 155260559))
     val pseudoY = List(Region("Y", 10000, 2649519), Region("Y", 59034049, 59363565))
-    val pseudo = pseudoX ::: pseudoY
+    val pseudo = IntervalTree( pseudoX ::: pseudoY toIterator )
     /** use a definition of MHC region from Genome Reference Consortium
       * url:
       * http://www.ncbi.nlm.nih.gov/projects/genome/assembly/grc/human/
@@ -306,7 +196,7 @@ object Constant {
     /** 0-based closed intervals, as with Region */
     val pseudoX = List(Region("X", 10000, 2781478), Region("X", 155701382, 156030894))
     val pseudoY = List(Region("Y", 10000, 2781478), Region("Y", 56887902, 57217414))
-    val pseudo = pseudoX ::: pseudoY
+    val pseudo = IntervalTree( pseudoX ::: pseudoY toIterator)
     val mhc = Region("6", 28510119, 33480576)
   }
 }

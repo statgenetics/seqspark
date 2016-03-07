@@ -32,6 +32,13 @@ object UserConfig {
 
   object Variants extends Enumeration {
     val all = Value("all")
+    val none = Value("none")
+  }
+
+  object MutType extends Enumeration {
+    val snv = Value("snv")
+    val indel = Value("indel")
+    val cnv = Value("cnv")
   }
 
   object CodingMethod extends Enumeration {
@@ -62,9 +69,14 @@ object UserConfig {
 
   case class RootConfig(config: Config) extends UserConfig {
 
+    def project = config.getString("project")
+    def seqSparkHome = config.getString("seqSparkHome")
+    def localDir = config.getString("localDir")
+    def hdfsDir = config.getString("hdfsDir")
+    def pipeline = config.getStringList("pipeline").asScala.toArray
+
     def `import` = ImExConfig(config.getConfig("import"))
     def export = ImExConfig(config.getConfig("export"))
-    //def sampleInfo = SampleInfoConfig(config.getConfig("sampleInfo"))
     def genotypeLevelQC = GenotypeLevelQCConfig(config.getConfig("genotypeLevelQC"))
     def sampleLevelQC = SampleLevelQCConfig(config.getConfig("sampleLevelQC"))
     def variantLevelQC = VariantLevelQCConfig(config.getConfig("variantLevelQC"))
@@ -75,7 +87,9 @@ object UserConfig {
 
   case class ImExConfig(config: Config) extends UserConfig {
 
-    def `type` = ImExType.withName(config.getString("type"))
+    def format = ImExType.withName(config.getString("format"))
+
+    def gtOnly = config.getBoolean("gtOnly")
 
     def phased = config.getBoolean("phased")
 
@@ -87,21 +101,19 @@ object UserConfig {
 
     def genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
-    def maxAlleles = config.getInt("maxAlleles")
+    def maxAlleleNum = config.getInt("maxAlleleNum")
 
-    def snv = config.getBoolean("snv")
-
-    def indel = config.getBoolean("indel")
+    def mutType: Array[MutType.Value] = {
+      config.getStringList("mutType").asScala.map(m => MutType.withName(m)).toArray
+    }
 
     def save = config.getBoolean("save")
 
-    def samples: Either[Samples.Value, Set[String]] = {
-      val file = """file://(.+)""".r
+    def samples: Either[Samples.Value, String] = {
       config.getString("samples") match {
         case "all" => Left(Samples.all)
         case "none" => Left(Samples.none)
-        case file(f) => Right(Source.fromFile(f).getLines().toSet)
-        case x => Right(x.split(",").toSet)
+        case field => Right(field)
       }
     }
 
@@ -128,7 +140,7 @@ object UserConfig {
 
   case class GenotypeLevelQCConfig(config: Config) extends UserConfig {
 
-    def format = config.getString("format")
+    def format = config.getString("format").split(":").zipWithIndex.toMap
     def gd = config.getIntList("gd").asScala.toArray
     def gq = config.getInt("gq")
     def save = config.getBoolean("save")
@@ -155,6 +167,9 @@ object UserConfig {
     def mafTag = config.getString("maf.tag")
     def mafAN = config.getString("maf.an")
     def mafAC = config.getString("maf.ac")
+    def geneBuild = config.getString("gene.build")
+    def geneCoord = config.getString("gene.coord")
+    def geneSeq = config.getString("gene.seq")
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {
@@ -189,7 +204,3 @@ object UserConfig {
 sealed trait UserConfig {
   def config: Config
 }
-
-
-
-

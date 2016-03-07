@@ -2,62 +2,35 @@ package org.dizhang.seqspark.worker
 
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqspark.ds.{ByteGenotype, Genotype}
+import org.dizhang.seqspark.ds.{Variant, ByteGenotype, VCF}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.ds.Counter._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
+import org.dizhang.seqspark.worker.Worker.Data
 
 /**
  * Variant level QC
  */
 
-object VariantLevelQC extends Worker[Genotype, Genotype] {
+object VariantLevelQC extends Worker[Data, Data] {
 
   implicit val name = new WorkerName("variant")
 
-  def apply(geno: Genotype)(implicit cnf: Config, sc: SparkContext): Genotype = {
-    val input = geno.data
-    val rareMaf = cnf.getString("variantLevelQC.rareMaf").toDouble
-    def mafFunc (m: Double): Boolean =
-      if (m < rareMaf || m > (1 - rareMaf)) true else false
+  def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
+    val (geno, pheno) = data
+    val input = geno.vars
+    val rare = miniQC(input, pheno.batch, _ => true)
 
-    val newPheno = cnf.getString("sampleInfo.source")
-//      "%s/%s/%s" format(resultsDir, SampleLevelQC.name, cnf.getString("sampleInfo.source").split("/").last)
-    val rare = miniQC(input, newPheno, mafFunc)
-    /**
-    *val targetFile = cnf.getString("variantLevelQC.target")
-    *val select: Boolean = Option(targetFile) match {
-      *case Some(f) => true
-      *case None => false
-    *}
-
-    *val rare =
-      *if (select) {
-        *val iter = Source.fromFile(targetFile).getLines()
-        *val res =
-          *for {l <- iter
-               *s = l.split("\t")
-          *} yield "%s-%s".format(s(0), s(1)) -> (s(2) + s(3))
-        *val vMap = res.toMap
-        *afterQC.filter(v => vMap.contains("%s-%s".format(v.chr, v.pos)) && vMap("%s-%s".format(v.chr, v.pos)) == (v.ref + v.alt))
-      *} else
-        *afterQC
-    */
-    rare.persist(StorageLevel.MEMORY_AND_DISK_SER)
-    /** save is very time-consuming and resource-demanding */
-    if (cnf.getBoolean("variantLevelQC.save"))
-      try {
-        rare.saveAsTextFile(saveDir)
-      } catch {
-        case e: Exception => {println("Variant level QC: save failed"); System.exit(1)}
-      }
-    ByteGenotype(rare)
+    (ByteGenotype(rare, cnf.`import`), pheno)
   }
 
-  def miniQC(vars: VCF, pheno: String, mafFunc: Double => Boolean)(implicit cnf: Config, sc: SparkContext): VCF = {
-    //val pheno = ini.get("general", "pheno")
-    val batchCol = cnf.getString("sampleInfo.batch")
-    val batchStr = readColumn(pheno, batchCol)
+  def miniQC(vars: RDD[Variant[Byte]],
+             batchStr: Array[String],
+             mafFunc: Double => Boolean)
+            (implicit cnf: Config, sc: SparkContext): RDD[Var] = {
+
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))

@@ -1,16 +1,27 @@
 package org.dizhang.seqspark.ds
 
 import scala.annotation.tailrec
+import org.dizhang.seqspark.util.UserConfig.MutType
 
 /**
- * a variant is a collection holding a row of VCF
- */
+  * a variant is a collection holding a row of VCF
+  * Note that VCF use 1-based coordinates
+  * In our analysis, only bi-allelic sites are legal
+  *
+  * */
 
 
 object Variant {
   val THRESHOLD = 0.25
   val MINIMIUM = 10000
-  def fill[A](meta: Array[String], size: Int)(default: A): Variant[A] = SparseVariant(meta, Map.empty[Int, A], default, size)
+
+  def fill[A](meta: Array[String], size: Int)(default: A): Variant[A] = {
+    if (size == 0) {
+      DummyVariant(meta, default)
+    } else {
+      SparseVariant(meta, Map.empty[Int, A], default, size)
+    }
+  }
 
   def fromString(line: String, default: String): Variant[String] = {
     val s = line.split("\t")
@@ -36,7 +47,7 @@ object Variant {
       val maxIdx = m.keys.max
       require(maxIdx < size, "max key (%s) exceeds valid for size (%s)" format(maxIdx, size))
       val denseSize = m.count( _._2 != default )
-      if (size >= MINIMIUM && denseSize < size * THRESHOLD)
+      if (size >= MINIMIUM && denseSize < (size * THRESHOLD))
         SparseVariant(meta, m, default, size)
       else
         DenseVariant(meta, toIndexedSeq(m, default, size), default, denseSize)
@@ -70,6 +81,21 @@ object Variant {
       case SparseVariant(_, m, _, size) => Counter.fromMap(m.map(x => x._1 -> make(x._2)), default, size)
     }
   }
+
+  def mutType(ref: String, alt: String): MutType.Value = {
+    val cnvReg = """[\[\]\<\>]""".r
+    cnvReg.findFirstIn(alt) match {
+      case Some(_) => MutType.cnv
+      case None => if (ref.length > 1) {
+        MutType.indel
+      } else if (alt.split(",").forall(_.length == 1)) {
+        MutType.snv
+      } else {
+        MutType.indel
+      }
+    }
+  }
+
 }
 
 @SerialVersionUID(1L)
@@ -89,6 +115,12 @@ sealed trait Variant[A] extends Serializable {
   def filter: String = meta(6)
   def info: String = meta(7)
   def format: String = meta(8)
+
+  def alleles: Array[String] = Array(ref) ++ alt.split(",")
+
+  def alleleNum: Int = alleles.length
+
+  def mutType: MutType.Value = Variant.mutType(ref, alt)
 
   def geno(implicit make: A => String): IndexedSeq[String] =
     Variant.toIndexedSeq(this.map(g => make(g)))
@@ -122,7 +154,7 @@ sealed trait Variant[A] extends Serializable {
   var meta: Array[String]
 
   def site: String = {
-    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t."
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info"
   }
 
   def isTi: Boolean = {
@@ -151,7 +183,7 @@ sealed trait Variant[A] extends Serializable {
 
   def addInfo(key: String, value: String): Unit = {
     require(! this.parseInfo.contains(key))
-    this.meta(7) = s"${info};${key}=${value}"
+    this.meta(7) = s"$info;$key=$value"
   }
 
   def parseFormat: Array[String] = {
@@ -166,7 +198,26 @@ sealed trait Variant[A] extends Serializable {
   def toIndexedSeq = Variant.toIndexedSeq(this)
 
   def toArray = this.toIndexedSeq.toArray
+
+  def toRegion: Region = {
+    Region(s"$chr:${pos.toInt - 1}-${pos.toInt + alleles.map(_.length).max - 1}")
+  }
+
+  def toVariation: Variation = new Variation(toRegion, ref, alt)
+
+  def toDummy: Variant[A] = {
+    DummyVariant(meta, default)
+  }
 }
+
+case class DummyVariant[A](var meta: Array[String], default: A)
+  extends Variant[A] {
+  def size = 0
+  def select(indicator: Array[Boolean]): DummyVariant[A] = this
+  def denseSize = 0
+  def map[B](f: A => B): DummyVariant[B] = DummyVariant(meta, f(default))
+}
+
 
 /**
  * Dense Variant implementation
@@ -196,11 +247,9 @@ case class DenseVariant[A](var meta: Array[String],
 
 }
 
-
 /**
  * Sparse Variant
  * */
-
 
 case class SparseVariant[A](var meta: Array[String],
                        elems: Map[Int, A],

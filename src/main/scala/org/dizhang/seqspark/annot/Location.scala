@@ -1,11 +1,13 @@
 package org.dizhang.seqspark.annot
 
 import breeze.linalg.sum
-import org.dizhang.seqspark.ds.{Region, Single}
+import org.dizhang.seqspark.ds.{Variation, Region, Single}
 import org.dizhang.seqspark.util.Constant.Annotation
 import org.dizhang.seqspark.util.Constant.Annotation.Nucleotide.Nucleotide
 import org.dizhang.seqspark.util.Constant.Annotation._
 import Location._
+import org.dizhang.seqspark.util.UserConfig.MutType
+
 /**
   * location of a gene with a specific splicing and translation.
   * the cds and utr defined here are not accurate, for it may include part of intronic region.
@@ -40,7 +42,7 @@ class Location(val geneName: String,
     }
   }
 
-  def downStream: Region = {
+  def downstream: Region = {
     if (strand == Strand.Negative) {
       Region(chr, start - upDownStreamRange, start)
     } else {
@@ -98,13 +100,46 @@ class Location(val geneName: String,
     }
   }
 
-
+  def annotate(v: Variation, seq: mRNA): feature.Feature = {
+    v.mutType match {
+      case MutType.snv => annotate(Single(v.chr, v.start), Some(seq), Some(Nucleotide.withName(v.alt)))
+      case MutType.indel => {
+        val int = Region(v.chr, v.start + 1, v.end)
+        if (int overlap this) {
+          if (int overlap cds) {
+            if (exons.exists(e => e overlap int)) {
+              if (math.abs(v.ref.length - v.alt.length)%3 == 0) {
+                feature.FrameShiftIndel
+              } else {
+                feature.NonFrameShiftIndel
+              }
+            } else if (spliceSites.exists(s => s overlap int)) {
+              feature.SpliceSite
+            } else {
+              feature.Intronic
+            }
+          } else if (int overlap utr5) {
+            feature.UTR5
+          } else {
+            feature.UTR3
+          }
+        } else if (int overlap upstream) {
+          feature.Upstream
+        } else if (int overlap downstream) {
+          feature.Downstream
+        } else {
+          feature.InterGenic
+        }
+      }
+      case MutType.cnv => feature.CNV
+    }
+  }
 
   def annotate(p: Single, seq: Option[mRNA] = None, alt: Option[Nucleotide] = None): feature.Feature = {
     import AminoAcid._
     if (p overlap upstream) {
       feature.Upstream
-    } else if (p overlap downStream) {
+    } else if (p overlap downstream) {
       feature.Downstream
     } else if (p overlap this) {
       if (exons.exists(e => p overlap e)) {

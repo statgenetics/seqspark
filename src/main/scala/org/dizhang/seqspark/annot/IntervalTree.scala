@@ -106,6 +106,13 @@ object IntervalTree {
     lookupRegion(List(tree), item, Nil)
   }
 
+  def overlap[A <: Region](tree: IntervalTree[A], item: Region): Boolean = {
+    lookup(tree, item) match {
+      case Nil => false
+      case _ => true
+    }
+  }
+
   def apply[A <: Region](iter: Iterator[A]): IntervalTree[A] = {
     def rec(i: Iterator[A], acc: IntervalTree[A]): IntervalTree[A] = {
       if (i.hasNext) {

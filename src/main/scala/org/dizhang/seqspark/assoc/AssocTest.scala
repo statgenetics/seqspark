@@ -4,10 +4,10 @@ import breeze.linalg.{sum, DenseMatrix, DenseVector}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.dizhang.seqspark.ds.{VCF, Phenotype}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.Constant.Pheno
-import org.dizhang.seqspark.util.InputOutput.VCF
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.worker.Annotation
 import AssocTest._
@@ -18,18 +18,11 @@ import org.dizhang.seqspark.ds.Counter._
   */
 object AssocTest {
   /** constants */
-  val CPSomeTrait = Constant.ConfigPath.Association.SomeTrait
-  val CPTrait = Constant.ConfigPath.Association.`trait`
-  val CPTraitList = Constant.ConfigPath.Association.Trait.list
-  val CPSomeMethod = Constant.ConfigPath.Association.SomeMethod
-  val CPMethod = Constant.ConfigPath.Association.method
-  val CPMethodList = Constant.ConfigPath.Association.Method.list
-  val CVSomeTrait = Constant.ConfigValue.Association.SomeTrait
-  val CVSomeMethod = Constant.ConfigValue.Association.SomeMethod
   val IntPair = CounterElementSemiGroup.PairInt
   val Permu = Constant.Permutation
   val F = Constant.Annotation.Feature
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
+  val IK = Constant.Variant.InfoKey
 
   def makeEncode(currentGenotype: VCF,
                  y: Broadcast[DenseVector[Double]],
@@ -44,14 +37,16 @@ object AssocTest {
     val codingScheme = config.coding
     val annotated = codingScheme match {
       case CodingMethod.single =>
-        currentGenotype.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
-      case _ => Annotation(currentGenotype)
-        .filter(x => FuncF.contains(x._2._1))
-        .map(x => (x._1, x._2._2)).groupByKey()}
+        currentGenotype.vars.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
+      case _ => Annotation(currentGenotype).vars
+          .map(v => (v.parseInfo(IK.gene), v))
+          .filter(x => FuncF.contains(F.withName(x._2.parseInfo(IK.func))))
+          .groupByKey()
+    }
 
     annotated.map(p =>
       (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, config))
-    ).filter(p => p._2.isDefined)
+    )
   }
 
   def adjustForCov(binaryTrait: Boolean,
@@ -180,7 +175,7 @@ class AssocTest(genotype: VCF,
       val indicator = sc.broadcast(phenotype.indicate(traitName))
       val controls = sc.broadcast(phenotype(Pheno.Header.control).zip(indicator.value)
         .filter(p => p._2).map(p => if (p._1.get == 1.0) true else false))
-      val currentGenotype = genotype.map(v => v.select(indicator.value))
+      val currentGenotype = genotype.select(indicator.value)
       val traitConfig = config.`trait`(traitName)
       val currentCov = sc.broadcast(
         if (traitConfig.covariates.nonEmpty)

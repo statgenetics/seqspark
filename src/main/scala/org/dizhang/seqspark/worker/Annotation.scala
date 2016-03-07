@@ -5,43 +5,60 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene}
-import org.dizhang.seqspark.ds.{Region, Single, Variant}
+import org.dizhang.seqspark.ds._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.{Constant, Command}
 import org.dizhang.seqspark.util.InputOutput._
-import scala.collection.immutable.TreeSet
+import org.dizhang.seqspark.worker.Worker._
 import sys.process._
 
-import scala.io.Source
 
 /**
  * Annotation pipeline
  */
 
-object Annotation extends Worker[VCF, AnnoVCF] {
+object Annotation extends Worker[Data, Data] {
 
   implicit val name = new WorkerName("annotation")
 
-  val CP = Constant.ConfigPath.Annotation
-  val CV = Constant.ConfigValue.Annotation
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
   val Nucleotide = Constant.Annotation.Nucleotide
+  val IK = Constant.Variant.InfoKey
 
   type Genes = Map[String, List[Location]]
 
-  def annotate(v: Var, dict: Broadcast[RefGene]): Array[(String, (F.Feature, Var))] = {
+  def annotate[A](v: Variant[A], dict: Broadcast[RefGene]): Array[Variant[A]] = {
     /** the argument RefGene is the whole set of all genes involved
       * the output RefGene each represents a single gene
       * */
     val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
+
+    val variation = v.toVariation
+
     val all = IntervalTree.lookup(dict.value.loci, point)
-      .map(l => (l.geneName, l.annotate(point, Some(dict.value.seq(l.mRNAName)), Some(Nucleotide.withName(v.alt)))))
+      .map(l => (l.geneName, l.annotate(variation, dict.value.seq(l.mRNAName))))
       .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
-      .toArray.map(x => (x._1, (x._2, v)))
+      .toArray.map{x => v.addInfo(IK.gene, x._1); v.addInfo(IK.func, x._2.toString); v}
     all
   }
 
-  def apply(input: VCF)(implicit cnf: Config, sc: SparkContext): AnnoVCF = {
+  def apply(input: VCF)(implicit cnf: RootConfig, sc: SparkContext): VCF = {
+    val build = input.config.genomeBuild.toString
+    val coordFile = cnf.annotation.geneCoord
+    val seqFile = cnf.annotation.geneSeq
+    val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
+    input match {
+      case (ByteGenotype(vs, c), _) =>
+        val anno = vs.map(v => annotate(v, refGene)).flatMap(x => x)
+        ByteGenotype(anno, c)
+      case (StringGenotype(rvs, c), _) =>
+        val anno = rvs.map(v => annotate(v, refGene)).flatMap(x => x)
+        StringGenotype(anno, c)
+    }
+  }
+
+  def apply(input: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
     logger.info("start annotation")
     try {
       val exitCode = s"mkdir -p $workerDir".!
@@ -51,12 +68,17 @@ object Annotation extends Worker[VCF, AnnoVCF] {
         logger.error(s"failed to create workerDir '$workerDir', exit")
         System.exit(1)
     }
-    val build = cnf.getString(CP.RefGene.build)
-    val coordFile = cnf.getString(CP.RefGene.coord)
-    val seqFile = cnf.getString(CP.RefGene.seq)
+    val build = input._1.config.genomeBuild.toString
+    val coordFile = cnf.annotation.geneCoord
+    val seqFile = cnf.annotation.geneSeq
     val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
-    val anno = input.map(v => annotate(v, refGene)).flatMap(x => x)
-    anno
+    input match {
+      case (ByteGenotype(vs, c), p) =>
+        val anno = vs.map(v => annotate(v, refGene)).flatMap(x => x)
+        (ByteGenotype(anno, c), p)
+      case (StringGenotype(rvs, c), p) =>
+        val anno = rvs.map(v => annotate(v, refGene)).flatMap(x => x)
+        (StringGenotype(anno, c), p)
+    }
   }
-
 }

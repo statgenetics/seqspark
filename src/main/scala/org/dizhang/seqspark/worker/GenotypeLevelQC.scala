@@ -4,30 +4,34 @@ import java.io.{File, PrintWriter}
 import com.typesafe.config.Config
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.SparkContext
-import org.dizhang.seqspark.ds.{ByteGenotype, Genotype, Counter}
-import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup._
+import org.apache.spark.rdd.RDD
+import org.dizhang.seqspark.ds.{Variant, ByteGenotype, Counter}
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util.UserConfig.{GenotypeLevelQCConfig, RootConfig}
+import org.dizhang.seqspark.worker.Worker.Data
 import sys.process._
 
 /**
  * Genotype level QC
  */
 
-object GenotypeLevelQC extends Worker[Genotype, Genotype] {
+object GenotypeLevelQC extends Worker[Data, Data] {
 
   import UnPhased._
   implicit val name = new WorkerName("genotypeLevelQC")
 
-  def apply(geno: Genotype)(implicit cnf: Config, sc: SparkContext): Genotype = {
-    val input = geno.rawData
+  def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
+
+    val (geno, pheno) = data
+    val input = data._1.rawVars
     statGdGq(input)
-    val genoCnf : Config = cnf.getConfig(name.toString)
-    val gd = genoCnf.getIntList("gd")
-    val gq = genoCnf.getDouble("gq")
-    val gtFormat = genoCnf.getString("format").split(":").zipWithIndex.toMap
-    val gdLower : Int = gd.get(0)
-    val gdUpper : Int = gd.get(1)
+    val genoCnf : GenotypeLevelQCConfig = cnf.genotypeLevelQC
+    val gd = genoCnf.gd
+    val gq = genoCnf.gq
+    val gtFormat = genoCnf.format
+    val gdLower : Int = gd(0)
+    val gdUpper : Int = gd(1)
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
     val gqIdx = gtFormat("GQ")
@@ -48,13 +52,13 @@ object GenotypeLevelQC extends Worker[Genotype, Genotype] {
     //res.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     /** save is very time-consuming and resource-demanding */
-    if (genoCnf.getBoolean("save"))
+    if (genoCnf.save)
       try {
         res.saveAsObjectFile(saveDir)
       } catch {
         case e: Exception => {println("Genotype level QC: save failed"); System.exit(1)}
       }
-    ByteGenotype(res)
+    (ByteGenotype(res, cnf.`import`), data._2)
   }
 
   /** compute call rate */
@@ -87,7 +91,7 @@ object GenotypeLevelQC extends Worker[Genotype, Genotype] {
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: RawVCF)(implicit cnf: Config, sc: SparkContext) {
+  def statGdGq(vars: RDD[Variant[String]])(implicit cnf: Config, sc: SparkContext) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
     val phenoFile = cnf.getString("sampleInfo.source")
@@ -114,7 +118,7 @@ object GenotypeLevelQC extends Worker[Genotype, Genotype] {
     def keyFunc(i: Int): Int =
       broadCastBatchIdx.value(i)
 
-    def count(vars: RawVCF): Bcnt = {
+    def count(vars: RDD[Variant[String]]): Bcnt = {
       val all = vars map (v => v.toCounter(make, new Cnt(Array(0), Array(1))).reduceByKey(keyFunc))
       val res = all reduce ((a, b) => Counter.addByKey(a, b))
       res

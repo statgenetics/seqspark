@@ -2,16 +2,17 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, FileOutputStream, IOException, PrintWriter}
 
-import breeze.linalg.{SparseVector, Vector}
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant
 import Constant._
-import UnPhased._
 import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
+import org.dizhang.seqspark.worker.Worker.Data
 
 import sys.process._
 import scala.io.Source
@@ -19,64 +20,30 @@ import scala.io.Source
 /**
  * Sample level QC
  */
-object SampleLevelQC extends Worker[Genotype, Genotype] {
+object SampleLevelQC extends Worker[Data, Data] {
 
   implicit val name = new WorkerName("sample")
 
-  def apply(geno: Genotype)(implicit cnf: Config, sc: SparkContext): Genotype = {
-    val input = geno.data
+  def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
+
+    val (geno, pheno) = data
+    val input = geno.vars
 
     checkSex(input)
 
-    mds(input)
+    mds(input, pheno.batch, cnf.sampleLevelQC.pcaMaf)
 
-    val pheno = cnf.getString("sampleInfo.source")
-    val newPheno = workerDir + "/" + pheno.split("/").last
-    val samples = readColumn(pheno, "IID")
-    val removeCol = cnf.getString("sampleInfo.filter")
-    val remove =
-      if (hasColumn(pheno, removeCol))
-        readColumn(pheno, removeCol)
-      else
-        Array.fill(samples.length)("0")
-
-    /** save new pheno file after remove bad samples */
-    val phenoArray = Source.fromFile(pheno).getLines().toArray
-    val header = phenoArray(0)
-    val newPhenoArray =
-      for {
-        i <- remove.indices.toArray
-        if remove(i) != "1"
-      } yield phenoArray(i + 1)
-    writeArray(newPheno, header +: newPhenoArray)
-
-    val maskMap: Map[Int, Byte] = remove
-        .zipWithIndex
-        .filter(p => p._1 == "1")
-        .map(p => p._2 -> Bt.mis)
-        .toMap
-    val indicator = sc.broadcast(remove map (x => if (x == "1") false else true))
-    val res = input.map(v => v.select(indicator.value))
-    res.persist(StorageLevel.MEMORY_AND_DISK_SER)
-
-    /** save is very time-consuming and resource-demanding */
-    if (cnf.getBoolean("sampleLevelQC.save"))
-      try {
-        res.saveAsObjectFile(saveDir)
-      } catch {
-        case e: Exception => {println("Sample level QC: save failed"); System.exit(1)}
-      }
-    ByteGenotype(res)
+    data
   }
 
   /** Check the concordance of the genetic sex and recorded sex */
-  def checkSex(vars: VCF)(implicit cnf: Config) {
+  def checkSex(vars: RDD[Variant[Byte]])(implicit cnf: Config) {
     /** Assume:
       *  1. genotype are cleaned before.
       *  2. only SNV
       * */
 
-
+    import UnPhased._
     /** count heterozygosity rate */
     def makex (g: Byte): Pair = {
       if (g == Bt.mis)
@@ -92,15 +59,15 @@ object SampleLevelQC extends Worker[Genotype, Genotype] {
       if (g == Bt.mis) (0, 1) else (1, 1)
 
     /** count for all the SNVs on allosomes */
-    def count (vars: VCF): (Counter[Pair], Counter[Pair]) = {
+    def count (vars: RDD[Variant[Byte]]): (Counter[Pair], Counter[Pair]) = {
       val pXY =
         if (cnf.getString("genotypeInput.genomeBuild") == "hg19")
           Hg19.pseudo
         else
           Hg38.pseudo
       val allo = vars
-        .filter (v => v.chr == "X" || v.chr == "Y")
-        .filter (v => pXY forall (r => ! (r overlap Region(v.chr, v.pos.toInt - 1))))
+        .filter(v => v.chr == "X" || v.chr == "Y")
+        .filter(v => IntervalTree.overlap(pXY, v.toRegion))
       allo.cache()
       //println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
@@ -155,18 +122,18 @@ object SampleLevelQC extends Worker[Genotype, Genotype] {
   }
 
   /** run the global ancestry analysis */
-  def mds (vars: VCF)(implicit cnf: Config, sc: SparkContext) {
+  def mds (vars: RDD[Variant[Byte]], batch: Array[String], mdsMaf: Double)(implicit sc: SparkContext) {
     /**
      * Assume:
      *     1. genotype are cleaned before
      *     2. only SNVs
      */
-    val pheno = cnf.getString("sampleInfo.source")
-    val mdsMaf = cnf.getString("sampleLevelQC.mdsMaf").toDouble
+
+
     def mafFunc (m: Double): Boolean =
       if (m >= mdsMaf && m <= (1 - mdsMaf)) true else false
 
-    val snp = VariantLevelQC.miniQC(vars, pheno, mafFunc)
+    val snp = VariantLevelQC.miniQC(vars, batch, mafFunc)
     //saveAsBed(snp, ini, "%s/9external/plink" format (ini.get("general", "project")))
     //println("\n\n\n\tThere are %s snps for mds" format(snp.count()))
     val bed = snp map (s => Bed(s))

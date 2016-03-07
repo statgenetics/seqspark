@@ -3,6 +3,7 @@ package org.dizhang.seqspark
 import org.apache.spark.{SparkContext, SparkConf}
 import org.dizhang.seqspark.ds.{Counter, Bed}
 import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.worker.{Import, GenotypeLevelQC}
 import com.typesafe.config.{ConfigFactory, Config}
 import java.io.File
@@ -27,6 +28,8 @@ object SeqSpark {
       //implicit val ini = new Ini(userConfFile)
 
       implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load().getConfig("seqa"))
+
+      implicit val rootConf = RootConfig(userConf)
 
       val modules = if (args.length == 2) args(1) else "1-4"
       checkConf
@@ -64,7 +67,7 @@ object SeqSpark {
                 |                     Annotate the variants using annovar.
                 |                 5: Association test
                 |                     Run rare variant association test
-                |                 6: Export data
+                |
                 |"""
 
     if (args.length == 0 || args.length > 2) {
@@ -89,7 +92,7 @@ object SeqSpark {
     println("Conf file fine")
   }
 
-  def run(modules: String)(implicit cnf: Config): Unit = {
+  def run(modules: String)(implicit cnf: RootConfig): Unit = {
     /**
      * May have other run mode later
      **/
@@ -100,11 +103,12 @@ object SeqSpark {
    * quick run. run through the specified modules
    * act as if the vcf is the only input
    */
-  def quickRun(modules: String)(implicit cnf: Config) {
-    val project = cnf.getString("project")
+
+  def quickRun(modules: String)(implicit cnf: RootConfig) {
+    val project = cnf.project
 
     /** determine the input */
-    val dirs = List("readvcf", "genotype", "sample", "variant", "association")
+    val dirs = List("genotypeLevelQC", "sampleLevelQC", "variantLevelQC", "annotation", "association")
     val rangeP = """(\d+)-(\d+)""".r
     val listP = """(\d+)(,\d+)+""".r
     val singleP = """(\d+)""".r
@@ -120,31 +124,13 @@ object SeqSpark {
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[Pair]]))
     implicit val sc: SparkContext = new SparkContext(scConf)
 
-    val raw: RawVCF = Import(cnf.getString("genotypeInput.source"))
+    val current = Import({})
 
     println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
-    val current: VCF =
-      if (s.head == 1)
-        GenotypeLevelQC(raw)
-      else
-        raw
 
-    val last =
-      if (s.head == 1)
-        Worker.recurSlaves(current, s.tail.map(dirs(_)))
-      else
-        Worker.recurSlaves(current, s.map(dirs(_)))
+    val last = Worker.recurSlaves(current, s.map(dirs(_)))
 
-    /**
-      * for (i <- s.slice(2, s.length - 1)) {
-      * val currentWorker = Worker.slaves(dirs(i))
-      * println("Current Worker: %s %s" format(dirs(i), currentWorker.name))
-      * current.persist(StorageLevel.MEMORY_AND_DISK_SER)
-      * current = currentWorker(current)
-      * }
-      */
-    implicit def make(b: Byte): String = {
-      util.Constant.UnPhased.Bt.conv(b)
-    }
+    Export(last)
+
   }
 }

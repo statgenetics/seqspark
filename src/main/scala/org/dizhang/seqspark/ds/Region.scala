@@ -27,6 +27,15 @@ trait Region extends Serializable {
     this.chr == that.chr && min(this.end, that.end) > max(this.start, that.start)
   }
 
+  def intersect(that: Region): Region = {
+    require(this overlap that, "this region must overlap that")
+    Region(this.chr, max(this.start, that, start), min(this.end, that.end))
+  }
+
+  def in(that: Region): Boolean = {
+    this.chr == that.chr && this.start >= that.start && this.end <= that.end
+  }
+
   def <(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
     if (ordering.compare(this, that) == -1) true else false
   }
@@ -51,6 +60,11 @@ case class Single(chr: Byte, pos: Int) extends Region {
 case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
 case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
+
+case class Variation(chr: Byte, start: Int, end: Int, ref: String, alt: String) extends Region {
+  def this(region: Region, ref: String, alt: String) = this(region.chr, region.start, region.end, ref, alt)
+  def mutType = Variant.mutType(ref, alt)
+}
 
 object Region {
 

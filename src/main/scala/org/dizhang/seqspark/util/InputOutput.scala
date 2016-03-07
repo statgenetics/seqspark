@@ -14,9 +14,9 @@ import scala.io.Source
 object InputOutput {
   type RawVar = Variant[String]
   type Var = Variant[Byte]
-  type RawVCF = RDD[RawVar]
-  type VCF = RDD[Var]
-  type AnnoVCF = RDD[(String, (Constant.Annotation.Feature.Feature, Var))]
+  //type RawVCF = RDD[RawVar]
+  //type VCF = RDD[Var]
+  //type AnnoVCF = RDD[(String, (Constant.Annotation.Feature.Feature, Var))]
   type Pair = (Int, Int)
 
   /** Give Worker Object a name
@@ -27,7 +27,7 @@ object InputOutput {
 
   /** If RDD[Variant[Byte]\] is required but RDD[Variant[String]\]
     * is provided, convert it implicitly */
-  implicit def naivelyConvertRawVcfToVcf(raw: RawVCF)(implicit cnf: Config): VCF =
+  implicit def naivelyConvertRawVcfToVcf(raw: RDD[RawVar])(implicit cnf: Config): RDD[Var] =
     raw.map(v => v.map(g => g.bt))
 
   def localWorkingDir(implicit cnf: Config): String =

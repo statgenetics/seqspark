@@ -6,6 +6,7 @@ import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
 import Constant._
 import org.dizhang.seqspark.ds.Variant
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 import scala.io.Source
 /**
  * defines some input/output functions here
@@ -26,26 +27,26 @@ object InputOutput {
   }
 
   /** If RDD[Variant[Byte]\] is required but RDD[Variant[String]\]
-    * is provided, convert it implicitly */
-  implicit def naivelyConvertRawVcfToVcf(raw: RDD[RawVar])(implicit cnf: Config): RDD[Var] =
-    raw.map(v => v.map(g => g.bt))
+    * is provided, convert it implicitly
+  *implicit def naivelyConvertRawVcfToVcf(raw: RDD[RawVar])(implicit cnf: Config): RDD[Var] =
+    *raw.map(v => v.map(g => g.bt))
+  */
 
-  def localWorkingDir(implicit cnf: Config): String =
-    cnf.getString("localWorkingDir")
+  def localWorkingDir(implicit cnf: RootConfig): String = cnf.localDir
 
-  def resultsDir(implicit cnf: Config): String = {
+  def resultsDir(implicit cnf: RootConfig): String = {
     "%s/results" format localWorkingDir
   }
 
-  def workerDir(implicit cnf: Config, name: WorkerName): String = {
+  def workerDir(implicit cnf: RootConfig, name: WorkerName): String = {
     "%s/%s" format (resultsDir, name)
   }
 
-  def saveDir(implicit cnf: Config, name: WorkerName): String = {
-    "%s/%s" format (cnf.getString("hdfsWorkingDir"), name)
+  def saveDir(implicit cnf: RootConfig, name: WorkerName): String = {
+    "%s/%s" format (cnf.hdfsDir, name)
   }
 
-  def sitesFile(implicit cnf: Config, name: WorkerName): String = {
+  def sitesFile(implicit cnf: RootConfig, name: WorkerName): String = {
     "%s/sites.raw.vcf" format workerDir
   }
 

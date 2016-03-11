@@ -2,6 +2,7 @@ package org.dizhang.seqspark.annot
 
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.ds.{Single, Region}
+import Region._
 import IntervalTree._
 import annotation.tailrec
 /**
@@ -112,6 +113,7 @@ object IntervalTree {
       case _ => true
     }
   }
+
 
   def apply[A <: Region](iter: Iterator[A]): IntervalTree[A] = {
     def rec(i: Iterator[A], acc: IntervalTree[A]): IntervalTree[A] = {

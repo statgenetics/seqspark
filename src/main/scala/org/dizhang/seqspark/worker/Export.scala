@@ -1,6 +1,7 @@
 package org.dizhang.seqspark.worker
 
 import org.apache.spark.SparkContext
+import org.dizhang.seqspark.annot.RefGene
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig._
@@ -27,6 +28,7 @@ object Export extends Worker[Data, Unit] {
     samples match {
       case Left(Samples.all) => VCF.save(geno, path)
       case Left(Samples.none) => VCF.save(geno.toDummy, path)
+      case Left(_) => VCF.save(geno.toDummy, path)
       case Right(b) => VCF.save(geno.select(b), path)
     }
   }
@@ -42,8 +44,13 @@ object Export extends Worker[Data, Unit] {
 
     writePheno(pheno, exCnf.samples, exCnf.sampleInfo)
     exCnf.variants match {
-      case Left(Variants.none) => {}
+      case Left(Variants.exome) => {
+        val coordFile = cnf.annotation.geneCoord
+        val exome = sc.broadcast(RefGene.makeExome(coordFile))
+        writeGeno(geno.filter(exome), samples, exCnf.path)
+      }
       case Left(Variants.all) => writeGeno(geno, samples, exCnf.path)
+      case Left(_) => {}
       case Right(b) => writeGeno(geno.filter(b), samples, exCnf.path)
     }
 

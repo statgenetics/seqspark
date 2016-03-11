@@ -184,7 +184,7 @@ object Constant {
     //val chr1 = Region("1", 0, 248956421)
     val pseudoX = List(Region("X", 60000, 2699519), Region("X", 154931043, 155260559))
     val pseudoY = List(Region("Y", 10000, 2649519), Region("Y", 59034049, 59363565))
-    val pseudo = IntervalTree( pseudoX ::: pseudoY toIterator )
+    val pseudo = IntervalTree( (pseudoX ::: pseudoY).toIterator )
     /** use a definition of MHC region from Genome Reference Consortium
       * url:
       * http://www.ncbi.nlm.nih.gov/projects/genome/assembly/grc/human/
@@ -196,7 +196,7 @@ object Constant {
     /** 0-based closed intervals, as with Region */
     val pseudoX = List(Region("X", 10000, 2781478), Region("X", 155701382, 156030894))
     val pseudoY = List(Region("Y", 10000, 2781478), Region("Y", 56887902, 57217414))
-    val pseudo = IntervalTree( pseudoX ::: pseudoY toIterator)
+    val pseudo = IntervalTree( (pseudoX ::: pseudoY).toIterator)
     val mhc = Region("6", 28510119, 33480576)
   }
 }

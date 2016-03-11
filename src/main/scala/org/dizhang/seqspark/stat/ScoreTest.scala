@@ -23,13 +23,13 @@ object ScoreTest {
   class K //number of features
   class S //number of schemes (weight or maf cutoff)
 
-  def ones(n: Int) = DenseVector.ones(n)
+  def ones(n: Int) = DenseVector.ones[Double](n)
 
   def apply(binaryTrait: Boolean,
             y: DenseVector[Double],
             x: Coding,
-            cov: Option[DenseMatrix[Double]] = None,
-            estimates: Option[DenseVector[Double]] = None): ScoreTest = {
+            cov: Option[DenseMatrix[Double]],
+            estimates: Option[DenseVector[Double]]): ScoreTest = {
     x match {
       case Fixed(c) => apply(binaryTrait, y, c, cov, estimates)
       case VT(c) => apply(binaryTrait, y, c, cov.get, estimates.get)
@@ -39,8 +39,8 @@ object ScoreTest {
   def apply(binary: Boolean,
             y: DenseVector[Double],
             x: DenseVector[Double],
-            cov: Option[DenseMatrix[Double]] = None,
-            estimates: Option[DenseVector[Double]] = None): ScoreTest = {
+            cov: Option[DenseMatrix[Double]],
+            estimates: Option[DenseVector[Double]]): ScoreTest = {
     cov match {
       case None => if (binary) BinaryNoCovUniScoreTest(y, x) else QuantNoCovUniScoreTest(y, x)
       case Some(c) => if (binary) BinaryCovUniScoreTest(y, x, c, estimates.get) else QuantCovUniScoreTest(y, x, c, estimates.get)
@@ -71,15 +71,7 @@ sealed trait ScoreTest extends HypoTest {
   }
 
   def summary: TestResult =
-    new TestResult {
-      override val estimate: Option[Double] = None
-
-      override val stdErr: Option[Double] = None
-
-      override val pValue: Double = pValue
-
-      override val statistic: Double = statistic
-    }
+    TestResult(None, None, statistic, pValue)
 }
 
 case class BinaryNoCovUniScoreTest(y: DenseVector[Double],
@@ -95,7 +87,7 @@ case class BinaryCovUniScoreTest(y: DenseVector[Double],
                                  cov: DenseMatrix[Double],
                                  estimates: DenseVector[Double]) extends ScoreTest {
   lazy val n = y.length
-  lazy val xs = DenseMatrix.horzcat(DenseVector.ones(n).toDenseMatrix.t, cov)
+  lazy val xs = DenseMatrix.horzcat(DenseVector.ones[Double](n).toDenseMatrix.t, cov)
   lazy val mp: DenseVector[Double] = estimates
   lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
   lazy val u: Double = (y - mp).t * x
@@ -111,8 +103,8 @@ case class BinaryCovMultiScoreTest(y: DenseVector[Double],
                                    cov: DenseMatrix[Double],
                                    estimates: DenseVector[Double]) extends ScoreTest {
   /** For K choices of weight schemes */
-  lazy val u = 0
-  lazy val v = 1
+  lazy val u = 0.0
+  lazy val v = 1.0
   lazy val n = y.length
   lazy val k = cov.cols + 1
   lazy val s = x.cols
@@ -167,8 +159,8 @@ case class QuantCovMultiScoreTest(y: DenseVector[Double],
                                   x: DenseMatrix[Double],
                                   cov: DenseMatrix[Double],
                                   estimates: DenseVector[Double]) extends ScoreTest {
-  lazy val u = 0
-  lazy val v = 0
+  lazy val u = 0.0
+  lazy val v = 0.0
   lazy val n = y.length
   lazy val s = x.cols
   lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)

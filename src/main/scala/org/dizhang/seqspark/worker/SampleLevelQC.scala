@@ -2,20 +2,16 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, FileOutputStream, IOException, PrintWriter}
 
-import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant
 import Constant._
 import org.dizhang.seqspark.util.InputOutput._
-import org.dizhang.seqspark.util.UserConfig.RootConfig
+import org.dizhang.seqspark.util.UserConfig.{GenomeBuild, RootConfig}
 import org.dizhang.seqspark.worker.Worker.Data
-
 import sys.process._
-import scala.io.Source
 
 /**
  * Sample level QC
@@ -37,7 +33,7 @@ object SampleLevelQC extends Worker[Data, Data] {
   }
 
   /** Check the concordance of the genetic sex and recorded sex */
-  def checkSex(vars: RDD[Variant[Byte]])(implicit cnf: Config) {
+  def checkSex(vars: RDD[Variant[Byte]])(implicit cnf: RootConfig) {
     /** Assume:
       *  1. genotype are cleaned before.
       *  2. only SNV
@@ -61,7 +57,7 @@ object SampleLevelQC extends Worker[Data, Data] {
     /** count for all the SNVs on allosomes */
     def count (vars: RDD[Variant[Byte]]): (Counter[Pair], Counter[Pair]) = {
       val pXY =
-        if (cnf.getString("genotypeInput.genomeBuild") == "hg19")
+        if (cnf.`import`.genomeBuild == GenomeBuild.hg19)
           Hg19.pseudo
         else
           Hg38.pseudo
@@ -72,7 +68,7 @@ object SampleLevelQC extends Worker[Data, Data] {
       //println("The number of variants on allosomes is %s" format (allo.count()))
       val xVars = allo filter (v => v.chr == "X")
       val yVars = allo filter (v => v.chr == "Y")
-      val emp: Counter[Pair] = Counter.fill[Pair](sampleSize(cnf.getString("sampleInfo.source")))((0, 0))
+      val emp: Counter[Pair] = Counter.fill[Pair](sampleSize(cnf.`import`.sampleInfo))((0, 0))
       val xHetRate =
         if (xVars.isEmpty())
           emp
@@ -101,7 +97,7 @@ object SampleLevelQC extends Worker[Data, Data] {
 
     /** write the result into file */
     def write (res: (Counter[Pair], Counter[Pair])) {
-      val pheno = cnf.getString("sampleInfo.source")
+      val pheno = cnf.`import`.sampleInfo
       val fids = readColumn(pheno, "fid")
       val iids = readColumn(pheno, "iid")
       val sex = readColumn(pheno, "sex")
@@ -122,7 +118,7 @@ object SampleLevelQC extends Worker[Data, Data] {
   }
 
   /** run the global ancestry analysis */
-  def mds (vars: RDD[Variant[Byte]], batch: Array[String], mdsMaf: Double)(implicit sc: SparkContext) {
+  def mds (vars: RDD[Variant[Byte]], batch: Array[String], mdsMaf: Double)(implicit sc: SparkContext, cnf: RootConfig) {
     /**
      * Assume:
      *     1. genotype are cleaned before

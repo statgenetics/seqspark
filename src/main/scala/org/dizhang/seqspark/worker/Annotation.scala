@@ -1,13 +1,11 @@
 package org.dizhang.seqspark.worker
 
-import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.util.{Constant, Command}
+import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.worker.Worker._
 import sys.process._
@@ -43,16 +41,16 @@ object Annotation extends Worker[Data, Data] {
     all
   }
 
-  def apply(input: VCF)(implicit cnf: RootConfig, sc: SparkContext): VCF = {
+  def forAssoc(input: VCF)(implicit cnf: RootConfig, sc: SparkContext): VCF = {
     val build = input.config.genomeBuild.toString
     val coordFile = cnf.annotation.geneCoord
     val seqFile = cnf.annotation.geneSeq
     val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
     input match {
-      case (ByteGenotype(vs, c), _) =>
+      case ByteGenotype(vs, c) =>
         val anno = vs.map(v => annotate(v, refGene)).flatMap(x => x)
         ByteGenotype(anno, c)
-      case (StringGenotype(rvs, c), _) =>
+      case StringGenotype(rvs, c) =>
         val anno = rvs.map(v => annotate(v, refGene)).flatMap(x => x)
         StringGenotype(anno, c)
     }

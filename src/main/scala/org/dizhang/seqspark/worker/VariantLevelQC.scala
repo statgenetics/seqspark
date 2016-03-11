@@ -29,7 +29,7 @@ object VariantLevelQC extends Worker[Data, Data] {
   def miniQC(vars: RDD[Variant[Byte]],
              batchStr: Array[String],
              mafFunc: Double => Boolean)
-            (implicit cnf: Config, sc: SparkContext): RDD[Var] = {
+            (implicit cnf: RootConfig, sc: SparkContext): RDD[Var] = {
 
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
@@ -38,7 +38,7 @@ object VariantLevelQC extends Worker[Data, Data] {
     def keyFunc(i: Int): Int = broadCastBatchIdx.value(i)
 
     val batch = batchIdx
-    val misRate = cnf.getString("variantLevelQC.batchMissing").toDouble
+    val misRate = cnf.variantLevelQC.batchMissing
 
     /** if call rate is high enough */
     def callRateP (v: Var): Boolean = {

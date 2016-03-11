@@ -27,10 +27,10 @@ object Resampling {
             controls: Option[Array[Boolean]],
             config: Option[MethodConfig],
             bt: Boolean): Resampling = {
-    (config, controls) match {
-      case (None, None) =>
+    config match {
+      case None =>
         apply(ref, min, max, x.getCoding.get, y, cov, e, bt)
-      case (Some(cnf), _) =>
+      case Some(cnf) =>
         apply(ref, min, max, x.vars, y, cov, e, controls, cnf, bt)
     }
   }

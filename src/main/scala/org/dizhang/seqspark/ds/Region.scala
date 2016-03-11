@@ -29,7 +29,7 @@ trait Region extends Serializable {
 
   def intersect(that: Region): Region = {
     require(this overlap that, "this region must overlap that")
-    Region(this.chr, max(this.start, that, start), min(this.end, that.end))
+    Region(this.chr, max(this.start, that.start), min(this.end, that.end))
   }
 
   def in(that: Region): Boolean = {
@@ -66,7 +66,23 @@ case class Variation(chr: Byte, start: Int, end: Int, ref: String, alt: String) 
   def mutType = Variant.mutType(ref, alt)
 }
 
+object Single {
+  implicit object SingleOrdering extends Ordering[Single] {
+    def compare(x: Single, y: Single): Int = {
+      if (x.chr != y.chr) {
+        x.chr compare y.chr
+      } else {
+        x.pos compare y.pos
+      }
+    }
+  }
+}
+
 object Region {
+
+  implicit def ord[A <: Region]: Ordering[A] = {
+    Ordering.by(_.asInstanceOf[Region])
+  }
 
   implicit object RegionOrdering extends Ordering[Region] {
     def compare(x: Region, y: Region): Int = {

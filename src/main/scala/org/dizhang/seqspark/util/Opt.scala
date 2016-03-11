@@ -1,5 +1,7 @@
 package org.dizhang.seqspark.util
 
+import scala.language.implicitConversions
+
 /**
  * borrow from http://stackoverflow.com/questions/4199393/are-options-and-named-default-arguments-like-oil-and-water-in-a-scala-api/4199579#4199579
  * Aaron Novstrup's answer

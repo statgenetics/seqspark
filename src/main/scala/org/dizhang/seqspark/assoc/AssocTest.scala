@@ -28,7 +28,7 @@ object AssocTest {
                  y: Broadcast[DenseVector[Double]],
                  cov: Broadcast[Option[DenseMatrix[Double]]],
                  controls: Broadcast[Array[Boolean]],
-                 config: MethodConfig)(implicit sc: SparkContext): RDD[(String, Encode)] = {
+                 config: MethodConfig)(implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode)] = {
 
     /** this is quite tricky
       * some encoding methods require phenotype information
@@ -38,7 +38,7 @@ object AssocTest {
     val annotated = codingScheme match {
       case CodingMethod.single =>
         currentGenotype.vars.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
-      case _ => Annotation(currentGenotype).vars
+      case _ => Annotation.forAssoc(currentGenotype).vars
           .map(v => (v.parseInfo(IK.gene), v))
           .filter(x => FuncF.contains(F.withName(x._2.parseInfo(IK.func))))
           .groupByKey()
@@ -140,7 +140,8 @@ object AssocTest {
                          currentTrait: (String, Broadcast[DenseVector[Double]]),
                          cov: Broadcast[Option[DenseMatrix[Double]]],
                          controls: Broadcast[Array[Boolean]],
-                         method: String)(implicit sc: SparkContext, config: AssociationConfig): Unit = {
+                         method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
+    val config = cnf.association
     val methodConfig = config.method(method)
     val encode = makeEncode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
     val permutation = methodConfig.resampling
@@ -157,11 +158,13 @@ object AssocTest {
 
 class AssocTest(genotype: VCF,
                 phenotype: Phenotype)
-               (implicit config: AssociationConfig,
+               (implicit cnf: RootConfig,
                 sc: SparkContext) extends Assoc {
 
+  val assocConf = cnf.association
+
   def run(): Unit = {
-    val traits = config.traitList
+    val traits = assocConf.traitList
     traits.foreach{
       t => runTrait(t)
     }
@@ -171,12 +174,12 @@ class AssocTest(genotype: VCF,
     try {
       logger.info(s"load trait $traitName from phenotype database")
       val currentTrait = (traitName, sc.broadcast(phenotype.makeTrait(traitName)))
-      val methods = config.methodList
+      val methods = assocConf.methodList
       val indicator = sc.broadcast(phenotype.indicate(traitName))
       val controls = sc.broadcast(phenotype(Pheno.Header.control).zip(indicator.value)
         .filter(p => p._2).map(p => if (p._1.get == 1.0) true else false))
       val currentGenotype = genotype.select(indicator.value)
-      val traitConfig = config.`trait`(traitName)
+      val traitConfig = assocConf.`trait`(traitName)
       val currentCov = sc.broadcast(
         if (traitConfig.covariates.nonEmpty)
           Some(phenotype.makeCov(traitName, traitConfig.covariates))

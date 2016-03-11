@@ -3,6 +3,8 @@ package org.dizhang.seqspark.ds
 import scala.annotation.tailrec
 import org.dizhang.seqspark.util.UserConfig.MutType
 
+import scala.reflect.ClassTag
+
 /**
   * a variant is a collection holding a row of VCF
   * Note that VCF use 1-based coordinates
@@ -64,6 +66,7 @@ object Variant {
     v match {
       case DenseVariant(_, iseq, _, _) => iseq
       case SparseVariant(_, m, default, size) => toIndexedSeq(m, default, size)
+      case DummyVariant(_, _) => IndexedSeq[A]()
     }
 
   def toMap[A](iseq: IndexedSeq[A], default: A): Map[Int, A] =
@@ -73,12 +76,14 @@ object Variant {
     v match {
       case DenseVariant(_, iseq, default, _) => toMap(iseq, default)
       case SparseVariant(_, m, _, _) => m
+      case DummyVariant(_, _) => Map.empty[Int, A]
     }
 
   def toCounter[A, B](variant: Variant[A], make: A => B, default: B): Counter[B] = {
     variant match {
       case DenseVariant(_, iseq, _, _) => Counter.fromIndexedSeq(iseq.map(make), default)
       case SparseVariant(_, m, _, size) => Counter.fromMap(m.map(x => x._1 -> make(x._2)), default, size)
+      case DummyVariant(_, _) => Counter.fill(0)(default)
     }
   }
 
@@ -197,7 +202,7 @@ sealed trait Variant[A] extends Serializable {
 
   def toIndexedSeq = Variant.toIndexedSeq(this)
 
-  def toArray = this.toIndexedSeq.toArray
+  def toArray(implicit tag: ClassTag[A]) = this.toIndexedSeq.toArray
 
   def toRegion: Region = {
     Region(s"$chr:${pos.toInt - 1}-${pos.toInt + alleles.map(_.length).max - 1}")
@@ -216,6 +221,7 @@ case class DummyVariant[A](var meta: Array[String], default: A)
   def select(indicator: Array[Boolean]): DummyVariant[A] = this
   def denseSize = 0
   def map[B](f: A => B): DummyVariant[B] = DummyVariant(meta, f(default))
+  def apply(i: Int): A = default
 }
 
 

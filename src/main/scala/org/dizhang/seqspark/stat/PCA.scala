@@ -4,13 +4,14 @@ import breeze.linalg.{DenseMatrix => BDM}
 import org.apache.spark.mllib.linalg.{Vectors, Vector}
 import org.apache.spark.mllib.feature.{PCA => SPCA}
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.util.InputOutput.VCF
+import org.dizhang.seqspark.ds.VCF
 
 /**
   * perform PCA for
   */
-class PCA(val input: VCF) {
+class PCA(val vcf: VCF) {
   def transpose: RDD[Vector] = {
+    val input = vcf.vars
     val byColAndRow = input.zipWithIndex().flatMap{
       case (v, ri) => v.toArray.zipWithIndex.map{
         case (g, ci) => ci -> (ri, g.toDouble)

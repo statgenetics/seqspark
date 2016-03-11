@@ -32,6 +32,7 @@ object UserConfig {
 
   object Variants extends Enumeration {
     val all = Value("all")
+    val exome = Value("exome")
     val none = Value("none")
   }
 

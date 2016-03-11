@@ -3,6 +3,9 @@ package org.dizhang.seqspark.ds
 import breeze.linalg.DenseVector
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
+
+import scala.reflect.ClassTag
+
 //import collection.mutable.{IndexedSeq, Map}
 //import scala.collection.mutable
 
@@ -193,25 +196,10 @@ sealed trait Counter[A] extends Serializable {
     case SparseCounter(e, d, s) => Counter.toIndexedSeq(e, d, s)
   }
 
-  def toArray = this.toIndexedSeq.toArray
+  def toArray(implicit tag: ClassTag[A]) = this.toIndexedSeq.toArray
 
   def toMap: Map[Int, A]
 
-  /**
-  *def collapse(implicit sg: Counter.CounterElementSemiGroup[A]): A
-
-  *= {
-    //cnt.compact()
-    cnt.reduce((a, b) => sg.op(a, b))
-  *}
-  *def collapseByBatch(batch: Array[Int])
-                     *(implicit cm:ClassTag[A], sg: Counter.CounterElementSemiGroup[A]): Map[Int, A] = {
-    *//cnt.compact
-    *cnt.zipWithIndex groupBy { case (c, i) => batch(i) } mapValues (
-      *c => c map (x => x._1) reduce ((a, b) => sg.op(a, b))
-    *) map identity
-  *}
-    */
 }
 
 case class DenseCounter[A](elems: IndexedSeq[A], default: A)

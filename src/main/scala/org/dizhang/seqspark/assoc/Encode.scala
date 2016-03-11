@@ -207,14 +207,14 @@ sealed trait BRV extends Encode {
 
   def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
 
-  def getFixed(cutoff: Double = fixedCutoff): Option[DenseVector[Double]] = {
+  def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
     val genotype = this.getGenotype(cutoff)
     if (! this.isDefined)
       None
     else
       weight(cutoff) match {
-        case None => Some(genotype * DenseVector.fill(genotype.size)(1.0))
-        case Some(w) => Some(genotype * w)}}
+        case None => Some(Fixed(genotype * DenseVector.fill(genotype.size)(1.0)))
+        case Some(w) => Some(Fixed(genotype * w))}}
 }
 
 sealed trait PooledOrAnnotationMaf extends Encode {

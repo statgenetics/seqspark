@@ -24,15 +24,15 @@ object Location {
 
 }
 
-class Location(val geneName: String,
+case class Location(val geneName: String,
                val mRNAName: String,
                val strand: Strand.Strand,
                val exons: Array[Region],
                val cds: Region) extends Region {
 
-  def chr = cds.chr
-  def start = exons(0).start
-  def end = exons.last.end
+  val chr = cds.chr
+  val start = exons(0).start
+  val end = exons.last.end
 
   def upstream: Region = {
     if (strand == Strand.Positive) {

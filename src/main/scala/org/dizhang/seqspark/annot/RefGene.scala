@@ -20,6 +20,21 @@ object RefGene {
     new Location(geneName, mRNAName, strand, exons, cds)
   }
 
+  def makeExons(line: String, header: Array[String]): Array[Region] = {
+    val s = line.split("\t")
+    val m = header.zip(s).toMap
+    val exons = m("exonStarts").split(",").zip(m("exonEnds").split(","))
+      .map(e => Region(s"${m("chrom")}:${e._1.toInt - 2}-${e._2.toInt + 2}"))
+    exons
+  }
+
+  def makeExome(coordFile: String): IntervalTree[Region] = {
+    val iter = scala.io.Source.fromFile(coordFile).getLines()
+    val header = iter.next().split("\t")
+    val raw = iter.map(l => RefGene.makeExons(l, header)).flatMap(x => x)
+    IntervalTree(raw)
+  }
+
   def makeSeq(name: String, rawSeq: String): mRNA = {
     val len = rawSeq.length
     val na = rawSeq.zipWithIndex.filter(p => p._1 == 'N').map(p => p._2).toArray

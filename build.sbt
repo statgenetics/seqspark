@@ -1,4 +1,4 @@
-name := "seqa"
+name := "seqspark"
 
 version := "1.0"
 
@@ -10,8 +10,8 @@ scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
 libraryDependencies ++= Seq(
 	"org.apache.spark" %% "spark-core" % "1.6.0" % "provided",
-	"org.apache.spark" % "spark-sql_2.10" % "1.6.0",
-	"org.apache.spark" % "spark-mllib_2.10" % "1.6.0",
+	"org.apache.spark" % "spark-sql_2.10" % "1.6.0" % "provided",
+	"org.apache.spark" % "spark-mllib_2.10" % "1.6.0" % "provided",
 	"com.typesafe" % "config" % "1.2.1",
 	"it.unimi.dsi" % "fastutil" % "7.0.4",
 	"org.slf4j" % "slf4j-log4j12" % "1.7.12",
@@ -23,4 +23,4 @@ libraryDependencies ++= Seq(
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
-assemblyJarName in assembly := "SeqA-1.0.jar"
+assemblyJarName in assembly := "SeqSpark-1.0.jar"

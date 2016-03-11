@@ -4,6 +4,7 @@ import java.io.{File, PrintWriter}
 import com.typesafe.config.Config
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Variant, ByteGenotype, Counter}
 import org.dizhang.seqspark.util.Constant._
@@ -24,8 +25,9 @@ object GenotypeLevelQC extends Worker[Data, Data] {
   def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
 
     val (geno, pheno) = data
-    val input = data._1.rawVars
-    statGdGq(input)
+    val input = geno.rawVars
+    val batch = sc.broadcast(pheno.batch)
+    statGdGq(input, batch)
     val genoCnf : GenotypeLevelQCConfig = cnf.genotypeLevelQC
     val gd = genoCnf.gd
     val gq = genoCnf.gq
@@ -91,17 +93,15 @@ object GenotypeLevelQC extends Worker[Data, Data] {
   }
 
   /** compute by GD, GQ */
-  def statGdGq(vars: RDD[Variant[String]])(implicit cnf: Config, sc: SparkContext) {
+  def statGdGq(vars: RDD[Variant[String]], batch: Broadcast[Array[String]])(implicit cnf: RootConfig, sc: SparkContext) {
     type Cnt = Int2IntOpenHashMap
     type Bcnt = Map[Int, Cnt]
-    val phenoFile = cnf.getString("sampleInfo.source")
-    val batchCol = cnf.getString("sampleInfo.batch")
-    val batchStr = readColumn(phenoFile, batchCol)
+    val batchStr = batch.value
     val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
     val batchMap = batchKeys.zipWithIndex.toMap
     val batchIdx = batchStr.map(b => batchMap(b))
     val broadCastBatchIdx = sc.broadcast(batchIdx)
-    val gtFormat = cnf.getString("genotypeLevelQC.format").split(":").zipWithIndex.toMap
+    val gtFormat = cnf.genotypeLevelQC.format
     val gtIdx = gtFormat("GT")
     val gdIdx = gtFormat("GD")
     val gqIdx = gtFormat("GQ")

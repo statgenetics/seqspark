@@ -1,10 +1,11 @@
 package org.dizhang.seqspark.ds
 
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.util.Constant.{RawGenotype => CRG, InnerGenotype => CIG}
-import org.dizhang.seqspark.util.UserConfig.ImExConfig
+import org.dizhang.seqspark.util.UserConfig.{Variants, ImExConfig}
 
 /**
   * hold the distributed genetype data, RDD[Variant]
@@ -39,7 +40,9 @@ sealed trait VCF {
   def rawVars: RDD[Variant[String]]
   def vars: RDD[Variant[Byte]]
   def filter(regions: IntervalTree[Region]): VCF
+  def filter(regions: Broadcast[IntervalTree[Region]]): VCF
   def select(indicator: Array[Boolean]): VCF
+  def select(indicator: Broadcast[Array[Boolean]]): VCF
   def toDummy: VCF
 }
 
@@ -48,8 +51,14 @@ case class StringGenotype(rawVars: RDD[Variant[String]], config: ImExConfig) ext
   def filter(regions: IntervalTree[Region]): StringGenotype = {
      StringGenotype(rawVars.filter(v => IntervalTree.overlap(regions, v.toRegion)), config)
   }
+  def filter(regions: Broadcast[IntervalTree[Region]]): StringGenotype = {
+    StringGenotype(rawVars.filter(v => IntervalTree.overlap(regions.value, v.toRegion)), config)
+  }
   def select(indicator: Array[Boolean]): StringGenotype = {
     StringGenotype(rawVars.map(v => v.select(indicator)), config)
+  }
+  def select(indicator: Broadcast[Array[Boolean]]): StringGenotype = {
+    StringGenotype(rawVars.map(v => v.select(indicator.value)), config)
   }
   def toDummy = StringGenotype(rawVars.map(v => v.toDummy), config)
 }
@@ -64,8 +73,14 @@ case class ByteGenotype(vars: RDD[Variant[Byte]], config: ImExConfig) extends VC
   def filter(regions: IntervalTree[Region]): ByteGenotype = {
     ByteGenotype(vars.filter(v => IntervalTree.overlap(regions, v.toRegion)), config)
   }
+  def filter(regions: Broadcast[IntervalTree[Region]]): ByteGenotype = {
+    ByteGenotype(vars.filter(v => IntervalTree.overlap(regions.value, v.toRegion)), config)
+  }
   def select(indicator: Array[Boolean]): ByteGenotype = {
     ByteGenotype(vars.map(v => v.select(indicator)), config)
+  }
+  def select(indicator: Broadcast[Array[Boolean]]): ByteGenotype = {
+    ByteGenotype(vars.map(v => v.select(indicator.value)), config)
   }
   def toDummy = ByteGenotype(vars.map(v => v.toDummy), config)
 }

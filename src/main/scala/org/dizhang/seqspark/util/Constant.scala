@@ -42,6 +42,7 @@ object Constant {
       val weight = "SS_ANNO_WEIGHT"
       val gene = "SS_GENE"
       val func = "SS_FUNC"
+      val anno = "SS_ANNO"
     }
   }
 

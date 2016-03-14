@@ -26,15 +26,31 @@ object Annotation extends Worker[Data, Data] {
 
   type Genes = Map[String, List[Location]]
 
-  def annotate[A](v: Variant[A], dict: Broadcast[RefGene]): Array[Variant[A]] = {
+  def annotateByVariant[A](v: Variant[A], dict: Broadcast[RefGene]): Variant[A] = {
+    val variation = v.toVariation
+
+    val annot = IntervalTree.lookup(dict.value.loci, variation)
+      .map(l => (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName))))
+    val consensus = annot.map(p => (p._1, p._3))
+      .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
+    val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
+        .map{case (k, v) => "%s::%s".format(k, v.map(x => x._2).mkString(","))}
+        .mkString(",,")
+    v.addInfo(IK.anno, merge)
+    v.addInfo(IK.gene, consensus._1)
+    v.addInfo(IK.func, consensus._2.toString)
+    v
+  }
+
+  def annotateByGene[A](v: Variant[A], dict: Broadcast[RefGene]): Array[Variant[A]] = {
     /** the argument RefGene is the whole set of all genes involved
       * the output RefGene each represents a single gene
       * */
-    val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
+    //val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
 
     val variation = v.toVariation
 
-    val all = IntervalTree.lookup(dict.value.loci, point)
+    val all = IntervalTree.lookup(dict.value.loci, variation)
       .map(l => (l.geneName, l.annotate(variation, dict.value.seq(l.mRNAName))))
       .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
       .toArray.map{x => v.addInfo(IK.gene, x._1); v.addInfo(IK.func, x._2.toString); v}
@@ -48,10 +64,10 @@ object Annotation extends Worker[Data, Data] {
     val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
     input match {
       case ByteGenotype(vs, c) =>
-        val anno = vs.map(v => annotate(v, refGene)).flatMap(x => x)
+        val anno = vs.map(v => annotateByGene(v, refGene)).flatMap(x => x)
         ByteGenotype(anno, c)
       case StringGenotype(rvs, c) =>
-        val anno = rvs.map(v => annotate(v, refGene)).flatMap(x => x)
+        val anno = rvs.map(v => annotateByGene(v, refGene)).flatMap(x => x)
         StringGenotype(anno, c)
     }
   }
@@ -72,10 +88,10 @@ object Annotation extends Worker[Data, Data] {
     val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
     input match {
       case (ByteGenotype(vs, c), p) =>
-        val anno = vs.map(v => annotate(v, refGene)).flatMap(x => x)
+        val anno = vs.map(v => annotateByVariant(v, refGene))
         (ByteGenotype(anno, c), p)
       case (StringGenotype(rvs, c), p) =>
-        val anno = rvs.map(v => annotate(v, refGene)).flatMap(x => x)
+        val anno = rvs.map(v => annotateByVariant(v, refGene))
         (StringGenotype(anno, c), p)
     }
   }

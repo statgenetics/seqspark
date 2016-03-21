@@ -122,6 +122,7 @@ object UserConfig {
       val file = """file://(.+)""".r
       config.getString("variants") match {
         case "all" => Left(Variants.all)
+        case "exome" => Left(Variants.exome)
         case file(f) => Right(IntervalTree(Source.fromFile(f).getLines().map(Region(_))))
         case x => Right(IntervalTree(x.split(",").map(Region(_)).toIterator))
       }

@@ -18,6 +18,9 @@ object Import extends Worker[Unit, Data] {
   implicit val name = new WorkerName("import")
 
   def apply(none: Unit)(implicit config: RootConfig, sc: SparkContext): Data = {
+
+
+
     val importConfig = config.`import`
     val path = importConfig.path
     val rawPheno = Phenotype(importConfig.sampleInfo)

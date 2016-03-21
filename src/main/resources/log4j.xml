@@ -7,7 +7,7 @@
         </layout>
     </appender>
     <root>
-        <level value="warn" />
+        <level value="info" />
         <appender-ref ref="CA" />
     </root>
 </log4j:configuration>

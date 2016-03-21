@@ -8,6 +8,7 @@ import org.dizhang.seqspark.worker.{Import, GenotypeLevelQC}
 import com.typesafe.config.{ConfigFactory, Config}
 import java.io.File
 import worker._
+import scala.collection.JavaConversions._
 
 /**
  * Main function
@@ -25,9 +26,13 @@ object SeqSpark {
     val userConfFile = new File(args(0))
     require(userConfFile.exists())
     try {
-      //implicit val ini = new Ini(userConfFile)
 
-      implicit val userConf = ConfigFactory.parseFile(userConfFile).withFallback(ConfigFactory.load().getConfig("seqa"))
+      implicit val userConf = ConfigFactory
+        .parseFile(userConfFile)
+        .withFallback(ConfigFactory.load().getConfig("seqa"))
+        .resolve()
+
+      userConf.root().foreach{case (k, v) => println(s"$k: ${v.toString}")}
 
       implicit val rootConf = RootConfig(userConf)
 

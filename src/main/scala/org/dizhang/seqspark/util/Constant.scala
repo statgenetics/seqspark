@@ -1,6 +1,7 @@
 package org.dizhang.seqspark.util
 
 import org.dizhang.seqspark.annot.IntervalTree
+import org.dizhang.seqspark.annot.NucleicAcid._
 import org.dizhang.seqspark.ds.Region
 
 /**
@@ -66,13 +67,17 @@ object Constant {
       val InterGenic = Value("InterGenic")
       val CNV = Value("CNV")
     }
-    object Nucleotide extends Enumeration {
-      type Nucleotide = Value
+    object Base extends Enumeration {
+      type Base = Value
       val T = Value("T")
       val C = Value("C")
       val A = Value("A")
       val G = Value("G")
       val N = Value("N")
+    }
+    implicit class RichBase(val base: Base.Base) extends AnyVal {
+      def toInt: Int = baseToInt(base)
+      def toChar: Char = baseToChar(base)
     }
     object AminoAcid extends Enumeration {
       type AminoAcid = Value
@@ -105,16 +110,9 @@ object Constant {
             I, I, I, M, T, T, T, T, N, N, K, K, S, S, R, R,
             V, V, V, V, A, A, A, A, D, D, E, E, G, G, G, G)
     }
-    def translate(codon: String): AminoAcid.AminoAcid = {
-      require(codon.forall(_ != 'N') && codon.length == 3,
-        "cannot translate codon containing N or length not equal to 3")
-      val num = codon.map {
-        case 'T' => 0
-        case 'C' => 1
-        case 'A' => 2
-        case 'G' => 3
-      }
-      val idx = num(0) * 16 + num(1) * 4 + num(2)
+    def translate(codon: Codon): AminoAcid.AminoAcid = {
+      val idx = codon.zipWithIndex
+        .map{case (b, i) => b.toInt * math.pow(4, 2 - i).toInt}.sum
       codeTable(idx)
     }
   }

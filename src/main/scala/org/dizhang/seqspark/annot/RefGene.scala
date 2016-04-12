@@ -1,74 +1,52 @@
 package org.dizhang.seqspark.annot
 
 
-import org.dizhang.seqspark.ds.Region
+import org.apache.spark.SparkContext
+import org.dizhang.seqspark.ds.{Region, Single}
+import org.dizhang.seqspark.annot.NucleicAcid._
 import scala.io.Source
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * refgene
   */
 
 object RefGene {
+
+  val logger = LoggerFactory.getLogger(this.getClass)
+
   def makeLocation(line: String, header: Array[String]): Location = {
     val s = line.split("\t")
     val m = header.zip(s).toMap
     val geneName = m("geneName")
     val mRNAName = m("name")
     val strand = if (m("strand") == "+") Location.Strand.Positive else Location.Strand.Negative
-    val cds = Region(s"${m(s"chrom")}:${m("cdsStart")}-${m("cdsEnd")}")
+    val t = s"${m(s"chrom")}:${m("cdsStart")}-${m("cdsEnd")}"
+    //println(t)
+    val cds = Region(t)
     val exons = m("exonStarts").split(",").zip(m("exonEnds").split(",")).map(e => Region(s"${cds.chr}:${e._1}-${e._2}"))
-    new Location(geneName, mRNAName, strand, exons, cds)
+    Location(geneName, mRNAName, strand, exons, cds)
   }
 
   def makeExons(line: String, header: Array[String]): Array[Region] = {
+    //println(line)
     val s = line.split("\t")
     val m = header.zip(s).toMap
     val exons = m("exonStarts").split(",").zip(m("exonEnds").split(","))
-      .map(e => Region(s"${m("chrom")}:${e._1.toInt - 2}-${e._2.toInt + 2}"))
+      .map{ e => val t = s"${m("chrom")}:${e._1.toInt - 2}-${e._2.toInt + 2}"; Region(t)}
     exons
   }
 
-  def makeExome(coordFile: String): IntervalTree[Region] = {
-    val iter = scala.io.Source.fromFile(coordFile).getLines()
-    val header = iter.next().split("\t")
-    val raw = iter.map(l => RefGene.makeExons(l, header)).flatMap(x => x)
-    IntervalTree(raw)
-  }
-
-  def makeSeq(name: String, rawSeq: String): mRNA = {
-    val len = rawSeq.length
-    val na = rawSeq.zipWithIndex.filter(p => p._1 == 'N').map(p => p._2).toArray
-    val m = Map[Char, Byte](
-      'T' -> 0,
-      't' -> 0,
-      'C' -> 1,
-      'c' -> 1,
-      'A' -> 2,
-      'a' -> 2,
-      'G' -> 3,
-      'g' -> 3,
-      'N' -> 0,
-      'n' -> 0
-    )
-    val seq = (for (i <- 0 to len%4) yield {
-      val first = m(rawSeq(4*i)) << 6
-      val second = if (4*i + 1 < len) m(rawSeq(4*i + 1)) << 4 else 0
-      val third = if (4*i + 2 < len) m(rawSeq(4*i + 2)) << 2 else 0
-      val forth = if (4*i + 3 < len) m(rawSeq(4*i + 3)) else 0
-      (first + second + third + forth).toByte
-    }).toArray
-    new mRNA(name, len, seq, na)
-  }
-
-  def apply(build: String, coordFile: String, seqFile: String): RefGene = {
+  def apply(build: String, coordFile: String, seqFile: String)(implicit sc: SparkContext): RefGene = {
     val locIter = Source.fromFile(coordFile).getLines()
     val header = locIter.next().split("\t")
     val loci = IntervalTree(locIter.map(l => makeLocation(l, header)))
     val seqIter = Source.fromFile(seqFile).getLines()
-    val seqName = """>(NM_\d+).\d""".r
+    val seqName = """>(\w+_\d+)\.\d+""".r
+    val seqLines = sc.textFile(s"file://$seqFile")
 
-    val seq = seqIter.map{
-      case seqName(n) => Array((n + "\t", ""))
+    val seq = seqLines.map{
+      case seqName(n) => Array((n, ""))
       case l => Array(("", l))
     }.reduce{(a, b) =>
       if (b(0)._1.startsWith("NM_")) {
@@ -77,9 +55,23 @@ object RefGene {
         a(a.length - 1) = (a.last._1, a.last._2 + b(0)._2)
         a ++ b.slice(1, b.length)
       }
-    }.map(s => (s._1, makeSeq(s._1, s._2))).toMap
+    }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
 
-    new RefGene(build, loci, seq)
+
+
+    logger.debug(s"${seq.take(100).keys.mkString(":")}")
+    logger.info(s"${seq.size} mRNA sequences")
+
+    val res = new RefGene(build, loci, seq)
+    logger.info(s"${IntervalTree.count(res.loci)} locations generated")
+
+    val test = IntervalTree.lookup(res.loci, Single(1, 1296690))
+
+    test match {
+      case Nil => logger.info("cannot find anything for chr1:1296691")
+      case _ => logger.info(s"here we go: ${test.last.toString}")
+    }
+    res
   }
 }
 

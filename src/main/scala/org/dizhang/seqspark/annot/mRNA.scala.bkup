@@ -1,0 +1,61 @@
+package org.dizhang.seqspark.annot
+
+import org.dizhang.seqspark.util.Constant.Annotation.Base
+import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
+
+/**
+  * mRNA
+  */
+@SerialVersionUID(101L)
+class mRNA(val name: String,
+           val length: Int,
+           seq: Array[Byte],
+           na: Array[Int]) extends Serializable {
+  override def toString: String = {
+    val res = for (i <- 0 until length) yield apply(i).toString
+    res.reduce((a, b) => a + b)
+  }
+  def apply(i: Int): Base = {
+    require(i < length, s"$i >= $length, $name")
+    if (na.contains(i)) {
+      Base.N
+    } else {
+      val idx = i/4
+      val rem = i%4
+      val seg = seq(idx)
+      val tmp1 = seg << (rem * 2)
+      /** the return type of >>>> is Int, so we need to shift 30 bits */
+      val tmp2 = tmp1 >>> 30
+      //println(s"index for nuc: $tmp1 $tmp2")
+      Base.values.toArray.apply(tmp2)
+    }
+  }
+}
+
+object mRNA {
+
+  def apply(name: String, rawSeq: String): mRNA = {
+    val len = rawSeq.length
+    val na = rawSeq.zipWithIndex.filter(p => p._1 == 'N').map(p => p._2).toArray
+    val m = Map[Char, Byte](
+      'T' -> 0,
+      't' -> 0,
+      'C' -> 1,
+      'c' -> 1,
+      'A' -> 2,
+      'a' -> 2,
+      'G' -> 3,
+      'g' -> 3,
+      'N' -> 0,
+      'n' -> 0
+    )
+    val seq = (for (i <- 0 to (len - 1)/4) yield {
+      val first = m(rawSeq(4*i)) << 6
+      val second = if (4*i + 1 < len) m(rawSeq(4*i + 1)) << 4 else 0
+      val third = if (4*i + 2 < len) m(rawSeq(4*i + 2)) << 2 else 0
+      val forth = if (4*i + 3 < len) m(rawSeq(4*i + 3)) else 0
+      (first + second + third + forth).toByte
+    }).toArray
+    new mRNA(name, len, seq, na)
+  }
+}

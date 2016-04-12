@@ -153,7 +153,7 @@ sealed trait Variant[A] extends Serializable {
   def toCounter[B](make: A => B, d: B): Counter[B] = Variant.toCounter(this, make, d)
 
   def toString(implicit make: A => String) = {
-    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.mkString('\t'.toString)}\n"
+    s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.mkString('\t'.toString)}"
   }
 
   var meta: Array[String]

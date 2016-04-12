@@ -19,7 +19,6 @@ object Worker {
   type AnnoVCF = RDD[(String, (Constant.Annotation.Feature.Feature, Var))]
   type Data = (VCF, Phenotype)
 
-
   val slaves = Map[String, Worker[Data, Data]](
     "genotype" -> GenotypeLevelQC,
     "sample" -> SampleLevelQC,
@@ -28,9 +27,10 @@ object Worker {
     "annotation" -> Annotation,
     "association" -> Association
   )
+
   def recurSlaves(input: Data, sl: List[String])(implicit cnf: RootConfig, sc: SparkContext): Data = {
-    if (sl.tail == Nil)
-      slaves(sl.head)(input)
+    if (sl.isEmpty)
+      input
     else
       recurSlaves(slaves(sl.head)(input), sl.tail)
   }

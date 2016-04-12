@@ -74,7 +74,7 @@ object UserConfig {
     def seqSparkHome = config.getString("seqSparkHome")
     def localDir = config.getString("localDir")
     def hdfsDir = config.getString("hdfsDir")
-    def pipeline = config.getStringList("pipeline").asScala.toArray
+    def pipeline = config.getStringList("pipeline").asScala.toList
 
     def `import` = ImExConfig(config.getConfig("import"))
     def export = ImExConfig(config.getConfig("export"))
@@ -118,13 +118,13 @@ object UserConfig {
       }
     }
 
-    def variants: Either[Variants.Value, IntervalTree[Region]] = {
+    def variants: Either[Variants.Value, Regions] = {
       val file = """file://(.+)""".r
       config.getString("variants") match {
         case "all" => Left(Variants.all)
         case "exome" => Left(Variants.exome)
-        case file(f) => Right(IntervalTree(Source.fromFile(f).getLines().map(Region(_))))
-        case x => Right(IntervalTree(x.split(",").map(Region(_)).toIterator))
+        case file(f) => Right(Regions(Source.fromFile(f).getLines().map(Region(_))))
+        case x => Right(Regions(x.split(",").map(Region(_)).toIterator))
       }
     }
 

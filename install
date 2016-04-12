@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+my $prefix = $ENV{HOME} . "/seqspark";
+my $dbs = 1;
+my $env = 1;
+my $help = 0;
+
+GetOptions(
+	'prefix=s' => \$prefix,
+	'db!' => \$dbs,
+	'env!' => \$env,
+	'h|help!' => \$help
+);
+
+sub build {
+	!system("sbt", "assembly") or die "Failed to build jar\n";
+}
+
+sub install {
+	open my $fh, "build.sbt" or die "Failed to open build.sbt: $!\n";
+	my $jar;	
+	while (<$fh>) {
+		chomp;
+		if (m/(SeqSpark.*\.jar)/) {
+			$jar = $1;
+			last;
+		}
+	}
+	my $target = "target/scala-2.10/$jar"
+	if (! $jar) {
+		die "Cannot get the jar file name from build.sbt";
+	} elsif (! -f $target) {
+		die "Cannot find $target, compiling failed?";
+	}
+	my $scripts = "src/scripts/";
+	my $conf = "src/conf";
+	!system("mkdir", "-p", "$prefix/db") or die "Failed to create $prefix/\n";
+	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
+	!system("cp", "-r", $conf, $prefix) or die "Failed to copy conf folder to $prefix/\n";
+	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
+}
+sub set_env {
+	$env_vars = "#Environment variables for SeqSpark
+export PATH=$prefix/bin:\$PATH
+export CLASSPATH=$prefix/conf:\$CLASSPATH
+export SEQSPARK_HOME=$prefix\n";
+	if ($env) {
+		print STDERR "Going to add these environment variables to ~/.bashrc";
+		print STDERR $env_vars;
+		open my $fh, ">>~/.bashrc" or die "cannot open ~/.bashrc: $!\n";
+		print $fh $env_vars;		
+		close $fh or die "cannot close ~/.bashrc: $!\n";
+	} else {
+		print STDERR "Please set these environment variables before using seqspark";
+		print STDERR $env_vars;
+	}
+
+}
+
+sub download_dbs {
+	if ($dbs) {
+		!system("wget", "http://www.dizhang.org/seqspark/");
+	}
+}
+
+sub main {
+	if ($help) {
+		print "Usage: ./install [options]
+	Options:
+		--help,-h            show this help message
+		--prefix=[dir]       set prefix directory
+		--db,--nodb          download annotation databases or not
+		--env,--noenv        add environemnt variables to ~/.bashrc or not\n";
+		return;
+	}
+	my $dbs_des;
+	if ($dbs) {$dbs_des = "--db";} else {$dbs_des = "--nodb";}
+	my $env_des;
+	if ($env) {$env_des = "--env";} else {$env_des = "--noenv";}
+	print STDERR "Going to install seqspark with the following options:
+	--prefix         $prefix
+	$dbs_des
+	$env_des";
+	&compile;
+	&install;
+	&env;
+	&download_dbs;
+}
+
+

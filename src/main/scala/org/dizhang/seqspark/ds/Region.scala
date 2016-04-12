@@ -19,9 +19,12 @@ trait Region extends Serializable {
   val start: Int
   val end: Int
 
+  override def toString = s"$chr:$start-$end"
   def length = end - start
 
   def mid = start + length/2
+
+  def overlap(that: ZeroLength): Boolean = false
 
   def overlap(that: Region): Boolean = {
     this.chr == that.chr && min(this.end, that.end) > max(this.start, that.start)
@@ -36,8 +39,10 @@ trait Region extends Serializable {
     this.chr == that.chr && this.start >= that.start && this.end <= that.end
   }
 
+  def ==(that: Region): Boolean = this.chr == that.chr && this.start == that.start && this.end == that.end
+
   def <(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
-    if (ordering.compare(this, that) == -1) true else false
+    if (ordering.compare(this, that) < 0) true else false
   }
 
   def <=(that: Region)(implicit ordering: Ordering[Region]): Boolean = {
@@ -55,8 +60,13 @@ trait Region extends Serializable {
 case class Single(chr: Byte, pos: Int) extends Region {
   val start = pos
   val end = pos + 1
+  override def toString = s"$chr:$pos"
 }
-
+case class ZeroLength(chr: Byte, pos: Int) extends Region {
+  val start = pos
+  val end = pos
+  override def overlap(that: Region) = false
+}
 case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
 case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
@@ -64,6 +74,7 @@ case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 case class Variation(chr: Byte, start: Int, end: Int, ref: String, alt: String) extends Region {
   def this(region: Region, ref: String, alt: String) = this(region.chr, region.start, region.end, ref, alt)
   def mutType = Variant.mutType(ref, alt)
+  override def toString = s"$chr:$start-$end[$ref|$alt]"
 }
 
 object Single {
@@ -80,10 +91,18 @@ object Single {
 
 object Region {
 
-  implicit def ord[A <: Region]: Ordering[A] = {
-    Ordering.by(_.asInstanceOf[Region])
+  implicit def ord[A <: Region] = new Ordering[A] {
+    def compare(x: A, y: A): Int = {
+      if (x.chr != y.chr) {
+        x.chr compare y.chr
+      } else if (x.start != y.start) {
+        x.start compare y.start
+      } else {
+        x.end compare y.end
+      }
+    }
   }
-
+  /**
   implicit object RegionOrdering extends Ordering[Region] {
     def compare(x: Region, y: Region): Int = {
       if (x.chr != y.chr) {
@@ -95,7 +114,7 @@ object Region {
       }
     }
   }
-
+  */
   /**
     * implicit object StartOrdering extends Ordering[Region] {
     * def compare(a: Region, b: Region): Int = {
@@ -138,14 +157,17 @@ object Region {
       }
     }
   }
+
   def apply(c: Byte, p: Int): Region = Single(c, p)
-  def apply(c: String, p: Int): Region = apply(c, p)
+  def apply(c: String, p: Int): Region = apply(c.byte, p)
   def apply(c: String, s: Int, e: Int): Region = {
-    apply(c.toByte, s, e)
+    apply(c.byte, s, e)
   }
   def apply(c: Byte, s: Int, e: Int): Region = {
-    require(e > s, "end must be larger than start.")
-    if (e - s > 1)
+    require(e >= s, "end must be larger than or equal to start.")
+    if (e == s)
+      ZeroLength(c, s)
+    else if (e - s > 1)
       Interval(c, s, e)
     else
       Single(c, s)
@@ -154,16 +176,16 @@ object Region {
   def apply(c: String, s: Int, e: Int, n: String): Region = Named(c.byte, s, e, n)
 
   def apply(pattern: String): Region = {
-    val onlyChr = """(?:chr)?(\d+)""".r
-    val start = """(?:chr)?(\d+):(\d+)-""".r
-    val end = """(?:chr)?(\d+):-(\d+)""".r
-    val full = """(?:chr)?(\d+):(\d+)-(\d+)""".r
+    val onlyChr = """(?:chr)?([MTXY0-9]+)""".r
+    val start = """(?:chr)?([MTXY0-9]+):(\d+)-""".r
+    val end = """(?:chr)?([MTXY0-9]+):-(\d+)""".r
+    val full = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)""".r
     pattern match {
       case onlyChr(chr) => apply(chr, 0, Int.MaxValue)
       case start(chr, s) => apply(chr, s.toInt, Int.MaxValue)
       case end(chr, e) => apply(chr, 0, e.toInt)
       case full(chr, s, e) => apply(chr, s.toInt, e.toInt)
-      case _ => apply("27", 0, 0)
+      case _ => apply("27", 0, 1)
     }
   }
 

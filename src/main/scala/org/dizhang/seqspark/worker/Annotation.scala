@@ -10,7 +10,6 @@ import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.worker.Worker._
 import sys.process._
 
-
 /**
  * Annotation pipeline
  */
@@ -21,7 +20,7 @@ object Annotation extends Worker[Data, Data] {
 
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
-  val Nucleotide = Constant.Annotation.Nucleotide
+  val Nucleotide = Constant.Annotation.Base
   val IK = Constant.Variant.InfoKey
 
   type Genes = Map[String, List[Location]]
@@ -30,16 +29,24 @@ object Annotation extends Worker[Data, Data] {
     val variation = v.toVariation
 
     val annot = IntervalTree.lookup(dict.value.loci, variation)
-      .map(l => (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName))))
-    val consensus = annot.map(p => (p._1, p._3))
-      .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
-    val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
-        .map{case (k, v) => "%s::%s".format(k, v.map(x => x._2).mkString(","))}
-        .mkString(",,")
-    v.addInfo(IK.anno, merge)
-    v.addInfo(IK.gene, consensus._1)
-    v.addInfo(IK.func, consensus._2.toString)
-    v
+      .map{l =>
+        //println(s"${variation.toString} ${l.codon(Single(variation.chr, variation.start), dict.value.seq(l.mRNAName))} ${l.mRNAName}:${l.cdsIdx}")
+        (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
+    annot match {
+      case Nil =>
+        //logger.warn(s"no annotation for variant ${variation.toString}")
+        v
+      case _ =>
+        val consensus = annot.map(p => (p._1, p._3))
+          .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
+        val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
+          .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
+          .mkString(",,")
+        v.addInfo(IK.anno, merge)
+        v.addInfo(IK.gene, consensus._1)
+        v.addInfo(IK.func, consensus._2.toString)
+        v
+    }
   }
 
   def annotateByGene[A](v: Variant[A], dict: Broadcast[RefGene]): Array[Variant[A]] = {
@@ -86,6 +93,7 @@ object Annotation extends Worker[Data, Data] {
     val coordFile = cnf.annotation.geneCoord
     val seqFile = cnf.annotation.geneSeq
     val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
+    logger.info(s"${IntervalTree.count(refGene.value.loci)} locations in refgene")
     input match {
       case (ByteGenotype(vs, c), p) =>
         val anno = vs.map(v => annotateByVariant(v, refGene))

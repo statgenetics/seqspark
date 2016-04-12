@@ -1,11 +1,13 @@
 package org.dizhang.seqspark.annot
 
 import breeze.linalg.sum
-import org.dizhang.seqspark.ds.{Variation, Region, Single}
+import org.dizhang.seqspark.ds.{Region, Single, Variation}
 import org.dizhang.seqspark.util.Constant.Annotation
-import org.dizhang.seqspark.util.Constant.Annotation.Nucleotide.Nucleotide
+import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
 import org.dizhang.seqspark.util.Constant.Annotation._
 import Location._
+import org.dizhang.seqspark.annot.Location.Strand.Strand
+import org.dizhang.seqspark.annot.NucleicAcid._
 import org.dizhang.seqspark.util.UserConfig.MutType
 
 /**
@@ -22,48 +24,101 @@ object Location {
   }
   val upDownStreamRange = 2000
 
+  def apply(geneName: String,
+            mRNAName: String,
+            strand: Strand,
+            exons: Array[Region],
+            cds: Region): Location = {
+    strand match {
+      case Strand.Negative => NLoc(geneName, mRNAName, exons, cds)
+      case _ => PLoc(geneName, mRNAName, exons, cds)
+    }
+  }
+
+  def totalLen[A <: Region](regs: Array[A]): Int = {
+    sum(regs.map(r => r.length))
+  }
+
+  def intersects(regs: Array[Region], reg: Region): Array[Region] = {
+    regs.filter(r => r overlap reg).map(r => r intersect reg)
+  }
 }
 
-case class Location(val geneName: String,
-               val mRNAName: String,
-               val strand: Strand.Strand,
-               val exons: Array[Region],
-               val cds: Region) extends Region {
+final case class PLoc(geneName: String,
+                      mRNAName: String,
+                      exons: Array[Region],
+                      cds: Region) extends Location {
+  val strand = Location.Strand.Positive
+  def upstream = Region(chr, start - upDownStreamRange, start)
+  def downstream = Region(chr, end, end + upDownStreamRange)
+  def utr5 = Region(chr, start, cds.start)
+  def utr3 = Region(chr, cds.end, end)
+  def codon(p: Single, seq: mRNA, alt: Option[Base] = None): Codon = {
+    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
+    val intronsLen =
+      sum(for (i <- 0 until exonIdx)
+          yield exons(i + 1).start - exons(i).end)
+    val idx = p.pos - start - intronsLen
+    seq.getCodon(idx, cdsIdx, alt)
+  }
+}
+
+final case class NLoc(geneName: String,
+                      mRNAName: String,
+                      exons: Array[Region],
+                      cds: Region) extends Location {
+  val strand = Location.Strand.Negative
+  def upstream = Region(chr, end, end + upDownStreamRange)
+  def downstream = Region(chr, start - upDownStreamRange, start)
+  def utr5 = Region(chr, cds.end, end)
+  def utr3 = Region(chr, start, cds.start)
+  def codon(p: Single, seq: mRNA, alt: Option[Base] = None): Codon = {
+    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
+    val intronsLen =
+      sum(for (i <- exonIdx until (exons.length - 1))
+          yield exons(i + 1).start - exons(i).end)
+    val idx = end - p.pos - intronsLen - 1
+    seq.getCodon(idx, cdsIdx, alt)
+  }
+}
+
+sealed trait Location extends Region {
+
+  val geneName: String
+  val mRNAName: String
+  val strand: Strand.Strand
+  val exons: Array[Region]
+  val cds: Region
 
   val chr = cds.chr
   val start = exons(0).start
   val end = exons.last.end
 
-  def upstream: Region = {
-    if (strand == Strand.Positive) {
-      Region(chr, start - upDownStreamRange, start)
-    } else {
-      Region(chr, end, end + upDownStreamRange)
-    }
+  def upstream: Region
+
+  def downstream: Region
+
+  def utr5: Region
+
+  def utr3: Region
+
+  def ==(that: Location): Boolean = {
+    this.geneName == that.geneName &&
+    this.mRNAName == that.mRNAName &&
+    this.strand == that.strand &&
+    this.chr == that.chr &&
+    this.start == that.start &&
+    this.end == that.end &&
+    this.cds == that.cds &&
+    this.exons.length == that.exons.length &&
+    this.exons.zip(that.exons).forall(p => p._1 == p._2)
   }
 
-  def downstream: Region = {
-    if (strand == Strand.Negative) {
-      Region(chr, start - upDownStreamRange, start)
-    } else {
-      Region(chr, end, end + upDownStreamRange)
-    }
-  }
-
-  def utr5: Region = {
-    if (strand == Strand.Positive) {
-      Region(chr, start, cds.start)
-    } else {
-      Region(chr, cds.end, end)
-    }
-  }
-
-  def utr3: Region = {
-    if (strand == Strand.Negative) {
-      Region(chr, start, cds.start)
-    } else {
-      Region(chr, cds.end, end)
-    }
+  def cdsIdx: (Int, Int) = {
+    /** the indexes here are local, only work in mRNA/cDNA sequence */
+    val start = totalLen(intersects(exons, utr5))
+    val end = totalLen(exons) - totalLen(intersects(exons, utr3))
+    (start, end)
   }
 
   def spliceSites: Array[Region] = {
@@ -77,51 +132,30 @@ case class Location(val geneName: String,
     }
   }
 
-  def codon(p: Single, seq: mRNA, alt: Option[Nucleotide] = None): String = {
-    /** find the exon that contains the point */
-    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
-    val idx =
-      if (strand == Strand.Positive) {
-        val intronsLen =
-          sum(for (i <- 0 until exonIdx) yield exons(i + 1).start - exons(i).end)
-        p.pos - start - intronsLen
-      } else {
-        val intronsLen =
-          sum(for (i <- exonIdx until exons.length) yield exons(i + 1).start - exons(i).end)
-        end - intronsLen - p.pos
-      }
-    (idx % 3, alt) match {
-      case (0, None) => s"${seq(idx)}${seq(idx + 1)}${seq(idx + 2)}"
-      case (1, None) => s"${seq(idx - 1)}${seq(idx)}${seq(idx + 1)}"
-      case (_, None) => s"${seq(idx - 2)}${seq(idx - 1)}${seq(idx)}"
-      case (0, Some(n)) => s"$n${seq(idx + 1)}${seq(idx + 2)}"
-      case (1, Some(n)) => s"${seq(idx - 1)}$n${seq(idx + 1)}"
-      case (_, Some(n)) => s"${seq(idx - 2)}${seq(idx - 1)}$n"
-    }
-  }
+  def codon(p: Single, seq: mRNA, alt: Option[Base] = None): Codon
 
   def annotate(v: Variation, seq: mRNA): feature.Feature = {
     v.mutType match {
-      case MutType.snv => annotate(Single(v.chr, v.start), Some(seq), Some(Nucleotide.withName(v.alt)))
+      case MutType.snv => annotate(Single(v.chr, v.start), Some(seq), Some(Base.withName(v.alt)))
       case MutType.indel => {
         val int = Region(v.chr, v.start + 1, v.end)
         if (int overlap this) {
-          if (int overlap cds) {
-            if (exons.exists(e => e overlap int)) {
+          if (exons.exists(e => e overlap int)) {
+            if (int overlap cds) {
               if (math.abs(v.ref.length - v.alt.length)%3 == 0) {
                 feature.FrameShiftIndel
               } else {
                 feature.NonFrameShiftIndel
               }
-            } else if (spliceSites.exists(s => s overlap int)) {
-              feature.SpliceSite
+            } else if (int overlap utr5) {
+              feature.UTR5
             } else {
-              feature.Intronic
+             feature.UTR3
             }
-          } else if (int overlap utr5) {
-            feature.UTR5
+          } else if (spliceSites.exists(s => s overlap int)) {
+            feature.SpliceSite
           } else {
-            feature.UTR3
+            feature.Intronic
           }
         } else if (int overlap upstream) {
           feature.Upstream
@@ -135,7 +169,7 @@ case class Location(val geneName: String,
     }
   }
 
-  def annotate(p: Single, seq: Option[mRNA] = None, alt: Option[Nucleotide] = None): feature.Feature = {
+  def annotate(p: Single, seq: Option[mRNA] = None, alt: Option[Base] = None): feature.Feature = {
     import AminoAcid._
     if (p overlap upstream) {
       feature.Upstream

@@ -1,13 +1,16 @@
 package org.dizhang.seqspark
 
-import org.apache.spark.{SparkContext, SparkConf}
-import org.dizhang.seqspark.ds.{Counter, Bed}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.dizhang.seqspark.ds.{Bed, Counter}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.worker.{Import, GenotypeLevelQC}
-import com.typesafe.config.{ConfigFactory, Config}
+import org.dizhang.seqspark.worker.{GenotypeLevelQC, Import}
+import com.typesafe.config.{Config, ConfigFactory}
 import java.io.File
+
+import org.slf4j.LoggerFactory
 import worker._
+
 import scala.collection.JavaConversions._
 
 /**
@@ -15,6 +18,8 @@ import scala.collection.JavaConversions._
  */
 
 object SeqSpark {
+
+  val logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]) {
     /** check args */
@@ -32,13 +37,13 @@ object SeqSpark {
         .withFallback(ConfigFactory.load().getConfig("seqa"))
         .resolve()
 
-      userConf.root().foreach{case (k, v) => println(s"$k: ${v.toString}")}
+      //userConf.root().foreach{case (k, v) => println(s"$k: ${v.toString}")}
 
       implicit val rootConf = RootConfig(userConf)
 
       val modules = if (args.length == 2) args(1) else "1-4"
       checkConf
-      run(modules)
+      run
     } catch {
       case e: Exception => {
         e.printStackTrace()
@@ -94,14 +99,14 @@ object SeqSpark {
   }
 
   def checkConf(implicit cnf: Config) {
-    println("Conf file fine")
+    logger.info("Conf file fine")
   }
 
-  def run(modules: String)(implicit cnf: RootConfig): Unit = {
+  def run(implicit cnf: RootConfig): Unit = {
     /**
      * May have other run mode later
      **/
-    quickRun(modules)
+    quickRun
   }
 
   /**
@@ -109,10 +114,10 @@ object SeqSpark {
    * act as if the vcf is the only input
    */
 
-  def quickRun(modules: String)(implicit cnf: RootConfig) {
+  def quickRun(implicit cnf: RootConfig) {
     val project = cnf.project
 
-    /** determine the input */
+    /** determine the input
     val dirs = List("genotypeLevelQC", "sampleLevelQC", "variantLevelQC", "annotation", "association")
     val rangeP = """(\d+)-(\d+)""".r
     val listP = """(\d+)(,\d+)+""".r
@@ -122,20 +127,26 @@ object SeqSpark {
       case listP(_*) => modules.split(",").map(_.toInt).toList
       case singleP(a) => List(a.toInt)
     }
-
+    */
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqA-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[Pair]]))
     implicit val sc: SparkContext = new SparkContext(scConf)
 
+    val pipeline = cnf.pipeline
+
+    val binder = org.slf4j.impl.StaticLoggerBinder.getSingleton
+    logger.debug("hellor world")
+    logger.debug(binder.getLoggerFactoryClassStr)
+
+    logger.info(s"pipeline: ${(("import" :: pipeline) ::: List("export")).mkString(" ")}")
+
     val current = Import({})
 
-    println("!!!DEBUG: Steps: %s" format s.mkString("\t"))
-
-    val last = Worker.recurSlaves(current, s.map(dirs(_)))
+    val last = Worker.recurSlaves(current, pipeline)
 
     Export(last)
-
+    //PropertyConfigurator.configure("log4j.properties")
   }
 }

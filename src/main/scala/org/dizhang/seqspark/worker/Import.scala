@@ -2,13 +2,12 @@ package org.dizhang.seqspark.worker
 
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
-import org.dizhang.seqspark.annot.RefGene
-import org.dizhang.seqspark.ds.{Variant, Phenotype, VCF, StringGenotype}
+import org.dizhang.seqspark.annot.{Regions, RefGene}
+import org.dizhang.seqspark.ds.{Phenotype, StringGenotype, VCF, Variant}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.worker.Worker.Data
-import org.dizhang.seqspark.annot.IntervalTree.overlap
 
 /**
  * import data from VCF file or cache
@@ -20,6 +19,7 @@ object Import extends Worker[Unit, Data] {
   def apply(none: Unit)(implicit config: RootConfig, sc: SparkContext): Data = {
 
 
+    logger.info("start importing genotype data")
 
     val importConfig = config.`import`
     val path = importConfig.path
@@ -48,7 +48,7 @@ object Import extends Worker[Unit, Data] {
       case Left(Variants.all) => s1
       case Left(Variants.exome) => {
         val coord = cnf.annotation.geneCoord
-        val exome = sc.broadcast(RefGene.makeExome(coord))
+        val exome = sc.broadcast(Regions.makeExome(coord))
         s1.filter(exome)
       }
       case Left(_) => s1.toDummy
@@ -68,6 +68,8 @@ object Import extends Worker[Unit, Data] {
     val raw = sc.textFile(imCnf.path)
     val default = if (imCnf.phased) UnPhased.Gt.ref else UnPhased.Gt.ref.bt.toPhased
     val vars = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default))
+    //vars.cache()
+    //logger.info(s"${vars.count()} variants in total")
     val s1 = vars filter (v =>
       imCnf.filters.contains(v.filter) && v.alleleNum == 2 && imCnf.mutType.contains(v.mutType))
 
@@ -75,19 +77,21 @@ object Import extends Worker[Unit, Data] {
       case Left(Variants.all) => s1
       case Left(Variants.exome) => {
         val coord = cnf.annotation.geneCoord
-        val exome = sc.broadcast(RefGene.makeExome(coord))
-        s1 filter (v => overlap(exome.value, v.toRegion))
+        val exome = sc.broadcast(Regions.makeExome(coord))
+        s1 filter (v => exome.value.overlap(v.toRegion))
       }
       case Left(_) => s1
-      case Right(tree) => s1 filter (v => overlap(tree, v.toRegion))
+      case Right(tree) => s1 filter (v => tree.overlap(v.toRegion))
     }
-
+    //vars.unpersist()
+    s2.cache()
+    logger.info(s"${s2.count()} variants chosen")
     val s3 = samples match {
       case Left(Samples.all) => s2
       case Left(_) => s2.map(v => Variant.fill[String](v.meta, 0)(default))
       case Right(b) => s2.map(v => v.select(b.value))
     }
-
+    s2.unpersist()
     /** save is very time-consuming and resource-demanding */
     if (imCnf.save)
       try {

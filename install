@@ -30,21 +30,22 @@ sub install {
 			last;
 		}
 	}
-	my $target = "target/scala-2.10/$jar"
+	my $target = "target/scala-2.10/$jar";
 	if (! $jar) {
 		die "Cannot get the jar file name from build.sbt";
 	} elsif (! -f $target) {
 		die "Cannot find $target, compiling failed?";
 	}
-	my $scripts = "src/scripts/";
+	my $scripts = "src/bin/";
 	my $conf = "src/conf";
 	!system("mkdir", "-p", "$prefix/db") or die "Failed to create $prefix/\n";
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
 	!system("cp", "-r", $conf, $prefix) or die "Failed to copy conf folder to $prefix/\n";
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
 }
+
 sub set_env {
-	$env_vars = "#Environment variables for SeqSpark
+	my $env_vars = "#Environment variables for SeqSpark
 export PATH=$prefix/bin:\$PATH
 export CLASSPATH=$prefix/conf:\$CLASSPATH
 export SEQSPARK_HOME=$prefix\n";
@@ -63,20 +64,25 @@ export SEQSPARK_HOME=$prefix\n";
 
 sub download_dbs {
 	if ($dbs) {
-		!system("wget", "http://www.dizhang.org/seqspark/");
+		!system("wget", "http://www.dizhang.org/seqspark/") or die "Failed to download\n";
+	} else {
+		print "You choose to not download refgene database, please prepare gene definition and sequence files brefore using annotation or rare variant association module\n";
 	}
 }
 
-sub main {
-	if ($help) {
+sub help {
 		print "Usage: ./install [options]
-	Options:
-		--help,-h            show this help message
-		--prefix=[dir]       set prefix directory
-		--db,--nodb          download annotation databases or not
-		--env,--noenv        add environemnt variables to ~/.bashrc or not\n";
-		return;
-	}
+Options:
+	--help,-h            show this help message
+	--prefix=[dir]       set prefix directory [~/seqspark]
+	--db,--nodb          download refgene for annotation or not [--db]
+	--env,--noenv        add environemnt variables to ~/.bashrc or not [--env]\n";
+	exit;
+}
+
+sub main {
+	if (scalar @ARGV == 0) {$help = 1;}
+	&help if $help;
 	my $dbs_des;
 	if ($dbs) {$dbs_des = "--db";} else {$dbs_des = "--nodb";}
 	my $env_des;
@@ -85,10 +91,11 @@ sub main {
 	--prefix         $prefix
 	$dbs_des
 	$env_des";
-	&compile;
+	&build;
 	&install;
 	&env;
 	&download_dbs;
 }
 
+&main;
 

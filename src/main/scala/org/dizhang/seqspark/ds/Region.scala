@@ -75,6 +75,9 @@ case class Variation(chr: Byte, start: Int, end: Int, ref: String, alt: String) 
   def this(region: Region, ref: String, alt: String) = this(region.chr, region.start, region.end, ref, alt)
   def mutType = Variant.mutType(ref, alt)
   override def toString = s"$chr:$start-$end[$ref|$alt]"
+  def ==(that: Variation): Boolean = {
+    this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
+  }
 }
 
 object Single {

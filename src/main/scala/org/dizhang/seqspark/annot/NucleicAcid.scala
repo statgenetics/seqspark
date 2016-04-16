@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.annot
 
 import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
-import org.dizhang.seqspark.util.Constant.Annotation.Base
+import org.dizhang.seqspark.util.Constant.Annotation.{AminoAcid, Base, codeTable}
 
 import scala.collection.{IndexedSeqLike, mutable}
 import scala.collection.mutable.ArrayBuffer
@@ -25,6 +25,11 @@ object NucleicAcid {
   def baseFromChar(c: Char): Base = CharBase(c)
   def baseToChar(base: Base): Char = BaseChar(base)
 
+  implicit class RichBase(val base: Base.Base) extends AnyVal {
+    def toInt: Int = baseToInt(base)
+    def toChar: Char = baseToChar(base)
+  }
+
   case class DNA(groups: Array[Int], length: Int, na: Set[Int]) extends NucleicAcid
 
   case class Codon(group: Int) extends NucleicAcid {
@@ -33,6 +38,11 @@ object NucleicAcid {
     val groups = Array(group)
     def update(i: Int, alt: Base): Codon = {
       Codon(~(M << (i * 2)) & group | (baseToInt(alt) << (i * 2)))
+    }
+    def translate: AminoAcid.AminoAcid = {
+      val idx = this.zipWithIndex
+        .map{case (b, i) => b.toInt * math.pow(4, 2 - i).toInt}.sum
+      codeTable(idx)
     }
   }
   case class mRNA(groups: Array[Int],

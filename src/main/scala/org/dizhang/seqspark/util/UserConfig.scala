@@ -130,16 +130,6 @@ object UserConfig {
 
   }
 
-  /**
-  case class SampleInfoConfig(config: Config) extends UserConfig {
-    def source = config.getString("source")
-    def batch = config.getString("batch")
-    def filter = config.getString("filter")
-    def control = config.getString("config")
-    def sex = config.getString("sex")
-  }
-  */
-
   case class GenotypeLevelQCConfig(config: Config) extends UserConfig {
 
     def format = config.getString("format").split(":").zipWithIndex.toMap
@@ -172,6 +162,7 @@ object UserConfig {
     def geneBuild = config.getString("gene.build")
     def geneCoord = config.getString("gene.coord")
     def geneSeq = config.getString("gene.seq")
+    def dbNSFP = config.getString("dbNSFP")
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {

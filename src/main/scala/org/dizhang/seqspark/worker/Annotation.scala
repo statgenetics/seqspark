@@ -2,12 +2,13 @@ package org.dizhang.seqspark.worker
 
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
-import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene}
+import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene, dbNSFP}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.worker.Worker._
+
 import sys.process._
 
 /**
@@ -75,6 +76,31 @@ object Annotation extends Worker[Data, Data] {
         ByteGenotype(anno, c)
       case StringGenotype(rvs, c) =>
         val anno = rvs.map(v => annotateByGene(v, refGene)).flatMap(x => x)
+        StringGenotype(anno, c)
+    }
+  }
+
+  def joinDbNSFP(input: VCF)(implicit cnf: RootConfig, sc: SparkContext): VCF = {
+    val annoConf = cnf.annotation
+    val db = dbNSFP(annoConf.dbNSFP)
+    input match {
+      case ByteGenotype(vs, c) =>
+        val pair = vs.map(v => (v.toVariation, v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
+        val anno = pair.map{p =>
+          if (p._2._2.isDefined) {
+            p._2._2.get.foreach((k, v) => p._2._1.addInfo(k, v))
+          }
+          p._2._1
+        }
+        ByteGenotype(anno, c)
+      case StringGenotype(rvs, c) =>
+        val pair = rvs.map(v => (v.toVariation, v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
+        val anno = pair.map{p =>
+          if (p._2._2.isDefined) {
+            p._2._2.get.foreach((k ,v ) => p._2._1.addInfo(k, v))
+          }
+          p._2._1
+        }
         StringGenotype(anno, c)
     }
   }

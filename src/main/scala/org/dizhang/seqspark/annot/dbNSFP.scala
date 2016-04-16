@@ -1,0 +1,58 @@
+package org.dizhang.seqspark.annot
+
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.dizhang.seqspark.annot.dbNSFP.Record
+import org.dizhang.seqspark.ds.{Region, Single, Variation}
+import org.dizhang.seqspark.util.UserConfig.GenomeBuild
+
+/**
+  * Created by zhangdi on 4/13/16.
+  */
+class dbNSFP(val data: RDD[Record]) {
+  def zipWithKey(build: GenomeBuild.Value): RDD[(Variation, Record)] = {
+    data.map(r => (r.toVariantion(build), r))
+  }
+}
+
+object dbNSFP {
+
+  var header: Array[String] = Array[String]()
+
+  def apply(path: String)(implicit sc: SparkContext): dbNSFP = {
+    val raw = sc.textFile(path)
+    raw.cache()
+    header = raw.first().split("\t")
+    val rest = raw.mapPartitionsWithIndex { (idx, iter) => if (idx == 0) iter.drop(1) else iter }
+    new dbNSFP(rest.map(l => new Record(l.split("\t"))))
+  }
+
+  class Record(val data: Array[String]) {
+    def apply(key: String): String = {
+      header.zip(data).toMap.apply(key)
+    }
+
+    def foreach(f: (String, String) => Unit): Unit = {
+      header.zip(data).foreach(p => f(p._1, p._2))
+    }
+
+    def toVariantion(build: GenomeBuild.Value): Variation = {
+      val r: Region = build match {
+        case GenomeBuild.hg38 =>
+          val chr = this("chr")
+          val pos = this("pos").toInt - 1
+          Region(chr, pos)
+        case GenomeBuild.hg19 =>
+          val chr = this("hg19_chr")
+          val pos = this("hg19_pos").toInt - 1
+          Region(chr, pos)
+        case _ =>
+          val chr = this("hg18_chr")
+          val pos = this("hg18_pos").toInt - 1
+          Region(chr, pos)
+      }
+      new Variation(r, this("ref"), this("alt"))
+    }
+  }
+
+}

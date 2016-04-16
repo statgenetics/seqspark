@@ -181,8 +181,8 @@ sealed trait Location extends Region {
           seq match {
             case None => feature.CDS
             case Some(s) =>
-              val o = translate(codon(p, s))
-              val a = translate(codon(p, s, alt))
+              val o = codon(p, s).translate
+              val a = codon(p, s, alt).translate
               if (o == a) {
                 feature.Synonymous
               } else if (o == Stop && a != Stop) {

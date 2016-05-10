@@ -20,10 +20,17 @@ object SafeMatrix {
 }
 
 class SafeMatrix[A, B](val mat: DenseMatrix[Double]) {
-  def *[C](other: SafeMatrix[B,C]): SafeMatrix[A,C] = new SafeMatrix[A,C](mat*other.mat)
-  def t: SafeMatrix[B,A] = new SafeMatrix[B,A](mat.t)
-  def +(other: SafeMatrix[A,B]): SafeMatrix[A,B] = new SafeMatrix[A,B](mat + other.mat)
-  def -(other: SafeMatrix[A,B]): SafeMatrix[A,B] = new SafeMatrix[A,B](mat - other.mat)
-  def :*(other: SafeMatrix[A,B]): SafeMatrix[A,B] = new SafeMatrix[A,B](mat :* other.mat)
-  def *(scalar: Double): SafeMatrix[A,B] = new SafeMatrix[A,B](mat * scalar)
+  def apply(i: Int, j: Int): Double = mat(i,j)
+
+  def *[C](other: SafeMatrix[B, C]): SafeMatrix[A, C] = new SafeMatrix[A, C](mat * other.mat)
+
+  def t: SafeMatrix[B, A] = new SafeMatrix[B, A](mat.t)
+
+  def +(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat + other.mat)
+
+  def -(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat - other.mat)
+
+  def :*(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat :* other.mat)
+
+  def *(scalar: Double): SafeMatrix[A, B] = new SafeMatrix[A, B](mat * scalar)
 }

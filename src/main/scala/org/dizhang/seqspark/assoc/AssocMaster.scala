@@ -1,22 +1,23 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{sum, DenseMatrix, DenseVector}
+import breeze.linalg.{DenseMatrix, DenseVector, sum}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.{VCF, Phenotype}
+import org.dizhang.seqspark.ds.{Phenotype, VCF}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.worker.Annotation
-import AssocTest._
+import AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
+import org.slf4j.LoggerFactory
 
 /**
   * asymptotic test
   */
-object AssocTest {
+object AssocMaster {
   /** constants */
   val IntPair = CounterElementSemiGroup.PairInt
   val Permu = Constant.Permutation
@@ -156,10 +157,12 @@ object AssocTest {
   }
 }
 
-class AssocTest(genotype: VCF,
-                phenotype: Phenotype)
-               (implicit cnf: RootConfig,
-                sc: SparkContext) extends Assoc {
+class AssocMaster(genotype: VCF,
+                  phenotype: Phenotype)
+                 (implicit cnf: RootConfig,
+                sc: SparkContext) extends {
+
+  val logger = LoggerFactory.getLogger(this.getClass)
 
   val assocConf = cnf.association
 

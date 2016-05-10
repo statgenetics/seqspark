@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import breeze.numerics.pow
+import breeze.numerics.{exp, lbeta, pow}
 import org.dizhang.seqspark.ds.Counter
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
@@ -22,6 +22,7 @@ object Encode {
   //val CVMethod = Constant.ConfigValue.Association.SomeMethod
 
   trait Coding
+  case class Raw(coding: DenseMatrix[Double]) extends Coding
   case class Fixed(coding: DenseVector[Double]) extends Coding
   case class VT(coding: DenseMatrix[Double]) extends Coding
 
@@ -150,6 +151,7 @@ sealed trait Encode {
         else
           a ++ b))
   }
+  def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed]
   def getVT: Option[VT] = {
     thresholds match {
@@ -157,6 +159,11 @@ sealed trait Encode {
       case Some(th) =>
         Some(VT(DenseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)))
     }
+  }
+  def getRaw(cutoff: Double = fixedCutoff): Option[Raw] = {
+    val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
+      v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
+    Some(Raw(DenseMatrix(tmp: _*).t))
   }
   def getCoding: Option[Coding] = {
     if (config.mafFixed)
@@ -168,6 +175,7 @@ sealed trait Encode {
 }
 
 sealed trait Single extends Encode {
+  def weight(cutoff: Double) = None
   def isDefined = maf.exists(_ >= fixedCutoff)
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
     val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
@@ -187,6 +195,7 @@ sealed trait Single extends Encode {
 }
 
 sealed trait CMC extends Encode {
+  def weight(cutoff: Double) = None
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
     if (! this.isDefined)
       None
@@ -233,7 +242,6 @@ sealed trait ControlsMaf extends Encode {
   def controls: Array[Boolean]
   def maf = vars.map(v => getMaf(v.select(controls).toCounter(makeMaf, (0, 2)).reduce)).toArray
 }
-
 sealed trait SimpleWeight extends BRV {
   def weight(cutoff: Double): Option[DenseVector[Double]] = {
     config.weight match {
@@ -244,6 +252,9 @@ sealed trait SimpleWeight extends BRV {
       case WeightMethod.wss =>
         val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
         Some(pow(mafDV :* mafDV.map(1.0 - _), -0.5))
+      case WeightMethod.skat =>
+        val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
+        Some(mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0)))
       case _ => None
     }
   }

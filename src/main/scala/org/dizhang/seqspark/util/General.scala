@@ -5,6 +5,12 @@ package org.dizhang.seqspark.util
   */
 object General {
 
+  implicit class RichDouble(val x: Double) extends AnyVal {
+    def sqrt = math.pow(x, 0.5)
+    def square = math.pow(x, 2.0)
+    def cube = math.pow(x, 3.0)
+  }
+
   def max[A](x: A, y: A)(implicit ordering: Ordering[A]): A = {
     ordering.compare(x, y) match {
       case -1 => y

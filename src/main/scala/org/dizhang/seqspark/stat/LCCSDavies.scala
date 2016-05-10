@@ -1,7 +1,8 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, max, min, sum}
-import LinearCombChiSquare._
+import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
+import LCCSDavies._
 import breeze.numerics._
 import constants.Pi
 /**
@@ -10,7 +11,7 @@ import constants.Pi
   * global variables and side effects
   * Be careful!
   */
-object LinearCombChiSquare {
+object LCCSDavies {
   private val limit: Double = 1e4
   private val errorTolerance = 1e-6
   private val ln28 = math.log(2)/8
@@ -46,8 +47,9 @@ object LinearCombChiSquare {
       s
     }
   }
-  @SerialVersionUID(2021L)
-  case class CDFResult(pvalue: Double, ifault: Int, trace: Array[Double]) extends Serializable {
+  case class CDFResult(pvalue: Double,
+                       ifault: Int,
+                       trace: Array[Double]) extends LCCS.CDF {
     override def toString =
       """Pvalue:   %10f
         |Ifault:   %10d
@@ -67,7 +69,7 @@ object LinearCombChiSquare {
         trace(3), trace(4), trace(5), trace(6))
   }
 
-  case class SimpleLCCS(lambda: DenseVector[Double]) extends LinearCombChiSquare {
+  case class Simple(lambda: DenseVector[Double]) extends LCCSDavies {
     /** the original code is more versatile,
       * we set some variables to constants here
       * note that, it is easy to put these variables to
@@ -79,13 +81,7 @@ object LinearCombChiSquare {
 }
 
 
-@SerialVersionUID(202L)
-trait LinearCombChiSquare extends Serializable {
-  val lambda: DenseVector[Double]
-  val meanLambda: Double = sum(lambda)
-  val size = lambda.length
-  val nonCentrality: DenseVector[Double]
-  val degreeOfFreedom: DenseVector[Double]
+trait LCCSDavies extends LCCS {
   val sigma: Double
   var sigsq = sigma.square
   val lmax = max(lambda)
@@ -221,12 +217,12 @@ trait LinearCombChiSquare extends Serializable {
   def integrate(cutoff: Double, intl: Double, ersm: Double,
                 nterm: Int, interv: Double, tausq: Double, mainx: Boolean): (Double, Double) = {
     /**
-    printf("%6s %13s %13s %s %6s %13s %13s %6s\n",
-      "phase", "intl", "ersm", "cutoff",
-      "nterm", "interv", "tausq", "mainx")
-    printf("%6s %13.10f %13.10f %6.4f %6d %13.10f %13.10f %6s\n",
-      "begin", intl, ersm, cutoff,
-      nterm, interv, tausq, mainx.toString)
+    *printf("%6s %13s %13s %s %6s %13s %13s %6s\n",
+      *"phase", "intl", "ersm", "cutoff",
+      *"nterm", "interv", "tausq", "mainx")
+    *printf("%6s %13.10f %13.10f %6.4f %6d %13.10f %13.10f %6s\n",
+      *"begin", intl, ersm, cutoff,
+      *nterm, interv, tausq, mainx.toString)
       */
     var (inpi, u, sum1, sum2, sum3, x) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     val res = Array[Double](intl, ersm)
@@ -254,9 +250,9 @@ trait LinearCombChiSquare extends Serializable {
       res(1) += sum2
     }
     /**
-    printf("%6s %13.10f %13.10f %6.4f %6d %13.10f %13.10f %6s\n",
-      "end", res(0), res(1), cutoff,
-      nterm, interv, tausq, mainx.toString)
+    *printf("%6s %13.10f %13.10f %6.4f %6d %13.10f %13.10f %6s\n",
+      *"end", res(0), res(1), cutoff,
+      *nterm, interv, tausq, mainx.toString)
       */
     (res(0), res(1))
   }
@@ -299,7 +295,7 @@ trait LinearCombChiSquare extends Serializable {
     res
   }
 
-  def cdf(cutoff: Double): CDFResult = {
+  def cdf(cutoff: Double): LCCS.CDF = {
     /** Use closure to fake global counter
       * cnt is the free variable here
       * we will implicitly pass plusOne around

@@ -1,8 +1,9 @@
 package org.dizhang.seqspark.util
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.annot._
+
 import collection.JavaConverters._
 import scala.io.Source
 
@@ -53,6 +54,7 @@ object UserConfig {
     val equal = Value("equal")
     val wss = Value("wss")
     val erec = Value("erec")
+    val skat = Value("skat")
     val annotation = Value("annotation")
   }
 
@@ -179,8 +181,11 @@ object UserConfig {
     def mafSource = MafSource.withName(config.getString("maf.source"))
     def mafCutoff = config.getDouble("maf.cutoff")
     def mafFixed = config.getBoolean("maf.fixed")
-    def resampling = config.getBoolean("resampling")
-    def test = TestMethod.withName(config.getString("test"))
+    def resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
+    def test = TestMethod.withName("score")
+    def misc: Config = {
+      if (config.hasPath("misc")) config.getConfig("misc") else ConfigFactory.empty()
+    }
   }
 
   case class TraitConfig(config: Config) extends UserConfig {

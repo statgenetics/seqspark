@@ -1,187 +1,197 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.DenseVector
-import breeze.linalg._
-import breeze.numerics._
-import breeze.stats._
-import breeze.stats.distributions.{FDistribution, Gaussian}
-import org.dizhang.seqspark.assoc.Encode.{VT, Fixed, Coding}
-import org.dizhang.seqspark.ds.SafeMatrix
-import org.dizhang.seqspark.stat.ScoreTest._
+import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector}
 
 /**
-  * Score test for regression
-  * Why some case classes take estimates as input, instead of computing one?
-  * some tests share the same estimates, so we can compute it once and pass
-  * it to all the ScoreTests
+  * score test for regression model
+  *
+  * Here we only compute the score vectors and its cov matrix
+  * leave the p-value to specific association method, e.g.
+  * Burden, VT, MetaAnalysis summary
+  *
+  * for efficiency, avoid CSCMatrix * DenseMatrix,
+  * instead, use DenseMatrix * CSCMatrix
+  *
+  * The SparseXXX classes are using SparseMatrix to coding rare variants,
+  * so this test is very fast for large sample rare variant association
+  *
+  * Only implement linear and logistic models here
+  *
   */
 
 object ScoreTest {
-  /** the following three classes are fake dimensions */
-  class One //1
-  class N //number of samples
-  class K //number of features
-  class S //number of schemes (weight or maf cutoff)
 
-  def ones(n: Int) = DenseVector.ones[Double](n)
+  @SerialVersionUID(52L)
+  sealed trait NullModel extends Serializable {
+    def regressionResult: Regression.Result
+  }
+  final case class LinearModel(regressionResult: Regression.LinearResult) extends NullModel
+  final case class LogisticModel(regressionResult: Regression.LogisticResult) extends NullModel
 
-  def apply(binaryTrait: Boolean,
-            y: DenseVector[Double],
-            x: Coding,
-            cov: Option[DenseMatrix[Double]],
-            estimates: Option[DenseVector[Double]]): ScoreTest = {
-    x match {
-      case Fixed(c) => apply(binaryTrait, y, c, cov, estimates)
-      case VT(c) => apply(binaryTrait, y, c, cov.get, estimates.get)
+  case object Dummy extends ScoreTest {
+    def score = DenseVector(0.0)
+    def variance = DenseMatrix(0.0)
+  }
+
+  def apply(nm: NullModel, x: CSCMatrix[Double]): ScoreTest = {
+    nm match {
+      case LinearModel(lim) => SparseContinuous(lim, x)
+      case LogisticModel(lom) => SparseDichotomous(lom, x)
+      case _ => Dummy
     }
   }
 
-  def apply(binary: Boolean,
-            y: DenseVector[Double],
-            x: DenseVector[Double],
-            cov: Option[DenseMatrix[Double]],
-            estimates: Option[DenseVector[Double]]): ScoreTest = {
-    cov match {
-      case None => if (binary) BinaryNoCovUniScoreTest(y, x) else QuantNoCovUniScoreTest(y, x)
-      case Some(c) => if (binary) BinaryCovUniScoreTest(y, x, c, estimates.get) else QuantCovUniScoreTest(y, x, c, estimates.get)
+  def apply(nm: NullModel, x: DenseMatrix[Double]): ScoreTest = {
+    nm match {
+      case LinearModel(lim) => DenseContinuous(lim, x)
+      case LogisticModel(lom) => DenseDichotomous(lom, x)
+      case _ => Dummy
     }
   }
 
-  def apply(binary: Boolean,
-            y: DenseVector[Double],
-            x: DenseMatrix[Double],
-            cov: DenseMatrix[Double],
-            estimates: DenseVector[Double]): ScoreTest = {
-    if (binary)
-      BinaryCovMultiScoreTest(y, x, cov, estimates)
-    else
-      QuantCovMultiScoreTest(y, x, cov, estimates)
+  def apply(nm: NullModel, x: DenseVector[Double]): ScoreTest = {
+    nm match {
+      case LinearModel(lim) => DenseContinuous(lim, x.toDenseMatrix.t)
+      case LogisticModel(lom) => DenseDichotomous(lom, x.toDenseMatrix.t)
+      case _ => Dummy
+    }
   }
+
+  def apply(nm: NullModel,
+            x1: DenseMatrix[Double],
+            x2: CSCMatrix[Double]): ScoreTest = {
+    nm match {
+      case LinearModel(lim) => MixedContinous(lim, x1, x2)
+      case LogisticModel(lom) => MixedDichotomous(lom, x1, x2)
+      case _ => Dummy
+    }
+  }
+
+  def apply(nm: NullModel,
+            x1: Option[DenseMatrix[Double]],
+            x2: Option[CSCMatrix[Double]]): ScoreTest = {
+    (x1, x2) match {
+      case (Some(c), Some(r)) => apply(nm, c, r)
+      case (Some(c), None) => apply(nm, c)
+      case (None, Some(r)) => apply(nm, r)
+      case (None, None) => Dummy
+    }
+  }
+
+
+  final case class SparseContinuous(regRes: Regression.LinearResult,
+                                    x: CSCMatrix[Double]) extends ScoreTest {
+    val score = (regRes.residuals.toDenseMatrix * x).toDenseVector / regRes.residualsVariance
+    val variance = {
+      val c = regRes.xs
+      val resVar = regRes.residualsVariance
+      val IccInv = regRes.informationInverse * resVar
+      val Igg = (x.t * x).toDense
+      /** this is important here */
+      val Icg = c.t * x
+      val Igc = Icg.t
+      (Igg - Igc * IccInv * Icg)/resVar
+    }
+  }
+
+  final case class DenseContinuous(regRes: Regression.LinearResult,
+                                   x: DenseMatrix[Double]) extends ScoreTest {
+    /** Because x is dense here. it will take a longer time to run
+      * only use this for common variants
+      * */
+    val score = (x.t * regRes.residuals) / regRes.residualsVariance
+    val variance = {
+      val c = regRes.xs
+      val resVar = regRes.residualsVariance
+      /**
+        * theoretically, each information matrix here is lack of a resVar term.
+        *
+        * */
+      val IccInv = regRes.informationInverse * resVar
+      val Igg = x.t * x
+      val Icg = c.t * x
+      val Igc = Icg.t
+      (Igg - Igc * IccInv * Icg)/resVar
+    }
+  }
+
+  final case class MixedContinous(regRes: Regression.LinearResult,
+                                  x1: DenseMatrix[Double],
+                                  x2: CSCMatrix[Double]) extends ScoreTest {
+    /** to efficiently compute the covariance matrix,
+      * we need to blockwise the genotype matrix first
+      * */
+    private val dense = DenseContinuous(regRes, x1)
+    private val sparse = SparseContinuous(regRes, x2)
+    val score = DenseVector.vertcat(dense.score, sparse.score)
+    val variance = {
+      val v1 = dense.variance
+      val v4 = sparse.variance
+      val v2 = {
+        val c = regRes.xs
+        val IccInv = regRes.informationInverse * regRes.residualsVariance
+        val Igg = x1.t * x2
+        val Icg = c.t * x2
+        val Igc = x1.t * c
+        (Igg - Igc * IccInv * Icg)/regRes.residualsVariance
+      }
+      val v3 = v2.t
+      val v12 = DenseMatrix.horzcat(v1, v2)
+      val v34 = DenseMatrix.horzcat(v3, v4)
+      DenseMatrix.vertcat(v12, v34)
+    }
+  }
+
+  final case class SparseDichotomous(regRes: Regression.LogisticResult,
+                                     x: CSCMatrix[Double]) extends ScoreTest {
+    val score = (regRes.residuals.toDenseMatrix * x).toDenseVector
+    val variance = {
+      val IccInv = regRes.informationInverse
+      val Igg = (x.t * x).toDense
+      val Icg = regRes.xsRV * x
+      val Igc = Icg.t
+      Igg - Igc * IccInv * Icg
+    }
+  }
+
+  final case class DenseDichotomous(regRes: Regression.LogisticResult,
+                                    x: DenseMatrix[Double]) extends ScoreTest {
+    val score = x.t * regRes.residuals
+    val variance = {
+      val IccInv = regRes.informationInverse
+      val Igg = x.t * x
+      val Icg = regRes.xsRV * x
+      val Igc = Icg.t
+      Igg - Igc * IccInv * Icg
+    }
+  }
+
+  final case class MixedDichotomous(regRes: Regression.LogisticResult,
+                                    x1: DenseMatrix[Double],
+                                    x2: CSCMatrix[Double]) extends ScoreTest {
+    private val dense = DenseDichotomous(regRes, x1)
+    private val sparse = SparseDichotomous(regRes, x2)
+    val score = DenseVector.vertcat(dense.score, sparse.score)
+    val variance = {
+      val v1 = dense.variance
+      val v4 = sparse.variance
+      val v2 = {
+        val IccInv = regRes.informationInverse
+        val Igg = x1.t * x2
+        val Icg = regRes.xsRV * x2
+        val Igc = x1.t * regRes.xsRV.t
+        Igg - Igc * IccInv * Icg
+      }
+      val v3 = v2.t
+      val v12 = DenseMatrix.horzcat(v1, v2)
+      val v34 = DenseMatrix.horzcat(v3, v4)
+      DenseMatrix.vertcat(v12, v34)
+    }
+  }
+
 }
 
 sealed trait ScoreTest extends HypoTest {
-  val u: Double
-  val v: Double
-  lazy val t = u / pow(v, 0.5)
-  lazy val statistic: Double = t
-  lazy val pValue: Double = {
-    val dis = new Gaussian(0, 1)
-    /** single side */
-    dis.cdf(- abs(t))
-  }
-
-  def summary: TestResult =
-    TestResult(None, None, statistic, pValue)
-}
-
-case class BinaryNoCovUniScoreTest(y: DenseVector[Double],
-                                   x: DenseVector[Double]) extends ScoreTest {
-  lazy val p: Double = mean(y)
-  lazy val n: Int = y.length
-  lazy val u: Double = y.map(_ - p).t * x
-  lazy val v: Double = p * (1 - p) * (x.t * x - 1 / n * pow(sum(x), 2))
-}
-
-case class BinaryCovUniScoreTest(y: DenseVector[Double],
-                                 x: DenseVector[Double],
-                                 cov: DenseMatrix[Double],
-                                 estimates: DenseVector[Double]) extends ScoreTest {
-  lazy val n = y.length
-  lazy val xs = DenseMatrix.horzcat(DenseVector.ones[Double](n).toDenseMatrix.t, cov)
-  lazy val mp: DenseVector[Double] = estimates
-  lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
-  lazy val u: Double = (y - mp).t * x
-  lazy val v: Double = {
-    val tmp1 = SafeMatrix[N, One](vp :* x).t * SafeMatrix[N, K](xs)
-    val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs))
-    sum(vp :* x :* x) - (tmp1 * tmp2 * tmp1.t).mat(0,0)
-  }
-}
-
-case class BinaryCovMultiScoreTest(y: DenseVector[Double],
-                                   x: DenseMatrix[Double],
-                                   cov: DenseMatrix[Double],
-                                   estimates: DenseVector[Double]) extends ScoreTest {
-  /** For K choices of weight schemes */
-  lazy val u = 0.0
-  lazy val v = 1.0
-  lazy val n = y.length
-  lazy val k = cov.cols + 1
-  lazy val s = x.cols
-  lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
-  lazy val mp: DenseVector[Double] = estimates
-  lazy val vp: DenseVector[Double] = mp :* mp.map(1 - _)
-  lazy val uVec: DenseVector[Double] = (SafeMatrix[N, S](x).t * SafeMatrix[N, One](y - mp)).mat(::, 0)
-  lazy val tmp0 = SafeMatrix[N, One](vp).t * SafeMatrix[N, S](x :* x)
-  lazy val tmp1 = SafeMatrix[N, S](x).t * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs)
-  lazy val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, N](diag(vp)) * SafeMatrix[N, K](xs))
-  lazy val vVec: DenseVector[Double] = tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat)
-  lazy val tVec = uVec :/ pow(vVec, 0.5)
-  lazy val tMax = max(tVec)
-  override lazy val statistic = {
-    val tmp = SafeMatrix[N, N](diag(y - mp)) * (SafeMatrix[N, S](x) - SafeMatrix[N, K](xs) * tmp2.t * tmp1.t)
-    val covU = (tmp.t * tmp).mat
-    val dU = diag(pow(diag(covU), 0.5))
-    val covT = SafeMatrix[S, S](dU) * SafeMatrix[S, S](covU) * SafeMatrix[S, S](dU)
-    val tMaxVec = DenseVector.fill(covT.mat.cols)(this.tMax)
-    val t2 = y.length * (SafeMatrix[S, One](tMaxVec).t * SafeMatrix.inverse(covT) * SafeMatrix[S, One](tMaxVec)).mat(0, 0)
-    val f = (y.length - covU.cols)/(covU.cols * (y.length - 1)) * t2
-    f
-  }
-  override lazy val pValue = 1 - new FDistribution(s, n - s).cdf(statistic)
-}
-
-case class QuantNoCovUniScoreTest(y: DenseVector[Double], x: DenseVector[Double]) extends ScoreTest {
-  lazy val my: Double = mean(y)
-  lazy val vy: Double = variance(y)
-  lazy val n: Int = y.length
-  lazy val u: Double = y.map(_ - my).t * x
-  lazy val v: Double = vy * ( x.t * x - 1/n * pow(sum(x), 2))
-}
-
-case class QuantCovUniScoreTest(y: DenseVector[Double],
-                                x: DenseVector[Double],
-                                cov: DenseMatrix[Double],
-                                estimates: DenseVector[Double]) extends ScoreTest {
-  lazy val n = y.length
-  lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
-  lazy val my: DenseVector[Double] = estimates
-  lazy val vy: Double = 1/n * pow(norm(y - my), 2)
-  lazy val u: Double = (y - my).t * x
-  lazy val v: Double = {
-    val tmp1 = SafeMatrix[N, One](x).t * SafeMatrix[N, K](xs)
-    val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, K](xs))
-    vy * (pow(norm(x), 2) - (tmp1 * tmp2 * tmp1.t).mat(0, 0))
-  }
-}
-
-case class QuantCovMultiScoreTest(y: DenseVector[Double],
-                                  x: DenseMatrix[Double],
-                                  cov: DenseMatrix[Double],
-                                  estimates: DenseVector[Double]) extends ScoreTest {
-  lazy val u = 0.0
-  lazy val v = 0.0
-  lazy val n = y.length
-  lazy val s = x.cols
-  lazy val xs = DenseMatrix.horzcat(ones(n).toDenseMatrix.t, cov)
-  lazy val my: DenseVector[Double] = estimates
-  lazy val vy: Double = 1/n * pow(norm(y - my), 2)
-  lazy val uVec: DenseVector[Double] = (SafeMatrix[N, S](x).t * SafeMatrix[N, One](y - my)).mat(::, 0)
-  private lazy val tmp0 = SafeMatrix[N, One](DenseVector.fill(n)(1.0)).t * SafeMatrix[N, S](x :* x)
-  private lazy val tmp1 = SafeMatrix[N, S](x).t * SafeMatrix[N, K](xs)
-  private lazy val tmp2 = SafeMatrix.inverse(SafeMatrix[K, N](xs.t) * SafeMatrix[N, K](xs))
-  lazy val vVec = vy * (tmp0.mat(0, ::).t - diag((tmp1 * tmp2 * tmp1.t).mat))
-  lazy val tVec = uVec :/ pow(vVec, 0.5)
-  lazy val tMax = max(tVec)
-  override lazy val statistic = {
-    val tmp = SafeMatrix[N, N](diag(y - my)) * (SafeMatrix[N, S](x) - SafeMatrix[N, K](xs) * tmp2.t * tmp1.t)
-    val covU = (tmp.t * tmp).mat
-    val dU = diag(pow(diag(covU), 0.5))
-    val covT = SafeMatrix[S, S](dU) * SafeMatrix[S, S](covU) * SafeMatrix[S, S](dU)
-    val tMaxVec = DenseVector.fill(s)(this.tMax)
-    val t2 = n * (SafeMatrix[S, One](tMaxVec).t * SafeMatrix.inverse(covT) * SafeMatrix[S, One](tMaxVec)).mat(0, 0)
-    val f = (n - s)/(s * (n - 1)) * t2
-    f
-  }
-  override lazy val pValue = 1 - new FDistribution(s, n - s).cdf(statistic)
+  def score: DenseVector[Double]
+  def variance: DenseMatrix[Double]
 }

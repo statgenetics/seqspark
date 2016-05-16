@@ -161,7 +161,7 @@ trait SKATO extends AssocMethod {
     }
   }
   lazy val residual = SM[N, One](y - yEstimate)
-  lazy val matrixZ = p0sqrt * x.getRaw().get.coding * diag(x.weight().get)
+  lazy val matrixZ = p0sqrt * x.getRare().get.coding * diag(x.weight().get)
   lazy val vectorZ = sum(matrixZ(*, ::))/numVars.toDouble
   lazy val matrixM = {
     val z = vectorZ
@@ -195,7 +195,7 @@ trait SKATO extends AssocMethod {
   }
 
   def kernel(rho: Double): SM[N, N] = {
-    val g = x.getRaw().get.coding
+    val g = x.getRare().get.coding
     val w = diag(x.weight().get)
     val mg = w.cols
     val r = (1.0 - rho) * DM.eye[Double](mg) + rho * DM.ones[Double](mg, mg)

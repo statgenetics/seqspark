@@ -35,9 +35,9 @@ object AssocMaster {
       * some encoding methods require phenotype information
       * e.g. to learning weight from data */
     val sampleSize = y.value.length
-    val codingScheme = config.coding
+    val codingScheme = config.`type`
     val annotated = codingScheme match {
-      case CodingMethod.single =>
+      case MethodType.single =>
         currentGenotype.vars.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
       case _ => Annotation.forAssoc(currentGenotype).vars
           .map(v => (v.parseInfo(IK.gene), v))
@@ -132,7 +132,7 @@ object AssocMaster {
     val estimates = adjustForCov(binaryTrait, y.value, cov.value)
     test match {
       case TestMethod.score =>
-        coding.map(p => (p._1, ScoreTest(binaryTrait, y.value, p._2, cov.value, estimates).summary))
+        coding.map(p => (p._1, ScoreTestBk(binaryTrait, y.value, p._2, cov.value, estimates).summary))
           .collect().toMap
     }
   }

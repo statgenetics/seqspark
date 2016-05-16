@@ -1,8 +1,8 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, Vector => BVec}
 import breeze.numerics.{exp, lbeta, pow}
-import org.dizhang.seqspark.ds.Counter
+import org.dizhang.seqspark.ds.{Counter, DenseVariant, DummyVariant, SparseVariant}
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.Constant.UnPhased
@@ -13,18 +13,13 @@ import org.dizhang.seqspark.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import Encode._
 
 /**
-  * How to code variants in one group (gene)
+  * How to code variants, either in one group (gene) or in a region
+  * This class only applies to burden test
+  * For meta and Skat, use the raw encoding
+  *
   */
-object Encode {
-  /** constants values of the pathes and values of
-    * the method config object*/
-  //val CPMethod = Constant.ConfigPath.Association.SomeMethod
-  //val CVMethod = Constant.ConfigValue.Association.SomeMethod
 
-  trait Coding
-  case class Raw(coding: DenseMatrix[Double]) extends Coding
-  case class Fixed(coding: DenseVector[Double]) extends Coding
-  case class VT(coding: DenseMatrix[Double]) extends Coding
+object Encode {
 
   def cmcMakeNaAdjust(x: Byte, maf: Double): Double = x match {
       case Bt.ref => 0.0
@@ -58,11 +53,11 @@ object Encode {
 
   val BrvAddNaAdjust = Counter.CounterElementSemiGroup.AtomDouble
 
-  /** The authors just said the sample size needed is very large, but not how large
-    * this function is full of magic numbers !!!
-    * */
 
   def erecDelta(n: Int): Double = {
+    /** The authors just said the sample size needed is very large, but not how large
+      * this function is full of magic numbers !!!
+      * */
     if (n < 2000)
       1.0
     else if (n > 100000)
@@ -72,67 +67,234 @@ object Encode {
   }
 
   def apply(vars: Iterable[Var],
-            sampleSize: Int,
             controls: Option[Array[Boolean]] = None,
             y: Option[DenseVector[Double]],
             cov: Option[DenseMatrix[Double]],
             config: MethodConfig): Encode = {
-    val codingScheme = config.coding
+    val codingScheme = config.`type`
     val mafSource = config.mafSource
     val weightMethod = config.weight
     (codingScheme, mafSource, weightMethod) match {
-      case (CodingMethod.brv, MafSource.controls, WeightMethod.erec) =>
-        apply(vars, sampleSize, controls.get, y.get, cov, config)
-      case (CodingMethod.brv, _, WeightMethod.erec) =>
-        apply(vars, sampleSize, y.get, cov, config)
+      case (MethodType.brv, MafSource.controls, WeightMethod.erec) =>
+        apply(vars, controls.get, y.get, cov, config)
+      case (MethodType.brv, _, WeightMethod.erec) =>
+        apply(vars, y.get, cov, config)
       case (_, MafSource.controls, _) =>
-        apply(vars, sampleSize, controls.get, config)
+        apply(vars, controls.get, config)
       case (_, _, _) =>
-        apply(vars, sampleSize, config)
+        apply(vars, config)
     }
   }
 
-
-  def apply(vars: Iterable[Var], sampleSize: Int, config: MethodConfig): Encode = {
-    config.coding match {
-      case CodingMethod.single => DefaultSingle(vars, sampleSize, config)
-      case CodingMethod.cmc => DefaultCMC(vars, sampleSize, config)
-      case CodingMethod.brv => SimpleBRV(vars, sampleSize, config)
-      case _ => DefaultCMC(vars, sampleSize, config)
+  def apply(varsIter: Iterable[Var], config: MethodConfig): Encode = {
+    val vars = varsIter.toArray
+    config.`type` match {
+      case MethodType.single => DefaultSingle(vars, config)
+      case MethodType.cmc => DefaultCMC(vars, config)
+      case MethodType.brv => SimpleBRV(vars, config)
+      case MethodType.skat => DefaultRaw(vars, config)
+      case MethodType.meta => DefaultRaw(vars, config)
+      case _ => DefaultCMC(vars, config)
     }
   }
 
-  def apply(vars: Iterable[Var], sampleSize: Int, controls: Array[Boolean], config: MethodConfig): Encode = {
-    config.coding match {
-      case CodingMethod.single => ControlsMafSingle(vars, sampleSize, controls, config)
-      case CodingMethod.cmc => ControlsMafCMC(vars, sampleSize, controls, config)
-      case CodingMethod.brv => ControlsMafSimpleBRV(vars, sampleSize, controls, config)
-      case _ => ControlsMafCMC(vars, sampleSize, controls, config)
+  def apply(varsIter: Iterable[Var], controls: Array[Boolean], config: MethodConfig): Encode = {
+    val vars = varsIter.toArray
+    config.`type` match {
+      case MethodType.single => ControlsMafSingle(vars, controls, config)
+      case MethodType.cmc => ControlsMafCMC(vars, controls, config)
+      case MethodType.brv => ControlsMafSimpleBRV(vars, controls, config)
+      case MethodType.skat => ControlsMafRaw(vars, controls, config)
+      case MethodType.meta => ControlsMafRaw(vars, controls, config)
+      case _ => ControlsMafCMC(vars, controls, config)
     }
   }
 
-  def apply(vars: Iterable[Var],
-            sampleSize: Int,
+  def apply(varsIter: Iterable[Var],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
             config: MethodConfig): Encode = {
-    ErecBRV(vars, sampleSize, y, cov, config)
+    ErecBRV(varsIter.toArray, y, cov, config)
   }
 
-  def apply(vars: Iterable[Var],
-            sampleSize: Int,
+  def apply(varsIter: Iterable[Var],
             controls: Array[Boolean],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
             config: MethodConfig): Encode = {
-    ControlsMafErecBRV(vars, sampleSize, controls, y, cov, config)
+    val vars = varsIter.toArray
+    ControlsMafErecBRV(vars, controls, y, cov, config)
   }
+
+  trait Coding
+  case class Rare(coding: CSCMatrix[Double], vars: Array[DummyVariant[Byte]]) extends Coding
+  case class Common(coding: DenseMatrix[Double], vars: Array[DummyVariant[Byte]]) extends Coding
+  case class Fixed(coding: DenseVector[Double]) extends Coding
+  case class VT(coding: DenseMatrix[Double]) extends Coding
+
+  sealed trait Raw extends Encode {
+    def weight(cutoff: Double) = None
+    def isDefined = maf.exists(_ > 0.0)
+    def getFixed(cutoff: Double = fixedCutoff) = None
+    override def getCoding = None
+  }
+
+  sealed trait Single extends Encode {
+    override def getRare(cutoff: Double) = None
+    def weight(cutoff: Double) = None
+    def isDefined = maf.exists(_ >= fixedCutoff)
+    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
+      val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
+      if (! this.isDefined)
+        None
+      else {
+        val res = tmp.reduce((a, b) => a)
+        Some(Fixed(DenseVector(res._1.map{
+          case UnPhased.Bt.ref => 0.0
+          case UnPhased.Bt.het1 => 1.0
+          case UnPhased.Bt.het2 => 1.0
+          case UnPhased.Bt.mut => 2.0
+          case _ => 2.0 * res._2
+        }.toArray)))
+      }
+    }
+  }
+
+  sealed trait CMC extends Encode {
+    def weight(cutoff: Double) = None
+    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
+      if (! this.isDefined)
+        None
+      else
+        Some(Fixed(vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
+          v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
+        ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)))
+    }
+    def isDefined = maf.exists(_ < fixedCutoff)
+  }
+
+  sealed trait BRV extends Encode {
+    def isDefined = maf.exists(_ < fixedCutoff)
+    def getGenotype(cutoff: Double = fixedCutoff): DenseMatrix[Double] = {
+      val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
+        v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
+      DenseMatrix(tmp: _*).t}
+
+    def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
+
+    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
+      val genotype = this.getGenotype(cutoff)
+      if (! this.isDefined)
+        None
+      else
+        weight(cutoff) match {
+          case None => Some(Fixed(genotype * DenseVector.fill(genotype.size)(1.0)))
+          case Some(w) => Some(Fixed(genotype * w))}}
+  }
+
+  sealed trait PooledOrAnnotationMaf extends Encode {
+    lazy val maf = {
+      config.mafSource match {
+        case MafSource.annotation =>
+          vars.map(v => v.parseInfo(Constant.Variant.InfoKey.maf).toDouble)
+        case MafSource.pooled =>
+          vars.map (v => getMaf (v.toCounter (makeMaf, (0, 2) ).reduce) )
+        case _ => vars.map (v => getMaf(v.toCounter(makeMaf, (0, 2)).reduce))
+      }
+    }
+  }
+
+  sealed trait ControlsMaf extends Encode {
+    def controls: Array[Boolean]
+    lazy val maf = vars.map(v => getMaf(v.select(controls).toCounter(makeMaf, (0, 2)).reduce))
+  }
+
+  sealed trait SimpleWeight extends BRV {
+    def weight(cutoff: Double): Option[DenseVector[Double]] = {
+      config.weight match {
+        case WeightMethod.equal => None
+        case WeightMethod.annotation =>
+          Some(DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
+            .filter(v => v._2 < cutoff).map(_._1).toArray))
+        case WeightMethod.wss =>
+          val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
+          Some(pow(mafDV :* mafDV.map(1.0 - _), -0.5))
+        case WeightMethod.skat =>
+          val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
+          Some(mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0)))
+        case _ => None
+      }
+    }
+  }
+
+  sealed trait LearnedWeight extends BRV {
+    def y: DenseVector[Double]
+    def cov: Option[DenseMatrix[Double]]
+    def weight(cutoff: Double) = {
+      val n = vars.size
+      val combined = cov match {
+        case None => getGenotype(cutoff)
+        case Some(c) => DenseMatrix.horzcat(getGenotype(cutoff), c)
+      }
+      val beta =
+        if (y.toArray.count(_ == 0.0) + y.toArray.count(_ == 1.0) == y.length) {
+          val model = new LogisticRegression(y, combined)
+          model.estimates.map(x => x + erecDelta(y.length))
+        } else {
+          val model = new LinearRegression(y, combined)
+          model.estimates.map(x => x + 2 * erecDelta(y.length))
+        }
+      Some(beta(1 to n))
+    }
+  }
+
+  case class DefaultRaw(vars: Array[Var],
+                        config: MethodConfig) extends Encode with Raw with PooledOrAnnotationMaf
+
+  case class ControlsMafRaw(vars: Array[Var],
+                            controls: Array[Boolean],
+                            config: MethodConfig) extends Encode with Raw with ControlsMaf
+
+  case class DefaultSingle(vars: Array[Var],
+                           config: MethodConfig) extends Encode with Single with PooledOrAnnotationMaf
+
+  case class ControlsMafSingle(vars: Array[Var],
+                               controls: Array[Boolean],
+                               config: MethodConfig) extends Encode with Single with ControlsMaf
+
+  case class DefaultCMC(vars: Array[Var],
+                        config: MethodConfig) extends Encode with CMC with PooledOrAnnotationMaf
+
+  case class ControlsMafCMC(vars: Array[Var],
+                            controls: Array[Boolean],
+                            config: MethodConfig) extends Encode with CMC with ControlsMaf
+
+  case class SimpleBRV(vars: Array[Var],
+                       config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with SimpleWeight
+
+
+  case class ControlsMafSimpleBRV(vars: Array[Var],
+                                  controls: Array[Boolean],
+                                  config: MethodConfig) extends Encode with BRV with ControlsMaf with SimpleWeight
+
+  case class ErecBRV(vars: Array[Var],
+                     y: DenseVector[Double],
+                     cov: Option[DenseMatrix[Double]],
+                     config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with LearnedWeight
+
+  case class ControlsMafErecBRV(vars: Array[Var],
+                                controls: Array[Boolean],
+                                y: DenseVector[Double],
+                                cov: Option[DenseMatrix[Double]],
+                                config: MethodConfig) extends Encode with BRV with ControlsMaf with LearnedWeight
+
+
 }
 
 sealed trait Encode {
-  def vars: Iterable[Var]
+  def vars: Array[Var]
   def maf: Array[Double]
-  def sampleSize: Int
+  def sampleSize: Int = if (vars.isEmpty) 0 else vars.head.length
   def config: MethodConfig
   lazy val fixedCutoff: Double = config.mafCutoff
   def thresholds: Option[Array[Double]] = {
@@ -160,11 +322,6 @@ sealed trait Encode {
         Some(VT(DenseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)))
     }
   }
-  def getRaw(cutoff: Double = fixedCutoff): Option[Raw] = {
-    val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-      v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
-    Some(Raw(DenseMatrix(tmp: _*).t))
-  }
   def getCoding: Option[Coding] = {
     if (config.mafFixed)
       this.getFixed()
@@ -172,152 +329,30 @@ sealed trait Encode {
       this.getVT
   }
   def isDefined: Boolean
-}
-
-sealed trait Single extends Encode {
-  def weight(cutoff: Double) = None
-  def isDefined = maf.exists(_ >= fixedCutoff)
-  def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-    val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
-    if (! this.isDefined)
+  def getCommon(cutoff: Double = fixedCutoff): Option[Common] = {
+    if (maf.forall(_ < cutoff)) {
       None
-    else {
-      val res = tmp.reduce((a, b) => a)
-      Some(Fixed(DenseVector(res._1.map{
-        case UnPhased.Bt.ref => 0.0
-        case UnPhased.Bt.het1 => 1.0
-        case UnPhased.Bt.het2 => 1.0
-        case UnPhased.Bt.mut => 2.0
-        case _ => 2.0 * res._2
-      }.toArray)))
+    } else {
+      val res = DenseVector.horzcat(vars.zip(maf).filter(v => v._2 >= cutoff).map {
+        case (v, m) => DenseVector(v.toArray.map(brvMakeNaAdjust(_, m)): _*)
+      }: _*)
+      val info = vars.zip(maf).filter(v => v._2 >= cutoff).map(_._1.toDummy)
+      Some(Common(res, info))
     }
   }
-}
-
-sealed trait CMC extends Encode {
-  def weight(cutoff: Double) = None
-  def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-    if (! this.isDefined)
+  def getRare(cutoff: Double = fixedCutoff): Option[Rare] = {
+    if (maf.forall(_ >= cutoff)) {
+      val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(_ < cutoff))
+      val cnt = vars.zip(maf).filter(v => v._2 < cutoff).map{ v =>
+        v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toMap}
+      cnt.zipWithIndex.foreach{ case (elems, col) =>
+          elems.foreach{case (row, v) => builder.add(row, col, v)}}
+      val info = vars.zip(maf).filter(v => v._2 >= cutoff).map(_._1.toDummy)
+      Some(Rare(builder.result, info))
+    } else {
       None
-    else
-      Some(Fixed(vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-        v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
-      ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)))
-  }
-  def isDefined = maf.exists(_ < fixedCutoff)
-}
-
-sealed trait BRV extends Encode {
-  def isDefined = maf.exists(_ < fixedCutoff)
-  def getGenotype(cutoff: Double = fixedCutoff): DenseMatrix[Double] = {
-    val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-      v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
-    DenseMatrix(tmp: _*).t}
-
-  def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
-
-  def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-    val genotype = this.getGenotype(cutoff)
-    if (! this.isDefined)
-      None
-    else
-      weight(cutoff) match {
-        case None => Some(Fixed(genotype * DenseVector.fill(genotype.size)(1.0)))
-        case Some(w) => Some(Fixed(genotype * w))}}
-}
-
-sealed trait PooledOrAnnotationMaf extends Encode {
-  def maf = {
-    config.mafSource match {
-      case MafSource.annotation =>
-        vars.map(v => v.parseInfo(Constant.Variant.InfoKey.maf).toDouble).toArray
-      case MafSource.pooled =>
-        vars.map (v => getMaf (v.toCounter (makeMaf, (0, 2) ).reduce) ).toArray
-      case _ => vars.map (v => getMaf(v.toCounter(makeMaf, (0, 2)).reduce)).toArray
     }
   }
+
 }
 
-sealed trait ControlsMaf extends Encode {
-  def controls: Array[Boolean]
-  def maf = vars.map(v => getMaf(v.select(controls).toCounter(makeMaf, (0, 2)).reduce)).toArray
-}
-sealed trait SimpleWeight extends BRV {
-  def weight(cutoff: Double): Option[DenseVector[Double]] = {
-    config.weight match {
-      case WeightMethod.equal => None
-      case WeightMethod.annotation =>
-        Some(DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
-          .filter(v => v._2 < cutoff).map(_._1).toArray))
-      case WeightMethod.wss =>
-        val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
-        Some(pow(mafDV :* mafDV.map(1.0 - _), -0.5))
-      case WeightMethod.skat =>
-        val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
-        Some(mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0)))
-      case _ => None
-    }
-  }
-}
-
-sealed trait LearnedWeight extends BRV {
-  def y: DenseVector[Double]
-  def cov: Option[DenseMatrix[Double]]
-  def weight(cutoff: Double) = {
-    val n = vars.size
-    val combined = cov match {
-      case None => getGenotype(cutoff)
-      case Some(c) => DenseMatrix.horzcat(getGenotype(cutoff), c)
-    }
-    val beta =
-      if (y.toArray.count(_ == 0.0) + y.toArray.count(_ == 1.0) == y.length) {
-        val model = new LogisticRegression(y, combined)
-        model.estimates.map(x => x + erecDelta(y.length))
-      } else {
-        val model = new LinearRegression(y, combined)
-        model.estimates.map(x => x + 2 * erecDelta(y.length))
-      }
-    Some(beta(1 to n))
-  }
-}
-
-case class DefaultSingle(vars: Iterable[Var],
-                         sampleSize: Int,
-                         config: MethodConfig) extends Encode with Single with PooledOrAnnotationMaf
-
-case class ControlsMafSingle(vars: Iterable[Var],
-                             sampleSize: Int,
-                             controls: Array[Boolean],
-                             config: MethodConfig) extends Encode with Single with ControlsMaf
-
-case class DefaultCMC(vars: Iterable[Var],
-                      sampleSize: Int,
-                      config: MethodConfig) extends Encode with CMC with PooledOrAnnotationMaf
-
-case class ControlsMafCMC(vars: Iterable[Var],
-                          sampleSize: Int,
-                          controls: Array[Boolean],
-                          config: MethodConfig) extends Encode with CMC with ControlsMaf
-
-case class SimpleBRV(vars: Iterable[Var],
-                     sampleSize: Int,
-                     config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with SimpleWeight
-
-
-case class ControlsMafSimpleBRV(vars: Iterable[Var],
-                          sampleSize: Int,
-                          controls: Array[Boolean],
-                          config: MethodConfig) extends Encode with BRV with ControlsMaf with SimpleWeight
-
-case class ErecBRV(vars: Iterable[Var],
-                   sampleSize: Int,
-                   y: DenseVector[Double],
-                   cov: Option[DenseMatrix[Double]],
-                   config: MethodConfig) extends Encode with BRV with PooledOrAnnotationMaf with LearnedWeight
-
-case class ControlsMafErecBRV(vars: Iterable[Var],
-                              sampleSize: Int,
-                              controls: Array[Boolean],
-                              y: DenseVector[Double],
-                              cov: Option[DenseMatrix[Double]],
-                              config: MethodConfig) extends Encode with BRV with ControlsMaf with LearnedWeight

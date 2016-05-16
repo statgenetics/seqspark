@@ -43,7 +43,9 @@ object UserConfig {
     val cnv = Value("cnv")
   }
 
-  object CodingMethod extends Enumeration {
+  object MethodType extends Enumeration {
+    val skat = Value("skat")
+    val meta = Value("meta")
     val cmc = Value("cmc")
     val brv = Value("burden")
     val single = Value("single")
@@ -176,7 +178,7 @@ object UserConfig {
   }
 
   case class MethodConfig(config: Config) extends UserConfig {
-    def coding = CodingMethod.withName(config.getString("coding"))
+    def `type` = MethodType.withName(config.getString("type"))
     def weight = WeightMethod.withName(config.getString("weight"))
     def mafSource = MafSource.withName(config.getString("maf.source"))
     def mafCutoff = config.getDouble("maf.cutoff")

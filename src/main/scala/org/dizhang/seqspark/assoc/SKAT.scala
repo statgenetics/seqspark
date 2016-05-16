@@ -201,7 +201,7 @@ trait SKAT extends AssocMethod {
   lazy val residual: DV[Double] = y - yEstimate
   lazy val kernel: DM[Double] = {
     val weight = diag(x.weight().get)
-    val g = x.getRaw().get.coding
+    val g = x.getRare().get.coding
     val r = (1.0 - rho) * DM.eye[Double](weight.cols) + rho * DM.ones[Double](weight.rows, weight.cols)
     g * weight * r * weight * g.t
   }

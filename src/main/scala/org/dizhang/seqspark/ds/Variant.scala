@@ -210,7 +210,7 @@ sealed trait Variant[A] extends Serializable {
 
   def toVariation: Variation = new Variation(toRegion, ref, alt)
 
-  def toDummy: Variant[A] = {
+  def toDummy: DummyVariant[A] = {
     DummyVariant(meta, default)
   }
 }

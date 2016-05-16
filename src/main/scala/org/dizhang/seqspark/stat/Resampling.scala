@@ -35,7 +35,6 @@ object Resampling {
     }
   }
 
-
   def apply(ref: Double,
             min: Int,
             max: Int,
@@ -75,8 +74,6 @@ object Resampling {
         new XRecodingRPermutation(ref, min, max, x, y, Some(c), e.get, controls, config)
     }
   }
-
-
 }
 
 sealed trait Resampling extends HypoTest {
@@ -99,7 +96,7 @@ sealed trait Resampling extends HypoTest {
         val newY = makeNewY
         val newX = makeNewX(newY)
         val newEstimates = makeNewE(newY)
-        val statistic = ScoreTest(binaryTrait, newY, newX, cov, newEstimates).summary.statistic
+        val statistic = ScoreTestBk(binaryTrait, newY, newX, cov, newEstimates).summary.statistic
         res = PairInt.op(res, if (statistic >= refStatistic) (1, 1) else (0, 1))
       }
     }

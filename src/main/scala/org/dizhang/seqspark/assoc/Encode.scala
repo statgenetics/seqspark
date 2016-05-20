@@ -92,7 +92,7 @@ object Encode {
       case MethodType.single => DefaultSingle(vars, config)
       case MethodType.cmc => DefaultCMC(vars, config)
       case MethodType.brv => SimpleBRV(vars, config)
-      case MethodType.skat => DefaultRaw(vars, config)
+      case MethodType.skat => SimpleBRV(vars, config)
       case MethodType.meta => DefaultRaw(vars, config)
       case _ => DefaultCMC(vars, config)
     }
@@ -104,7 +104,7 @@ object Encode {
       case MethodType.single => ControlsMafSingle(vars, controls, config)
       case MethodType.cmc => ControlsMafCMC(vars, controls, config)
       case MethodType.brv => ControlsMafSimpleBRV(vars, controls, config)
-      case MethodType.skat => ControlsMafRaw(vars, controls, config)
+      case MethodType.skat => ControlsMafSimpleBRV(vars, controls, config)
       case MethodType.meta => ControlsMafRaw(vars, controls, config)
       case _ => ControlsMafCMC(vars, controls, config)
     }
@@ -133,7 +133,6 @@ object Encode {
   case class VT(coding: DenseMatrix[Double]) extends Coding
 
   sealed trait Raw extends Encode {
-    def weight(cutoff: Double) = None
     def isDefined = maf.exists(_ > 0.0)
     def getFixed(cutoff: Double = fixedCutoff) = None
     override def getCoding = None
@@ -141,7 +140,7 @@ object Encode {
 
   sealed trait Single extends Encode {
     override def getRare(cutoff: Double) = None
-    def weight(cutoff: Double) = None
+    def weight(cutoff: Double) = DenseVector(1.0)
     def isDefined = maf.exists(_ >= fixedCutoff)
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
       val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
@@ -161,7 +160,7 @@ object Encode {
   }
 
   sealed trait CMC extends Encode {
-    def weight(cutoff: Double) = None
+    def weight(cutoff: Double) = DenseVector[Double]()
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
       if (! this.isDefined)
         None
@@ -175,21 +174,10 @@ object Encode {
 
   sealed trait BRV extends Encode {
     def isDefined = maf.exists(_ < fixedCutoff)
-    def getGenotype(cutoff: Double = fixedCutoff): DenseMatrix[Double] = {
-      val tmp = vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-        v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toArray).toArray
-      DenseMatrix(tmp: _*).t}
-
-    def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      val genotype = this.getGenotype(cutoff)
-      if (! this.isDefined)
-        None
-      else
-        weight(cutoff) match {
-          case None => Some(Fixed(genotype * DenseVector.fill(genotype.size)(1.0)))
-          case Some(w) => Some(Fixed(genotype * w))}}
+      this.getRare(cutoff).map(r => Fixed(r.coding * weight(cutoff)))}
+
   }
 
   sealed trait PooledOrAnnotationMaf extends Encode {
@@ -210,19 +198,17 @@ object Encode {
   }
 
   sealed trait SimpleWeight extends BRV {
-    def weight(cutoff: Double): Option[DenseVector[Double]] = {
+    def weight(cutoff: Double): DenseVector[Double] = {
+      val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
       config.weight match {
-        case WeightMethod.equal => None
         case WeightMethod.annotation =>
-          Some(DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
-            .filter(v => v._2 < cutoff).map(_._1).toArray))
+          DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
+            .filter(v => v._2 < cutoff).map(_._1))
         case WeightMethod.wss =>
-          val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
-          Some(pow(mafDV :* mafDV.map(1.0 - _), -0.5))
+          pow(mafDV :* mafDV.map(1.0 - _), -0.5)
         case WeightMethod.skat =>
-          val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
-          Some(mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0)))
-        case _ => None
+          mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0))
+        case _ => DenseVector.fill[Double](mafDV.length)(1.0)
       }
     }
   }
@@ -230,11 +216,12 @@ object Encode {
   sealed trait LearnedWeight extends BRV {
     def y: DenseVector[Double]
     def cov: Option[DenseMatrix[Double]]
-    def weight(cutoff: Double) = {
-      val n = vars.size
+    def weight(cutoff: Double = fixedCutoff) = {
+      val geno = getRare(cutoff).get.coding.toDense
+      val n = geno.cols
       val combined = cov match {
-        case None => getGenotype(cutoff)
-        case Some(c) => DenseMatrix.horzcat(getGenotype(cutoff), c)
+        case None => geno
+        case Some(c) => DenseMatrix.horzcat(geno, c)
       }
       val beta =
         if (y.toArray.count(_ == 0.0) + y.toArray.count(_ == 1.0) == y.length) {
@@ -244,16 +231,16 @@ object Encode {
           val model = new LinearRegression(y, combined)
           model.estimates.map(x => x + 2 * erecDelta(y.length))
         }
-      Some(beta(1 to n))
+      beta(1 to n)
     }
   }
 
   case class DefaultRaw(vars: Array[Var],
-                        config: MethodConfig) extends Encode with Raw with PooledOrAnnotationMaf
+                        config: MethodConfig) extends Encode with Raw with PooledOrAnnotationMaf with SimpleWeight
 
   case class ControlsMafRaw(vars: Array[Var],
                             controls: Array[Boolean],
-                            config: MethodConfig) extends Encode with Raw with ControlsMaf
+                            config: MethodConfig) extends Encode with Raw with ControlsMaf with SimpleWeight
 
   case class DefaultSingle(vars: Array[Var],
                            config: MethodConfig) extends Encode with Single with PooledOrAnnotationMaf
@@ -313,15 +300,13 @@ sealed trait Encode {
         else
           a ++ b))
   }
-  def weight(cutoff: Double = fixedCutoff): Option[DenseVector[Double]]
+  def weight(cutoff: Double = fixedCutoff): DenseVector[Double]
   def getFixed(cutoff: Double = fixedCutoff): Option[Fixed]
+
   def getVT: Option[VT] = {
-    thresholds match {
-      case None => None
-      case Some(th) =>
-        Some(VT(DenseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)))
-    }
+    thresholds.map(th => VT(DenseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)))
   }
+
   def getCoding: Option[Coding] = {
     if (config.mafFixed)
       this.getFixed()
@@ -353,6 +338,5 @@ sealed trait Encode {
       None
     }
   }
-
 }
 

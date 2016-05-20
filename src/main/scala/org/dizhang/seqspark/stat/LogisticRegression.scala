@@ -14,18 +14,6 @@ class LogisticRegression(val responses: DenseVector[Double],
   extends Regression {
 
   /**
-   * response: response variable
-   * xs: independents with ones
-   * */
-  val ones = DenseVector.ones[Double](independents.rows)
-
-  /**
-    * the matrix [n x p] (n: Sample size, p: parameter number) of all independent variables,
-    * including the first column of ones.
-    * */
-  val xs = DenseMatrix.horzcat(ones.toDenseMatrix.t, independents)
-
-  /**
     * z contains n elements (samples), is the result of xs * beta
     */
   def sigmoid(z: DenseVector[Double]): DenseVector[Double] =
@@ -60,11 +48,11 @@ class LogisticRegression(val responses: DenseVector[Double],
 
   lazy val residualsVariance: DenseVector[Double] = estimates :* estimates.map(1.0 - _)
 
+  lazy val xsRotated = if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
+
   lazy val information: DenseMatrix[Double] = {
     /** this is essentially (xs.t * diag(residualsVariance) * xs) */
-    xs.t * (xs(::, *) :* residualsVariance)
+    xsRotated.t * (xsRotated(::, *) :* residualsVariance)
   }
-  lazy val informationInverse = inv(information)
 
-  lazy val xsRV = (xs(::, *) :* residualsVariance).t
 }

@@ -30,11 +30,11 @@ object LCCSLiu {
 
   private trait Old extends LCCSLiu {
     val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s1
-    val l = if (squareOfS1LargerThanS2) a.square - 2 * delta else c2.cube/c3.square
+    val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else c2.cube/c3.square
   }
   private trait New extends LCCSLiu {
     val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s2.sqrt
-    val l = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
+    val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
   }
 
   case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old
@@ -59,13 +59,12 @@ trait LCCSLiu extends LinearCombinationChiSquare {
   }
   val a: Double
   val delta = if (squareOfS1LargerThanS2) s1 * a.cube - a.square else 0.0
-  val l: Double
+  val df: Double
   val sigmaX = 2.0.sqrt * a
-  val muX = l + delta
-
+  val muX = df + delta
 
   def cdf(cutoff: Double): CDFLiu = {
-    val nccs = NonCentralChiSquare(l + delta, delta)
+    val nccs = NonCentralChiSquare(df + delta, delta)
     val norm =  (cutoff - muQ)/sigmaQ
     val norm1 = norm * sigmaX + muX
     CDFLiu(nccs.cdf(norm1))

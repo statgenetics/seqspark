@@ -1,6 +1,8 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector}
+import breeze.linalg.{*, CSCMatrix, DenseMatrix, DenseVector, inv, sum}
+import breeze.numerics.pow
+import org.dizhang.seqspark.stat.ScoreTest.NullModel
 
 /**
   * score test for regression model
@@ -22,11 +24,19 @@ import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector}
 object ScoreTest {
 
   @SerialVersionUID(52L)
-  sealed trait NullModel extends Serializable {
+  trait NullModel extends Serializable {
     def regressionResult: Regression.Result
+    def xs = regressionResult.xs
+    val residuals = regressionResult.responses - regressionResult.estimates
+    val informationInverse = inv(regressionResult.information)
   }
-  final case class LinearModel(regressionResult: Regression.LinearResult) extends NullModel
-  final case class LogisticModel(regressionResult: Regression.LogisticResult) extends NullModel
+  case class LinearModel(regressionResult: Regression.LinearResult) extends NullModel {
+    val residualsVariance = sum(pow(regressionResult.residuals, 2))/regressionResult.residuals.length
+  }
+  case class LogisticModel(regressionResult: Regression.LogisticResult) extends NullModel {
+    val residualsVariance = regressionResult.estimates.map(p => p * (1.0 - p))
+    val xsRV = (xs(::, *) :* residualsVariance).t
+  }
 
   case object Dummy extends ScoreTest {
     def score = DenseVector(0.0)
@@ -35,24 +45,24 @@ object ScoreTest {
 
   def apply(nm: NullModel, x: CSCMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(lim) => SparseContinuous(lim, x)
-      case LogisticModel(lom) => SparseDichotomous(lom, x)
+      case LinearModel(_) => SparseContinuous(nm.asInstanceOf[LinearModel], x)
+      case LogisticModel(_) => SparseDichotomous(nm.asInstanceOf[LogisticModel], x)
       case _ => Dummy
     }
   }
 
   def apply(nm: NullModel, x: DenseMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(lim) => DenseContinuous(lim, x)
-      case LogisticModel(lom) => DenseDichotomous(lom, x)
+      case LinearModel(_) => DenseContinuous(nm.asInstanceOf[LinearModel], x)
+      case LogisticModel(_) => DenseDichotomous(nm.asInstanceOf[LogisticModel], x)
       case _ => Dummy
     }
   }
 
   def apply(nm: NullModel, x: DenseVector[Double]): ScoreTest = {
     nm match {
-      case LinearModel(lim) => DenseContinuous(lim, x.toDenseMatrix.t)
-      case LogisticModel(lom) => DenseDichotomous(lom, x.toDenseMatrix.t)
+      case LinearModel(_) => DenseContinuous(nm.asInstanceOf[LinearModel], x.toDenseMatrix.t)
+      case LogisticModel(_) => DenseDichotomous(nm.asInstanceOf[LogisticModel], x.toDenseMatrix.t)
       case _ => Dummy
     }
   }
@@ -61,8 +71,8 @@ object ScoreTest {
             x1: DenseMatrix[Double],
             x2: CSCMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(lim) => MixedContinous(lim, x1, x2)
-      case LogisticModel(lom) => MixedDichotomous(lom, x1, x2)
+      case LinearModel(_) => MixedContinuous(nm.asInstanceOf[LinearModel], x1, x2)
+      case LogisticModel(_) => MixedDichotomous(nm.asInstanceOf[LogisticModel], x1, x2)
       case _ => Dummy
     }
   }
@@ -79,13 +89,13 @@ object ScoreTest {
   }
 
 
-  final case class SparseContinuous(regRes: Regression.LinearResult,
+  final case class SparseContinuous(nullModel: LinearModel,
                                     x: CSCMatrix[Double]) extends ScoreTest {
-    val score = (regRes.residuals.toDenseMatrix * x).toDenseVector / regRes.residualsVariance
-    val variance = {
-      val c = regRes.xs
-      val resVar = regRes.residualsVariance
-      val IccInv = regRes.informationInverse * resVar
+    val score = (nullModel.residuals.toDenseMatrix * x).toDenseVector / nullModel.residualsVariance
+    lazy val variance = {
+      val c = nullModel.xs
+      val resVar = nullModel.residualsVariance
+      val IccInv = nullModel.informationInverse * resVar
       val Igg = (x.t * x).toDense
       /** this is important here */
       val Icg = c.t * x
@@ -94,20 +104,20 @@ object ScoreTest {
     }
   }
 
-  final case class DenseContinuous(regRes: Regression.LinearResult,
+  final case class DenseContinuous(nullModel: LinearModel,
                                    x: DenseMatrix[Double]) extends ScoreTest {
     /** Because x is dense here. it will take a longer time to run
       * only use this for common variants
       * */
-    val score = (x.t * regRes.residuals) / regRes.residualsVariance
-    val variance = {
-      val c = regRes.xs
-      val resVar = regRes.residualsVariance
+    val score = (x.t * nullModel.residuals) / nullModel.residualsVariance
+    lazy val variance = {
+      val c = nullModel.xs
+      val resVar = nullModel.residualsVariance
       /**
         * theoretically, each information matrix here is lack of a resVar term.
         *
         * */
-      val IccInv = regRes.informationInverse * resVar
+      val IccInv = nullModel.informationInverse * resVar
       val Igg = x.t * x
       val Icg = c.t * x
       val Igc = Icg.t
@@ -115,25 +125,25 @@ object ScoreTest {
     }
   }
 
-  final case class MixedContinous(regRes: Regression.LinearResult,
-                                  x1: DenseMatrix[Double],
-                                  x2: CSCMatrix[Double]) extends ScoreTest {
+  final case class MixedContinuous(nullModel: LinearModel,
+                                   x1: DenseMatrix[Double],
+                                   x2: CSCMatrix[Double]) extends ScoreTest {
     /** to efficiently compute the covariance matrix,
       * we need to blockwise the genotype matrix first
       * */
-    private val dense = DenseContinuous(regRes, x1)
-    private val sparse = SparseContinuous(regRes, x2)
+    private val dense = DenseContinuous(nullModel, x1)
+    private val sparse = SparseContinuous(nullModel, x2)
     val score = DenseVector.vertcat(dense.score, sparse.score)
-    val variance = {
+    lazy val variance = {
       val v1 = dense.variance
       val v4 = sparse.variance
       val v2 = {
-        val c = regRes.xs
-        val IccInv = regRes.informationInverse * regRes.residualsVariance
+        val c = nullModel.xs
+        val IccInv = nullModel.informationInverse * nullModel.residualsVariance
         val Igg = x1.t * x2
         val Icg = c.t * x2
         val Igc = x1.t * c
-        (Igg - Igc * IccInv * Icg)/regRes.residualsVariance
+        (Igg - Igc * IccInv * Icg)/nullModel.residualsVariance
       }
       val v3 = v2.t
       val v12 = DenseMatrix.horzcat(v1, v2)
@@ -142,44 +152,44 @@ object ScoreTest {
     }
   }
 
-  final case class SparseDichotomous(regRes: Regression.LogisticResult,
+  final case class SparseDichotomous(nullModel: LogisticModel,
                                      x: CSCMatrix[Double]) extends ScoreTest {
-    val score = (regRes.residuals.toDenseMatrix * x).toDenseVector
-    val variance = {
-      val IccInv = regRes.informationInverse
+    val score = (nullModel.residuals.toDenseMatrix * x).toDenseVector
+    lazy val variance = {
+      val IccInv = nullModel.informationInverse
       val Igg = (x.t * x).toDense
-      val Icg = regRes.xsRV * x
+      val Icg = nullModel.xsRV * x
       val Igc = Icg.t
       Igg - Igc * IccInv * Icg
     }
   }
 
-  final case class DenseDichotomous(regRes: Regression.LogisticResult,
+  final case class DenseDichotomous(nullModel: LogisticModel,
                                     x: DenseMatrix[Double]) extends ScoreTest {
-    val score = x.t * regRes.residuals
-    val variance = {
-      val IccInv = regRes.informationInverse
+    val score = x.t * nullModel.residuals
+    lazy val variance = {
+      val IccInv = nullModel.informationInverse
       val Igg = x.t * x
-      val Icg = regRes.xsRV * x
+      val Icg = nullModel.xsRV * x
       val Igc = Icg.t
       Igg - Igc * IccInv * Icg
     }
   }
 
-  final case class MixedDichotomous(regRes: Regression.LogisticResult,
+  final case class MixedDichotomous(nullModel: LogisticModel,
                                     x1: DenseMatrix[Double],
                                     x2: CSCMatrix[Double]) extends ScoreTest {
-    private val dense = DenseDichotomous(regRes, x1)
-    private val sparse = SparseDichotomous(regRes, x2)
+    private val dense = DenseDichotomous(nullModel, x1)
+    private val sparse = SparseDichotomous(nullModel, x2)
     val score = DenseVector.vertcat(dense.score, sparse.score)
-    val variance = {
+    lazy val variance = {
       val v1 = dense.variance
       val v4 = sparse.variance
       val v2 = {
-        val IccInv = regRes.informationInverse
+        val IccInv = nullModel.informationInverse
         val Igg = x1.t * x2
-        val Icg = regRes.xsRV * x2
-        val Igc = x1.t * regRes.xsRV.t
+        val Icg = nullModel.xsRV * x2
+        val Igc = x1.t * nullModel.xsRV.t
         Igg - Igc * IccInv * Icg
       }
       val v3 = v2.t

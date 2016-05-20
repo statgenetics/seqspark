@@ -12,11 +12,6 @@ import org.dizhang.seqspark.util.General._
 class LinearRegression(val responses: DenseVector[Double], val independents: DenseMatrix[Double])
   extends Regression {
 
-  val ones = DenseVector.ones[Double](responses.length)
-
-  /** n x (k + 1) */
-  val xs = DenseMatrix.horzcat(ones.toDenseMatrix.t, independents)
-
   val coefficients = {
     val qrMatrix = qr(xs)
     val r1 = qrMatrix.r(0 until xs.cols, ::)
@@ -27,9 +22,7 @@ class LinearRegression(val responses: DenseVector[Double], val independents: Den
   val estimates = xs * coefficients
 
   lazy val residualsVariance = sum(pow(residuals, 2))/residuals.length.toDouble
+  lazy val xsRotated = if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
+  lazy val information: DenseMatrix[Double] = xsRotated.t * xsRotated * residualsVariance
 
-  lazy val information: DenseMatrix[Double] = {
-    xs.t * xs * residualsVariance
-  }
-  lazy val informationInverse = inv(information)
 }

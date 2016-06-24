@@ -27,11 +27,9 @@ object Annotation extends Worker[Data, Data] {
   type Genes = Map[String, List[Location]]
 
   def annotateByVariant[A](v: Variant[A], dict: Broadcast[RefGene]): Variant[A] = {
-    val variation = v.toVariation
+    val variation = v.toVariation()
 
-    val annot = IntervalTree.lookup(dict.value.loci, variation)
-      .map{l =>
-        //println(s"${variation.toString} ${l.codon(Single(variation.chr, variation.start), dict.value.seq(l.mRNAName))} ${l.mRNAName}:${l.cdsIdx}")
+    val annot = IntervalTree.lookup(dict.value.loci, variation).map{l =>
         (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
     annot match {
       case Nil =>
@@ -56,12 +54,17 @@ object Annotation extends Worker[Data, Data] {
       * */
     //val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
 
-    val variation = v.toVariation
+    val variation = v.toVariation()
 
     val all = IntervalTree.lookup(dict.value.loci, variation)
       .map(l => (l.geneName, l.annotate(variation, dict.value.seq(l.mRNAName))))
       .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
-      .toArray.map{x => v.addInfo(IK.gene, x._1); v.addInfo(IK.func, x._2.toString); v}
+      .toArray.map{x =>
+        val newV = v.copy
+        newV.addInfo(IK.gene, x._1)
+        newV.addInfo(IK.func, x._2.toString)
+        newV
+    }
     all
   }
 
@@ -85,7 +88,7 @@ object Annotation extends Worker[Data, Data] {
     val db = dbNSFP(annoConf.dbNSFP)
     input match {
       case ByteGenotype(vs, c) =>
-        val pair = vs.map(v => (v.toVariation, v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
+        val pair = vs.map(v => (v.toVariation(), v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
         val anno = pair.map{p =>
           if (p._2._2.isDefined) {
             p._2._2.get.foreach((k, v) => p._2._1.addInfo(k, v))
@@ -94,7 +97,7 @@ object Annotation extends Worker[Data, Data] {
         }
         ByteGenotype(anno, c)
       case StringGenotype(rvs, c) =>
-        val pair = rvs.map(v => (v.toVariation, v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
+        val pair = rvs.map(v => (v.toVariation(), v)).leftOuterJoin(db.zipWithKey(c.genomeBuild))
         val anno = pair.map{p =>
           if (p._2._2.isDefined) {
             p._2._2.get.foreach((k ,v ) => p._2._1.addInfo(k, v))

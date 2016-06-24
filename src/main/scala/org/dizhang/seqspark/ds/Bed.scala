@@ -3,7 +3,7 @@ package org.dizhang.seqspark.ds
 import org.dizhang.seqspark.util.Constant
 import Constant.UnPhased._
 
-@SerialVersionUID(4L)
+@SerialVersionUID(7737230001L)
 class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
   /**
     * This class is for holding the output buf,

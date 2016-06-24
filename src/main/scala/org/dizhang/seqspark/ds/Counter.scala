@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.ds
 
-import breeze.linalg.DenseVector
+import breeze.linalg.{DenseVector, SparseVector, VectorBuilder}
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 
@@ -103,7 +103,7 @@ object Counter {
 
   }
 
-  @SerialVersionUID(3L)
+  @SerialVersionUID(7737260101L)
   trait CounterElementSemiGroup[A] extends Serializable {
     /** def zero here to help sparse operation
       * Note that zero is NOT necessarily the default of a sparse counter*/
@@ -170,7 +170,7 @@ object Counter {
   */
 }
 
-@SerialVersionUID(2L)
+@SerialVersionUID(7737260001L)
 sealed trait Counter[A] extends Serializable {
 
   def default: A
@@ -181,14 +181,16 @@ sealed trait Counter[A] extends Serializable {
   def reduce(implicit sg: CounterElementSemiGroup[A]): A
   def reduceByKey[B](keyFunc: Int => B)(implicit sg: CounterElementSemiGroup[A]): Map[B, A]
 
-  def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
-    require(this.length == that.length)
-    val newElems: IndexedSeq[A] = for (i <- IndexedSeq( 0 until length : _*)) yield sg.op(this(i), that(i))
-    Counter.fromIndexedSeq(newElems, sg.op(this.default, that.default))
-  }
+  def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A]
 
   def toDenseVector(make: A => Double): DenseVector[Double] = {
-    DenseVector((0 until size).map(i => make(this(i))).toArray)
+    DenseVector(toIndexedSeq.map(make(_)): _*)
+  }
+
+  def toSparseVector(make: A => Double): SparseVector[Double] = {
+    val builder = new VectorBuilder[Double](this.length)
+    this.toMap.foreach{case (i, v) => builder.add(i, make(v))}
+    builder.toSparseVector
   }
 
   def toIndexedSeq = this match {
@@ -202,6 +204,7 @@ sealed trait Counter[A] extends Serializable {
 
 }
 
+@SerialVersionUID(7737260201L)
 case class DenseCounter[A](elems: IndexedSeq[A], default: A)
   extends Counter[A] {
   def apply(i: Int) = elems(i)
@@ -214,10 +217,17 @@ case class DenseCounter[A](elems: IndexedSeq[A], default: A)
     ).map(identity)
   }
 
-  def toMap = elems.view.zipWithIndex.filter( _._1 != default ).map( _.swap ).toMap
+  def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
+    require(this.length == that.length)
+    val newElems = this.elems.zip(that.toIndexedSeq).map(x => sg.op(x._1, x._2))
+    Counter.fromIndexedSeq(newElems, sg.op(this.default, that.default))
+  }
+
+  def toMap = Counter.toMap(toIndexedSeq, default)
 
 }
 
+@SerialVersionUID(7737260301L)
 case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
   extends Counter[A] {
   def apply(i: Int) = {
@@ -239,6 +249,13 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
       for ((k, s) <- sizes) yield k -> (s - denseSizes.getOrElse(k, 0))
     val sparse = sparseSizes.map(x => x._1 -> sg.pow(default, x._2))
     dense ++ (for ((k, v) <- sparse) yield k -> sg.op(v, dense.getOrElse(k, sg.zero)))
+  }
+
+  def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
+    //x ++ (for ((k, v) <- y) yield k -> (v + x.getOrElse(k, 0)))
+    require(this.length == that.length)
+    val newElems = this.elems ++ (for ((k, v) <- that.toMap) yield k -> sg.op(this(k), v))
+    Counter.fromMap(newElems, sg.op(this.default, that.default), length)
   }
 
   def toMap = elems

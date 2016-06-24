@@ -45,6 +45,7 @@ object UserConfig {
 
   object MethodType extends Enumeration {
     val skat = Value("skat")
+    val skato = Value("skato")
     val meta = Value("meta")
     val cmc = Value("cmc")
     val brv = Value("burden")
@@ -87,7 +88,6 @@ object UserConfig {
     def variantLevelQC = VariantLevelQCConfig(config.getConfig("variantLevelQC"))
     def annotation = AnnotationConfig(config.getConfig("annotation"))
     def association = AssociationConfig(config.getConfig("association"))
-    def meta = MetaConfig(config.getConfig("meta"))
   }
 
   case class ImExConfig(config: Config) extends UserConfig {
@@ -192,11 +192,29 @@ object UserConfig {
 
   case class TraitConfig(config: Config) extends UserConfig {
     def binary = config.getBoolean("binary")
-    def covariates = config.getStringList("covariates").asScala.toArray
+    def covariates = if (config.hasPath("covariates")) {
+      config.getStringList("covariates").asScala.toArray
+    } else {
+      Array[String]()
+    }
+
+    def conditional = if (config.hasPath("conditional")) {
+      config.getStringList("conditional").asScala.toArray
+    } else {
+      Array[String]()
+    }
   }
 
   case class MetaConfig(config: Config) extends UserConfig {
+    def project = config.getString("project")
+    def seqSparkHome = config.getString("seqSparkHome")
+    def localDir = config.getString("localDir")
+    def hdfsDir = config.getString("hdfsDir")
     def studies = config.getStringList("studies").asScala.toArray
+    def traitList = config.getStringList("trait.list").asScala.toArray
+    def methodList = config.getStringList("method.list").asScala.toArray
+    def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
+    def method(name: String) = MetaConfig(config.getConfig(s"method.$name"))
   }
 
 }

@@ -38,8 +38,10 @@ object Constant {
 
   object Variant {
     object InfoKey {
-      val maf = "SS_ANNO_MAF"
-      val weight = "SS_ANNO_WEIGHT"
+      val maf = "SS_MAF"
+      val mafAll = "SS_MAF_ALL"
+      val mafCtrl = "SS_MAF_CTRL"
+      val weight = "SS_WEIGHT"
       val gene = "SS_GENE"
       val func = "SS_FUNC"
       val anno = "SS_ANNO"
@@ -66,6 +68,7 @@ object Constant {
       val InterGenic = Value("InterGenic")
       val CNV = Value("CNV")
     }
+
     object Base extends Enumeration {
       type Base = Value
       val T = Value("T")

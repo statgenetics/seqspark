@@ -68,7 +68,7 @@ object LCCSDavies {
       """.stripMargin.format(pvalue, ifault, trace(0), trace(1), trace(2),
         trace(3), trace(4), trace(5), trace(6))
   }
-
+  @SerialVersionUID(7778530101L)
   case class Simple(lambda: DenseVector[Double]) extends LCCSDavies {
     /** the original code is more versatile,
       * we set some variables to constants here
@@ -80,7 +80,7 @@ object LCCSDavies {
   }
 }
 
-
+@SerialVersionUID(7778530001L)
 trait LCCSDavies extends LCCS {
   val sigma: Double
   var sigsq = sigma.square

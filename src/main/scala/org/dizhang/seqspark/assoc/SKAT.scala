@@ -1,13 +1,12 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{*, diag, eig, eigSym, sum, svd, DenseMatrix => DM, DenseVector => DV}
-import breeze.numerics.{pow, sqrt}
-import breeze.stats._
 import org.dizhang.seqspark.stat._
-import org.dizhang.seqspark.ds.{SafeMatrix => SM}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
 import SKAT._
+import org.apache.spark.SparkContext
+
 /**
   * variance component test
   *
@@ -35,6 +34,14 @@ object SKAT {
     SmallSampleAdjust(nullModel, x, resampled, rho)
   }
 
+  def makeResampled(nullModel: LogisticModel)(implicit sc: SparkContext): DM[Double] = {
+    val times = sc.parallelize(1 to 10000)
+    val nm = sc.broadcast(nullModel)
+    times.map(i =>
+      Resampling.Base(nm.value).makeNewNullModel.residuals.toDenseMatrix
+    ).reduce((m1, m2) => DM.vertcat(m1, m2))
+  }
+
   def getLambdaU(sm: DM[Double]): (DV[Double], DM[Double]) = {
     val eg = eigSym(sm)
     val vals = eg.eigenvalues
@@ -48,6 +55,7 @@ object SKAT {
     (lambda, u)
   }
 
+  @SerialVersionUID(7727750101L)
   final case class Davies(nullModel: NullModel,
                           x: Encode,
                           rho: Double = 0.0) extends SKAT {
@@ -56,6 +64,7 @@ object SKAT {
       1.0 - LCCSDavies.Simple(lambda).cdf(qScore).pvalue
     }
   }
+  @SerialVersionUID(7727750201L)
   final case class Liu(nullModel: NullModel,
                        x: Encode,
                        rho: Double = 0.0) extends SKAT {
@@ -64,6 +73,7 @@ object SKAT {
       1.0 - LCCSLiu.Simple(lambda).cdf(qScore).pvalue
     }
   }
+  @SerialVersionUID(7727750301L)
   final case class LiuModified(nullModel: NullModel,
                                x: Encode,
                                rho: Double = 0.0) extends SKAT {
@@ -72,6 +82,7 @@ object SKAT {
       1.0 - LCCSLiu.Modified(lambda).cdf(qScore).pvalue
     }
   }
+  @SerialVersionUID(7727750401L)
   final case class SmallSampleAdjust(nullModel: LogisticModel,
                                      x: Encode,
                                      resampled: DM[Double],
@@ -81,13 +92,18 @@ object SKAT {
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
 
     def pValue: Double = {
-      val dis = new LCCSResampling(lambda, u, nullModel.regressionResult.residualsVariance, simQs)
+      val dis = new LCCSResampling(lambda, u, nullModel.residualsVariance, simQs)
       1.0 - dis.cdf(qScore).pvalue
     }
   }
 }
 
-trait SKAT extends AssocMethod {
+/**
+  * SKAT and SKAT-O are analytic tests
+  * The resampling version would be too slow
+  * */
+@SerialVersionUID(7727750001L)
+trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
   def x: Encode
   def isDefined: Boolean = x.isDefined
@@ -112,4 +128,5 @@ trait SKAT extends AssocMethod {
   lazy val vc = scoreSigma * kernel * scoreSigma
   lazy val (lambda, u) = getLambdaU(vc)
   def pValue: Double
+  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, 1.0 - pValue, pValue)
 }

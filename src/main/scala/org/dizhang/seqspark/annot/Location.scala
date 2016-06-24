@@ -82,6 +82,7 @@ final case class NLoc(geneName: String,
   }
 }
 
+@SerialVersionUID(7726)
 sealed trait Location extends Region {
 
   val geneName: String

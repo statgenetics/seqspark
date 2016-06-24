@@ -24,6 +24,15 @@ object SKATO {
   val RhosOld = (0 to 10).map(x => x * 1.0/10.0).toArray
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 1.0)
 
+  def apply(nullModel: NullModel,
+            x: Encode): SKATO = {
+    val method = x.config.misc.getString("method")
+    method match {
+      case "davies" => Davies(nullModel, x)
+      case _ => LiuModified(nullModel, x)
+    }
+  }
+
   def getParameters(p0sqrtZ: DM[Double],
                     rs: Array[Double],
                     pi: Option[DV[Double]] = None,
@@ -87,20 +96,36 @@ object SKATO {
   }
 
   @SerialVersionUID(302L)
-  trait NullModel extends Serializable {
-    def regressionResult: Regression.Result
-    def xs = regressionResult.xs
-    val informationInverse = inv(regressionResult.information)
+  trait NullModel extends Regression.Result with Serializable {
+    val informationInverse = inv(information)
     def STNullModel: STNull
   }
-  case class LinearModel(regressionResult: Regression.LinearResult) extends NullModel {
-    val STNullModel: STLinear = STLinear(regressionResult)
-    val sigma = regressionResult.residualsVariance.sqrt
-    val xsInfoInv = xs * informationInverse * regressionResult.residualsVariance
+
+  object NullModel {
+    def apply(reg: Regression): NullModel = {
+      reg match {
+        case _: LogisticRegression =>
+          LogisticModel(reg.responses, reg.estimates, reg.xs, reg.information)
+        case _ =>
+          LinearModel(reg.responses, reg.estimates, reg.xs, reg.information)
+      }
+    }
   }
-  case class LogisticModel(regressionResult: Regression.LogisticResult) extends NullModel {
-    val STNullModel: STLogistic = STLogistic(regressionResult)
-    def variance = regressionResult.residualsVariance
+
+  case class LinearModel(responses: DV[Double],
+                         estimates: DV[Double],
+                         xs: DM[Double],
+                         information: DM[Double]) extends NullModel {
+    val STNullModel: STLinear = STLinear(responses, estimates, xs, information)
+    val sigma = STNullModel.residualsVariance.sqrt
+    val xsInfoInv = xs * informationInverse * STNullModel.residualsVariance
+  }
+  case class LogisticModel(responses: DV[Double],
+                           estimates: DV[Double],
+                           xs: DM[Double],
+                           information: DM[Double]) extends NullModel {
+    val STNullModel: STLogistic = STLogistic(responses, estimates, xs, information)
+    def variance = STNullModel.residualsVariance
     val sigma = variance.map(p => p.sqrt)
     val xsInfoInv = (xs(::, *) :* sigma) * informationInverse
   }
@@ -118,11 +143,9 @@ object SKATO {
   final case class Moments(muQ: Double, varQ: Double, df: Double)
 
 
-  trait Asymptotic extends SKATO {
+  trait AsymptoticKur extends SKATO {
 
     val param = getParameters(P0SqrtZ, rhos)
-
-
 
     val pValues = {
       val cdf = lambdas.zip(qScores).map{case (l, q) =>
@@ -145,8 +168,9 @@ object SKATO {
     }
   }
 
+  @SerialVersionUID(7727760101L)
   case class Davies(nullModel: NullModel,
-                    x: Encode) extends SKATO with Asymptotic {
+                    x: Encode) extends SKATO with AsymptoticKur {
     lazy val term2 = new ChiSquared(1.0)
 
     def integralFunc(x: Double): Double = {
@@ -168,6 +192,7 @@ object SKATO {
     }
   }
 
+  @SerialVersionUID(7727760201L)
   trait LiuPValue extends SKATO {
 
     lazy val term1 = new ChiSquared(df)
@@ -186,8 +211,9 @@ object SKATO {
     }
   }
 
+  @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
-                         x: Encode) extends LiuPValue with Asymptotic {
+                         x: Encode) extends LiuPValue with AsymptoticKur {
     lazy val kurQ = {
       12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
     }
@@ -222,7 +248,8 @@ object SKATO {
   }
 }
 
-trait SKATO extends AssocMethod {
+@SerialVersionUID(7727760001L)
+trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
   def x: Encode
   lazy val geno: CM[Double] = x.getRare().get.coding
@@ -231,7 +258,7 @@ trait SKATO extends AssocMethod {
   lazy val misc = x.config.misc
   lazy val method = misc.getString("method")
   lazy val rhos: Array[Double] = {
-    val res = method match {
+    method match {
       case "optimal.adj" => RhosAdj
       case "optimal" => RhosOld
       case _ => misc.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
@@ -245,11 +272,9 @@ trait SKATO extends AssocMethod {
   lazy val P0SqrtZ: DM[Double] = {
     val z = rowMultiply(geno, weight)
     nullModel match {
-      case LinearModel(_) =>
-        val lm = nullModel.asInstanceOf[LinearModel]
+      case lm: LinearModel =>
         (- lm.xsInfoInv * (lm.xs.t * z) + z)/lm.sigma
-      case LogisticModel(_) =>
-        val lm = nullModel.asInstanceOf[LogisticModel]
+      case lm: LogisticModel =>
         colMultiply(z, lm.sigma) - lm.xsInfoInv * (lm.xs.t * colMultiply(z, lm.variance))
     }
   }
@@ -283,5 +308,9 @@ trait SKATO extends AssocMethod {
   def pMin = min(pValues)
 
   def pMinQuantiles: Array[Double]
+
+  def pValue: Double
+
+  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, 1.0 - pValue, pValue)
 
 }

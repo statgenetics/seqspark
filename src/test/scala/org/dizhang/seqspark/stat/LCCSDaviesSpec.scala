@@ -4,32 +4,32 @@ import java.util.logging
 
 import breeze.linalg.DenseVector
 import org.scalatest._
-import org.dizhang.seqspark.stat.{DaviesLCCS$ => LCCS}
+import org.dizhang.seqspark.stat.{LCCSDavies}
 
 /**
   * Test the linear combination chi-square distribution class
   */
 
-class LinearCombChiSquareSpec extends FlatSpec with Matchers {
+class LCCSDaviesSpec extends FlatSpec with Matchers {
   val flogger = logging.Logger.getLogger("com.github.fommil")
   flogger.setLevel(logging.Level.WARNING)
 
   trait SLCCS5 {
-    val slccs = LinearCombinationChiSquare.SimpleLCCS(DenseVector.fill(5)(1.0))
+    val slccs = LCCSDavies.Simple(DenseVector.fill(5)(1.0))
     implicit val counter = () => 1
     implicit val toggler = () => false
   }
   trait SLCCS {
     val lb: Array[Double]
-    def slccs = LinearCombinationChiSquare.SimpleLCCS(DenseVector(lb))
+    def slccs = LCCSDavies.Simple(DenseVector(lb))
     def cdf(c: Double) = slccs.cdf(c)
   }
   "LinearCombChiSquare functions" should "work fine" in new SLCCS5 {
     val x = -49.9
     val y = -50.1
-    assert(LinearCombinationChiSquare.exp1(x) != 0.0, "e^-49.9 is not 0.0")
-    assert(LinearCombinationChiSquare.exp1(y) == 0.0, "e^-50.1 is euqal to 0.0")
-    LinearCombinationChiSquare.log1(0.021662, first = true) should be (0.021430 +- 1e-6)
+    assert(LCCSDavies.exp1(x) != 0.0, "e^-49.9 is not 0.0")
+    assert(LCCSDavies.exp1(y) == 0.0, "e^-50.1 is euqal to 0.0")
+    LCCSDavies.log1(0.021662, first = true) should be (0.021430 +- 1e-6)
     val res1 = slccs.errbd(0.369996)
     res1._1 should be (0.0235764 +- 1e-6)
     res1._2 should be (19.2302 +- 1e-4)

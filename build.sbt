@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
 	"org.scalanlp" %% "breeze" % "0.11.2",
 	"org.scalanlp" %% "breeze-natives" % "0.11.2",
 	"org.scalaz" %% "scalaz-core" % "7.1.5",
-	"org.scalatest" % "scalatest_2.10" % "2.2.4" % "test"
+	"org.scalatest" % "scalatest_2.10" % "2.2.4" % "test",
+	"net.java.dev.jna" % "jna" % "4.2.2"
 )
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)

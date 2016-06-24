@@ -38,7 +38,9 @@ object AssocMaster {
     val codingScheme = config.`type`
     val annotated = codingScheme match {
       case MethodType.single =>
-        currentGenotype.vars.map(v => (s"${v.chr}-${v.pos}", v)).groupByKey()
+        currentGenotype.vars.map(v => (s"${v.chr}:${v.pos}", v)).groupByKey()
+      case MethodType.meta =>
+        currentGenotype.vars.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ => Annotation.forAssoc(currentGenotype).vars
           .map(v => (v.parseInfo(IK.gene), v))
           .filter(x => FuncF.contains(F.withName(x._2.parseInfo(IK.func))))
@@ -46,21 +48,18 @@ object AssocMaster {
     }
 
     annotated.map(p =>
-      (p._1, Encode(p._2, sampleSize, Option(controls.value), Option(y.value), cov.value, config))
+      (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, config))
     )
   }
 
   def adjustForCov(binaryTrait: Boolean,
                   y: DenseVector[Double],
-                  cov: Option[DenseMatrix[Double]]): Option[DenseVector[Double]] = {
-    cov match {
-      case None => None
-      case Some(c) => Some(
-        if (binaryTrait)
-          new LogisticRegression(y, c).estimates
-        else
-          new LinearRegression(y, c).estimates)
-    }
+                  cov: DenseMatrix[Double]): Regression = {
+      if (binaryTrait) {
+        new LogisticRegression(y, cov)
+      } else {
+        new LinearRegression(y, cov)
+      }
   }
 
   def maxThisLoop(base: Int, i: Int, max: Int, bs: Int): Int = {
@@ -86,9 +85,10 @@ object AssocMaster {
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
                       config: MethodConfig)(implicit sc: SparkContext): Map[String, TestResult] = {
-    val estimates = adjustForCov(binaryTrait, y.value, cov.value)
-    val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, TestMethod.score)
-    val asymptoticStatistic = sc.broadcast(asymptoticRes.map(x => x._1 -> x._2.statistic))
+    val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
+    val nm = ScoreTest.NullModel(reg)
+    val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, config).collect().toMap
+    val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
     val sites = encode.count().toInt
     val max = Permu.max(sites)
     val min = Permu.min(sites)
@@ -101,20 +101,17 @@ object AssocMaster {
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
       curEncode = expand(curEncode, lastMax, curMax)
-      val curPCount = curEncode
-        .map{x =>
-          val ref = asymptoticStatistic.value(x._1)
-          val model = Resampling(ref,
-            min - pCount.value(x._1)._1,
-            batchSize,
-            x._2, y.value,
-            cov.value,
-            estimates,
-            Option(controls.value),
-            Option(config),
-            binaryTrait)
-          (x._1, model.pCount)}
-        .reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap
+      val curPCount = curEncode.map{x =>
+        val ref = asymptoticStatistic.value(x._1)
+        val model =
+          if (config.mafFixed) {
+            Burden.ResamplingTest(ref, min - pCount.value(x._1)._1, batchSize, nm, x._2)
+          } else {
+            VT.ResamplingTest(ref, min - pCount.value(x._1)._1, batchSize, nm, x._2)
+          }
+        x._1 -> model.pCount
+      }.reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap
+
       pCount = sc.broadcast(for ((k, v) <- pCount.value)
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
@@ -126,15 +123,31 @@ object AssocMaster {
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
-                     test: TestMethod.Value): Map[String, TestResult] = {
-
-    val coding = encode.map(p => (p._1, p._2.getCoding.get))
-    val estimates = adjustForCov(binaryTrait, y.value, cov.value)
-    test match {
-      case TestMethod.score =>
-        coding.map(p => (p._1, ScoreTestBk(binaryTrait, y.value, p._2, cov.value, estimates).summary))
-          .collect().toMap
+                     config: MethodConfig)(implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+    val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
+    lazy val nm = sc.broadcast(ScoreTest.NullModel(reg))
+    lazy val snm = sc.broadcast(SKATO.NullModel(reg))
+    config.`type` match {
+      case MethodType.skat =>
+        encode.map(p => (p._1, SKAT(nm.value, p._2).result))
+      case MethodType.skato =>
+        encode.map(p => (p._1, SKATO(snm.value, p._2).result))
+      case _ =>
+        if (config.mafFixed)
+          encode.map(p => (p._1, Burden.AnalyticTest(nm.value, p._2).result))
+        else
+          encode.map(p => (p._1, VT.AnalyticTest(nm.value, p._2).result))
     }
+  }
+
+  def rareMetalWorker(encode: RDD[(String, Encode)],
+                      y: Broadcast[DenseVector[Double]],
+                      cov: Broadcast[Option[DenseMatrix[Double]]],
+                      binaryTrait: Boolean,
+                      config: MethodConfig)(implicit sc: SparkContext): Unit = {
+    val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
+    val nm = sc.broadcast(ScoreTest.NullModel(reg))
+    encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
   def runTraitWithMethod(currentGenotype: VCF,
@@ -149,10 +162,12 @@ object AssocMaster {
     val test = methodConfig.test
     val binary = config.`trait`(currentTrait._1).binary
 
-    if (permutation) {
+    if (methodConfig.`type` == MethodType.meta) {
+      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
+    } else if (permutation) {
       permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
     } else {
-      asymptoticTest(encode, currentTrait._2, cov, binary, test)
+      asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
     }
   }
 }
@@ -160,7 +175,7 @@ object AssocMaster {
 class AssocMaster(genotype: VCF,
                   phenotype: Phenotype)
                  (implicit cnf: RootConfig,
-                sc: SparkContext) extends {
+                  sc: SparkContext) extends {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 

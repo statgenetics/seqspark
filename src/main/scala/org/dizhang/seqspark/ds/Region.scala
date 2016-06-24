@@ -13,7 +13,7 @@ import breeze.linalg.{max, min}
   *   3. gene: for region with a name
   * */
 
-@SerialVersionUID(3L)
+@SerialVersionUID(7737730001L)
 trait Region extends Serializable {
   val chr: Byte
   val start: Int
@@ -71,12 +71,43 @@ case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
 case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 
-case class Variation(chr: Byte, start: Int, end: Int, ref: String, alt: String) extends Region {
-  def this(region: Region, ref: String, alt: String) = this(region.chr, region.start, region.end, ref, alt)
+case class Variation(chr: Byte, start: Int, end: Int,
+                     ref: String, alt: String, var info: Option[String] = None) extends Region {
+  def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
+    this(region.chr, region.start, region.end, ref, alt, info)
+  }
   def mutType = Variant.mutType(ref, alt)
-  override def toString = s"$chr:$start-$end[$ref|$alt]"
+  override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
   def ==(that: Variation): Boolean = {
     this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
+  }
+  def addInfo(k: String, v: String): Variation = {
+    info match {
+      case None => this.info = Some(s"$k=$v")
+      case Some(i) => this.info = Some(s"$i;$k=$v")
+    }
+    this
+  }
+}
+
+object Variation {
+  import Region.Chromosome
+  def apply(x: String): Variation = {
+    val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
+    x match {
+      case p(c, s, e, r, a) =>
+        Variation(c.byte, s.toInt, e.toInt, r, a)
+    }
+  }
+  implicit object VariationOrdering extends Ordering[Variation] {
+    def compare(x: Variation, y: Variation): Int = {
+      val c = Region.ord.compare(x, y)
+      if (c == 0) {
+        x.alt compare y.alt
+      } else {
+        c
+      }
+    }
   }
 }
 
@@ -106,17 +137,17 @@ object Region {
     }
   }
   /**
-  implicit object RegionOrdering extends Ordering[Region] {
-    def compare(x: Region, y: Region): Int = {
-      if (x.chr != y.chr) {
-        x.chr compare y.chr
-      } else if (x.start != y.start) {
-        x.start compare y.start
-      } else {
-        x.end compare y.end
-      }
-    }
-  }
+    * implicit object RegionOrdering extends Ordering[Region] {
+    * def compare(x: Region, y: Region): Int = {
+    * if (x.chr != y.chr) {
+    * x.chr compare y.chr
+    * } else if (x.start != y.start) {
+    * x.start compare y.start
+    * } else {
+    * x.end compare y.end
+    * }
+    * }
+    * }
   */
   /**
     * implicit object StartOrdering extends Ordering[Region] {
@@ -127,7 +158,7 @@ object Region {
     * a.start compare b.start
     * }
     * }
-
+    *
     * implicit object MidOrdering extends Ordering[Region] {
     * def compare(a: Region, b: Region): Int = {
     * if (a.chr != b.chr)
@@ -136,7 +167,7 @@ object Region {
     * a.mid compare b.mid
     * }
     * }
-
+    *
     * implicit object EndOrdering extends Ordering[Region] {
     * def compare(a: Region, b: Region): Int = {
     * if (a.chr != b.chr)

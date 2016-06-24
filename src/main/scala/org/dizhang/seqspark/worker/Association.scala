@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.worker
 
 import org.apache.spark.SparkContext
-import org.dizhang.seqspark.assoc.AssocMaster$
+import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.util.InputOutput._
 import java.util.logging
 import org.dizhang.seqspark.util.UserConfig.RootConfig

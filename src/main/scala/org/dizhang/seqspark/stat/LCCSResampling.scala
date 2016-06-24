@@ -15,6 +15,7 @@ import breeze.stats.distributions.ChiSquared
   * and uses resampling method to compute Kurtosis
   *
   */
+@SerialVersionUID(7778570001L)
 class LCCSResampling(val lambda: DV[Double],
                      u: DM[Double],
                      residualsVariance: DV[Double],

@@ -7,7 +7,7 @@ import LinearCombinationChiSquare._
   * Linear Combination of Chi-Square distributions
   *
   */
-@SerialVersionUID(401L)
+@SerialVersionUID(7778520001L)
 trait LinearCombinationChiSquare extends Serializable {
   def lambda: DenseVector[Double]
   def nonCentrality: DenseVector[Double]
@@ -20,7 +20,7 @@ trait LinearCombinationChiSquare extends Serializable {
 }
 
 object LinearCombinationChiSquare {
-  @SerialVersionUID(402L)
+  @SerialVersionUID(7778550101L)
   trait CDF extends Serializable {
     def pvalue: Double
     def ifault: Int

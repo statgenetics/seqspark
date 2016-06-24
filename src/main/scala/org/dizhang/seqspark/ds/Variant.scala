@@ -103,7 +103,7 @@ object Variant {
 
 }
 
-@SerialVersionUID(1L)
+@SerialVersionUID(7737820001L)
 sealed trait Variant[A] extends Serializable {
 
   def size: Int
@@ -208,13 +208,27 @@ sealed trait Variant[A] extends Serializable {
     Region(s"$chr:${pos.toInt - 1}-${pos.toInt + alleles.map(_.length).max - 1}")
   }
 
-  def toVariation: Variation = new Variation(toRegion, ref, alt)
+  def toVariation(withInfo: Boolean = false): Variation =
+    new Variation(toRegion, ref, alt, if (withInfo) Some(info) else None)
 
   def toDummy: DummyVariant[A] = {
     DummyVariant(meta, default)
   }
+
+  def copy: Variant[A] = {
+    this match {
+      case SparseVariant(m, e, d, s) =>
+        SparseVariant(Array[String]() ++ m, Map[Int, A]() ++ e, d, s)
+      case DenseVariant(m, e, d, s) =>
+        DenseVariant(Array[String]() ++ m, IndexedSeq[A]() ++ e, d, s)
+      case _ =>
+        DummyVariant(Array[String]() ++ meta, default)
+    }
+  }
+
 }
 
+@SerialVersionUID(7737820101L)
 case class DummyVariant[A](var meta: Array[String], default: A)
   extends Variant[A] {
   def size = 0
@@ -229,6 +243,7 @@ case class DummyVariant[A](var meta: Array[String], default: A)
  * Dense Variant implementation
  * */
 
+@SerialVersionUID(7737820201L)
 case class DenseVariant[A](var meta: Array[String],
                            elems: IndexedSeq[A],
                            default: A,
@@ -257,6 +272,7 @@ case class DenseVariant[A](var meta: Array[String],
  * Sparse Variant
  * */
 
+@SerialVersionUID(7737820301L)
 case class SparseVariant[A](var meta: Array[String],
                        elems: Map[Int, A],
                        default: A,

@@ -1,8 +1,7 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{*, CSCMatrix, DenseMatrix, DenseVector, inv, sum}
+import breeze.linalg.{*, CSCMatrix, DenseMatrix, DenseVector, SparseVector, inv, sum}
 import breeze.numerics.pow
-import org.dizhang.seqspark.stat.ScoreTest.NullModel
 
 /**
   * score test for regression model
@@ -23,46 +22,73 @@ import org.dizhang.seqspark.stat.ScoreTest.NullModel
 
 object ScoreTest {
 
-  @SerialVersionUID(52L)
-  trait NullModel extends Serializable {
-    def regressionResult: Regression.Result
-    def xs = regressionResult.xs
-    val residuals = regressionResult.responses - regressionResult.estimates
-    val informationInverse = inv(regressionResult.information)
+  object NullModel {
+    def apply(reg: Regression): NullModel = {
+      reg match {
+        case _: LinearRegression =>
+          LinearModel(reg.responses, reg.estimates, reg.xs, reg.information)
+        case _: LogisticRegression =>
+          LogisticModel(reg.responses, reg.estimates, reg.xs, reg.information)
+      }
+    }
   }
-  case class LinearModel(regressionResult: Regression.LinearResult) extends NullModel {
-    val residualsVariance = sum(pow(regressionResult.residuals, 2))/regressionResult.residuals.length
+
+  @SerialVersionUID(7778780101L)
+  trait NullModel extends Regression.Result with Serializable {
+    val residuals = responses - estimates
+    val informationInverse = inv(information)
   }
-  case class LogisticModel(regressionResult: Regression.LogisticResult) extends NullModel {
-    val residualsVariance = regressionResult.estimates.map(p => p * (1.0 - p))
+
+  @SerialVersionUID(7778780201L)
+  case class LinearModel(responses: DenseVector[Double],
+                         estimates: DenseVector[Double],
+                         xs: DenseMatrix[Double],
+                         information: DenseMatrix[Double]) extends NullModel {
+    val residualsVariance = sum(pow(residuals, 2))/residuals.length
+  }
+
+  @SerialVersionUID(7778780301L)
+  case class LogisticModel(responses: DenseVector[Double],
+                           estimates: DenseVector[Double],
+                           xs: DenseMatrix[Double],
+                           information: DenseMatrix[Double]) extends NullModel {
+    val residualsVariance = estimates.map(p => p * (1.0 - p))
     val xsRV = (xs(::, *) :* residualsVariance).t
   }
 
   case object Dummy extends ScoreTest {
     def score = DenseVector(0.0)
-    def variance = DenseMatrix(0.0)
+    def variance = DenseMatrix(1.0)
   }
 
   def apply(nm: NullModel, x: CSCMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(_) => SparseContinuous(nm.asInstanceOf[LinearModel], x)
-      case LogisticModel(_) => SparseDichotomous(nm.asInstanceOf[LogisticModel], x)
+      case lm: LinearModel => SparseContinuous(lm, x)
+      case lm: LogisticModel => SparseDichotomous(lm, x)
       case _ => Dummy
     }
   }
 
   def apply(nm: NullModel, x: DenseMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(_) => DenseContinuous(nm.asInstanceOf[LinearModel], x)
-      case LogisticModel(_) => DenseDichotomous(nm.asInstanceOf[LogisticModel], x)
+      case lm: LinearModel => DenseContinuous(lm, x)
+      case lm: LogisticModel => DenseDichotomous(lm, x)
       case _ => Dummy
     }
   }
 
   def apply(nm: NullModel, x: DenseVector[Double]): ScoreTest = {
     nm match {
-      case LinearModel(_) => DenseContinuous(nm.asInstanceOf[LinearModel], x.toDenseMatrix.t)
-      case LogisticModel(_) => DenseDichotomous(nm.asInstanceOf[LogisticModel], x.toDenseMatrix.t)
+      case lm: LinearModel => DenseContinuous(lm, x.toDenseMatrix.t)
+      case lm: LogisticModel => DenseDichotomous(lm, x.toDenseMatrix.t)
+      case _ => Dummy
+    }
+  }
+
+  def apply(nm: NullModel, x: SparseVector[Double]): ScoreTest = {
+    nm match {
+      case lm: LinearModel => SparseContinuous(lm, SparseVector.horzcat(x))
+      case lm: LogisticModel => SparseDichotomous(lm, SparseVector.horzcat(x))
       case _ => Dummy
     }
   }
@@ -71,8 +97,8 @@ object ScoreTest {
             x1: DenseMatrix[Double],
             x2: CSCMatrix[Double]): ScoreTest = {
     nm match {
-      case LinearModel(_) => MixedContinuous(nm.asInstanceOf[LinearModel], x1, x2)
-      case LogisticModel(_) => MixedDichotomous(nm.asInstanceOf[LogisticModel], x1, x2)
+      case lm: LinearModel => MixedContinuous(lm, x1, x2)
+      case lm: LogisticModel => MixedDichotomous(lm, x1, x2)
       case _ => Dummy
     }
   }
@@ -201,6 +227,7 @@ object ScoreTest {
 
 }
 
+@SerialVersionUID(7778780001L)
 sealed trait ScoreTest extends HypoTest {
   def score: DenseVector[Double]
   def variance: DenseMatrix[Double]

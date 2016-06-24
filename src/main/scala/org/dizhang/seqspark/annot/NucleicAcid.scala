@@ -30,8 +30,10 @@ object NucleicAcid {
     def toChar: Char = baseToChar(base)
   }
 
+  @SerialVersionUID(7726620101L)
   case class DNA(groups: Array[Int], length: Int, na: Set[Int]) extends NucleicAcid
 
+  @SerialVersionUID(7726620201L)
   case class Codon(group: Int) extends NucleicAcid {
     val length = 3
     val na = Set.empty[Int]
@@ -45,6 +47,8 @@ object NucleicAcid {
       codeTable(idx)
     }
   }
+
+  @SerialVersionUID(7726620301L)
   case class mRNA(groups: Array[Int],
                   length: Int,
                   na: Set[Int],
@@ -102,7 +106,7 @@ object NucleicAcid {
   }
 }
 
-@SerialVersionUID(201L)
+@SerialVersionUID(7726620001L)
 sealed trait NucleicAcid
 extends IndexedSeq[Base] with IndexedSeqLike[Base, NucleicAcid] with Serializable {
   val groups: Array[Int]

@@ -36,10 +36,12 @@ object LCCSLiu {
     val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s2.sqrt
     val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
   }
-
+  @SerialVersionUID(7778550101L)
   case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old
+  @SerialVersionUID(7778550201L)
   case class Modified(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with New
 }
+@SerialVersionUID(7778550001L)
 trait LCCSLiu extends LinearCombinationChiSquare {
 
   def ck(k: Int): Double = {

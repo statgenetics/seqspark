@@ -1,16 +1,16 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, Vector => BVec}
+import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, SparseVector}
 import breeze.numerics.{exp, lbeta, pow}
-import org.dizhang.seqspark.ds.{Counter, DenseVariant, DummyVariant, SparseVariant}
+import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
-import org.dizhang.seqspark.util.Constant.UnPhased
 import org.dizhang.seqspark.util.Constant.UnPhased.Bt
 import org.dizhang.seqspark.util.InputOutput.Var
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import Encode._
+import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 
 /**
   * How to code variants, either in one group (gene) or in a region
@@ -127,10 +127,10 @@ object Encode {
   }
 
   trait Coding
-  case class Rare(coding: CSCMatrix[Double], vars: Array[DummyVariant[Byte]]) extends Coding
-  case class Common(coding: DenseMatrix[Double], vars: Array[DummyVariant[Byte]]) extends Coding
-  case class Fixed(coding: DenseVector[Double]) extends Coding
-  case class VT(coding: DenseMatrix[Double]) extends Coding
+  case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
+  case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding
+  case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding
+  case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
 
   sealed trait Raw extends Encode {
     def isDefined = maf.exists(_ > 0.0)
@@ -142,32 +142,23 @@ object Encode {
     override def getRare(cutoff: Double) = None
     def weight(cutoff: Double) = DenseVector(1.0)
     def isDefined = maf.exists(_ >= fixedCutoff)
-    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      val tmp = vars.zip(maf).filter(p => p._2 >= cutoff)
-      if (! this.isDefined)
-        None
-      else {
-        val res = tmp.reduce((a, b) => a)
-        Some(Fixed(DenseVector(res._1.map{
-          case UnPhased.Bt.ref => 0.0
-          case UnPhased.Bt.het1 => 1.0
-          case UnPhased.Bt.het2 => 1.0
-          case UnPhased.Bt.mut => 2.0
-          case _ => 2.0 * res._2
-        }.toArray)))
-      }
-    }
+    def getFixed(cutoff: Double = fixedCutoff) = None
   }
 
   sealed trait CMC extends Encode {
     def weight(cutoff: Double) = DenseVector[Double]()
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      if (! this.isDefined)
-        None
-      else
-        Some(Fixed(vars.zip(maf).filter(v => v._2 < cutoff).map(v =>
-          v._1.toCounter(cmcMakeNaAdjust(_, v._2), 0.0)
-        ).reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)))
+      definedIndices(_ < cutoff).map{idx =>
+        val sv = idx.map{i =>
+          vars(i).toCounter(cmcMakeNaAdjust(_, maf(i)), 0.0)
+        }.reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toSparseVector(x => x)
+        val variations = idx.map{ i =>
+          val mc = mafCount(i)
+          val res = vars(i).toVariation()
+          res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
+        }
+        Fixed(sv, variations)
+      }
     }
     def isDefined = maf.exists(_ < fixedCutoff)
   }
@@ -176,25 +167,37 @@ object Encode {
     def isDefined = maf.exists(_ < fixedCutoff)
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      this.getRare(cutoff).map(r => Fixed(r.coding * weight(cutoff)))}
-
+      val w = weight(cutoff)
+      definedIndices(_ < cutoff).map{idx =>
+        val sv = idx.filter(maf(_) < cutoff).map { i =>
+          vars(i).toCounter(brvMakeNaAdjust(_, maf(i)) * w(i), 0.0)
+        }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toSparseVector(x => x)
+        val variations = idx.map{ i =>
+          val mc = mafCount(i)
+          val res = vars(i).toVariation()
+          res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
+        }
+        Fixed(sv, variations)
+      }
+    }
   }
 
   sealed trait PooledOrAnnotationMaf extends Encode {
+    lazy val mafCount = vars.map(v => v.toCounter(makeMaf, (0, 2)).reduce)
+
     lazy val maf = {
       config.mafSource match {
         case MafSource.annotation =>
           vars.map(v => v.parseInfo(Constant.Variant.InfoKey.maf).toDouble)
-        case MafSource.pooled =>
-          vars.map (v => getMaf (v.toCounter (makeMaf, (0, 2) ).reduce) )
-        case _ => vars.map (v => getMaf(v.toCounter(makeMaf, (0, 2)).reduce))
+        case _ => mafCount.map(getMaf(_))
       }
     }
   }
 
   sealed trait ControlsMaf extends Encode {
     def controls: Array[Boolean]
-    lazy val maf = vars.map(v => getMaf(v.select(controls).toCounter(makeMaf, (0, 2)).reduce))
+    lazy val mafCount = vars.map(v => v.select(controls).toCounter(makeMaf, (0, 2)).reduce)
+    lazy val maf = mafCount.map(getMaf(_))
   }
 
   sealed trait SimpleWeight extends BRV {
@@ -278,8 +281,10 @@ object Encode {
 
 }
 
-sealed trait Encode {
+@SerialVersionUID(7727390001L)
+sealed trait Encode extends Serializable {
   def vars: Array[Var]
+  def mafCount: Array[(Int, Int)]
   def maf: Array[Double]
   def sampleSize: Int = if (vars.isEmpty) 0 else vars.head.length
   def config: MethodConfig
@@ -301,13 +306,20 @@ sealed trait Encode {
           a ++ b))
   }
   def weight(cutoff: Double = fixedCutoff): DenseVector[Double]
-  def getFixed(cutoff: Double = fixedCutoff): Option[Fixed]
+  def getFixed(cutoff: Double = fixedCutoff): Option[Encode.Fixed]
 
-  def getVT: Option[VT] = {
-    thresholds.map(th => VT(DenseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)))
+  def getVT: Option[Encode.VT] = {
+    thresholds.map{th =>
+      val cm = SparseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)
+      val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => getMaf(p._2) <= th.max).map{
+        case (v, mc) =>
+          v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
+      }
+      Encode.VT(cm, variations)
+    }
   }
 
-  def getCoding: Option[Coding] = {
+  def getCoding: Option[Encode.Coding] = {
     if (config.mafFixed)
       this.getFixed()
     else
@@ -321,18 +333,33 @@ sealed trait Encode {
       val res = DenseVector.horzcat(vars.zip(maf).filter(v => v._2 >= cutoff).map {
         case (v, m) => DenseVector(v.toArray.map(brvMakeNaAdjust(_, m)): _*)
       }: _*)
-      val info = vars.zip(maf).filter(v => v._2 >= cutoff).map(_._1.toDummy)
+      val info = vars.zip(mafCount).filter(v => getMaf(v._2) >= cutoff).map{
+        case (v, m) =>
+          v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
+      }
       Some(Common(res, info))
     }
   }
-  def getRare(cutoff: Double = fixedCutoff): Option[Rare] = {
+  def definedIndices(p: Double => Boolean): Option[Array[Int]] = {
+    val definedMaf = maf.zipWithIndex.filter(x => p(x._1))
+    if (definedMaf.isEmpty) {
+      None
+    } else {
+      Some(definedMaf.map(_._2))
+    }
+  }
+
+  def getRare(cutoff: Double = fixedCutoff): Option[Encode.Rare] = {
     if (maf.forall(_ >= cutoff)) {
       val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(_ < cutoff))
       val cnt = vars.zip(maf).filter(v => v._2 < cutoff).map{ v =>
         v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toMap}
       cnt.zipWithIndex.foreach{ case (elems, col) =>
           elems.foreach{case (row, v) => builder.add(row, col, v)}}
-      val info = vars.zip(maf).filter(v => v._2 >= cutoff).map(_._1.toDummy)
+      val info = vars.zip(mafCount).filter(v => getMaf(v._2) >= cutoff).map{
+        case (v, m) =>
+          v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
+      }
       Some(Rare(builder.result, info))
     } else {
       None

@@ -38,6 +38,7 @@ object NonCentralChiSquare {
     f1 / x
   }
 
+  @SerialVersionUID(7778620101L)
   case class NCCSDing(degrees: Double,
                       nonCentrality: Double) extends NonCentralChiSquare {
     def cdf(cutoff: Double): Double = {
@@ -95,7 +96,7 @@ object NonCentralChiSquare {
       sum
     }
   }
-
+  @SerialVersionUID(7778620201L)
   case class NCCSBentonKrishnamoorthy(degrees: Double,
                                       nonCentrality: Double) extends NonCentralChiSquare {
     def cdfq(cutoff: Double): Double = {
@@ -276,7 +277,7 @@ object NonCentralChiSquare {
       sum
     }
   }
-
+  @SerialVersionUID(7778620301L)
   case class CCS(degrees: Double) extends NonCentralChiSquare {
     def nonCentrality = 0.0
     private lazy val ccs = new ChiSquared(degrees)
@@ -298,7 +299,7 @@ object NonCentralChiSquare {
 
 }
 
-@SerialVersionUID(403L)
+@SerialVersionUID(7778620001L)
 trait NonCentralChiSquare extends Serializable {
   def degrees: Double
   def nonCentrality: Double

@@ -118,8 +118,9 @@ extends IndexedSeq[Base] with IndexedSeqLike[Base, NucleicAcid] with Serializabl
     else
       baseFromInt(groups(i/N) >> (i % N * S) & M)
   }
-  override protected[this] def newBuilder: mutable.Builder[Base, NucleicAcid] =
+  override protected[this] def newBuilder: mutable.Builder[Base, NucleicAcid] = {
     NucleicAcid.newBuilder
+  }
   override def foreach[B](f: Base => B): Unit = {
     var i = 0
     var b = 0

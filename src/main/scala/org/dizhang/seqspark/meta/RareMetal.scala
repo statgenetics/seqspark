@@ -20,7 +20,7 @@ trait RareMetal {
   def sum: RMW.Result
 
   def annotate(refGene: RefGene): Map[String, Array[(String, Variation)]] = {
-    sum.vars.map{ v =>
+    sum.vars.flatMap{ v =>
       IntervalTree.lookup(refGene.loci, v)
         .map(l => (l.geneName, l.annotate(v, refGene.seq(l.mRNAName))))
         .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
@@ -29,7 +29,7 @@ trait RareMetal {
         newV.addInfo(IK.gene, x._1)
         newV.addInfo(IK.func, x._2.toString)
         (x._1, newV)}
-    }.flatMap(x => x).groupBy(x => x._1)
+    }.groupBy(x => x._1)
   }
 
   def getSingle: Array[(Variation, Double)] = {

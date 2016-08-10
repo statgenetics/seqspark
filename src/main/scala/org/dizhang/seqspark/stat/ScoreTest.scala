@@ -2,7 +2,7 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg.{*, CSCMatrix, DenseMatrix, DenseVector, SparseVector, inv, sum}
 import breeze.numerics.pow
-
+import org.dizhang.seqspark.util.General._
 /**
   * score test for regression model
   *
@@ -114,7 +114,6 @@ object ScoreTest {
     }
   }
 
-
   final case class SparseContinuous(nullModel: LinearModel,
                                     x: CSCMatrix[Double]) extends ScoreTest {
     val score = (nullModel.residuals.toDenseMatrix * x).toDenseVector / nullModel.residualsVariance
@@ -183,7 +182,7 @@ object ScoreTest {
     val score = (nullModel.residuals.toDenseMatrix * x).toDenseVector
     lazy val variance = {
       val IccInv = nullModel.informationInverse
-      val Igg = (x.t * x).toDense
+      val Igg = (colMultiply(x, nullModel.residualsVariance).t * x).toDense
       val Icg = nullModel.xsRV * x
       val Igc = Icg.t
       Igg - Igc * IccInv * Icg
@@ -195,7 +194,7 @@ object ScoreTest {
     val score = x.t * nullModel.residuals
     lazy val variance = {
       val IccInv = nullModel.informationInverse
-      val Igg = x.t * x
+      val Igg = (x(::, *) :* nullModel.residualsVariance).t * x
       val Icg = nullModel.xsRV * x
       val Igc = Icg.t
       Igg - Igc * IccInv * Icg
@@ -213,7 +212,7 @@ object ScoreTest {
       val v4 = sparse.variance
       val v2 = {
         val IccInv = nullModel.informationInverse
-        val Igg = x1.t * x2
+        val Igg = (x1(::, *) :* nullModel.residualsVariance).t * x2
         val Icg = nullModel.xsRV * x2
         val Igc = x1.t * nullModel.xsRV.t
         Igg - Igc * IccInv * Icg

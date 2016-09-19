@@ -7,12 +7,12 @@ import org.dizhang.seqspark.ds.{Phenotype, StringGenotype, VCF, Variant}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 
 /**
  * import data from VCF file or cache
  */
-object Import extends Worker[Unit, Data] {
+object Import extends WorkerObsolete[Unit, Data] {
 
   implicit val name = new WorkerName("import")
 

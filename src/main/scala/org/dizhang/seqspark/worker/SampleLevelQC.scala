@@ -10,15 +10,15 @@ import org.dizhang.seqspark.util.Constant
 import Constant._
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.{GenomeBuild, RootConfig}
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 import sys.process._
 
 /**
  * Sample level QC
  */
-object SampleLevelQC extends Worker[Data, Data] {
+object SampleLevelQC extends WorkerObsolete[Data, Data] {
 
-  implicit val name = new WorkerName("sample")
+  implicit val name = WorkerName("sample")
 
   def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
 

@@ -131,7 +131,6 @@ object UserConfig {
         case x => Right(Regions(x.split(",").map(Region(_)).toIterator))
       }
     }
-
   }
 
   case class GenotypeLevelQCConfig(config: Config) extends UserConfig {

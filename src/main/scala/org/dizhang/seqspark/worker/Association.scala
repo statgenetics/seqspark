@@ -5,13 +5,13 @@ import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.util.InputOutput._
 import java.util.logging
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 
 /**
  * Association testing
  */
 
-object Association extends Worker[Data, Data] {
+object Association extends WorkerObsolete[Data, Data] {
 
   implicit val name = new WorkerName("association")
 

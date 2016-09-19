@@ -126,6 +126,53 @@ object Constant {
     def toPhased = toUnPhased.replace('/', '|')
   }
 
+  object Genotype {
+    object Raw {
+      val diploidPhasedMis = ".|."
+      val diploidPhasedRef = "0|0"
+      val diploidPhasedHet1 = "0|1"
+      val diploidPhasedHet2 = "1|0"
+      val diploidPhasedMut = "1|1"
+      val diploidUnPhasedMis = "./."
+      val diploidUnPhasedRef = "0/0"
+      val diploidUnPhasedHet1 = "0/1"
+      val diploidUnPhasedHet2 = "1/0"
+      val diploidUnPhasedMut = "1/1"
+      val monoploidMis = "."
+      val monoploidRef = "0"
+      val monoploidMut = "1"
+    }
+
+    object Imputed {
+      val mis = (0.0, 0.0, 0.0)
+      val ref = (1.0, 0.0, 0.0)
+    }
+    def rawToSimple(g: String): Byte = {
+      """
+        |the simple genotype system uses 5 bits to represent a genotype
+        |b00010000: is diploid
+        |b00001000: is phased, notice that there is no 8, but 24
+        |b00000100: is missing
+        |00-11 represent the four possible genotypes
+      """.stripMargin
+      val diploidPhased = if (g.contains('|')) {
+        24 //b00011000
+      } else if (g.contains('/')) {
+        16 //b00010000
+      } else {
+        0
+      }
+      val gt = try {
+        g.split("[/|]").map(_.toInt).sum //0-3 for normal genotype
+      } catch {
+        case e: Exception => 4 //b00000100 for missing
+      }
+
+      (diploidPhased | gt).toByte
+
+    }
+  }
+
   object UnPhased {
     object Bt {
       val mis: Byte = -9

@@ -7,7 +7,7 @@ import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.InputOutput._
-import org.dizhang.seqspark.worker.Worker._
+import org.dizhang.seqspark.worker.WorkerObsolete._
 
 import sys.process._
 
@@ -15,7 +15,7 @@ import sys.process._
  * Annotation pipeline
  */
 
-object Annotation extends Worker[Data, Data] {
+object Annotation extends WorkerObsolete[Data, Data] {
 
   implicit val name = new WorkerName("annotation")
 

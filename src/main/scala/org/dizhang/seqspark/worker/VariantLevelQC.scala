@@ -8,15 +8,15 @@ import org.dizhang.seqspark.ds.{Variant, ByteGenotype, VCF}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 
 /**
  * Variant level QC
  */
 
-object VariantLevelQC extends Worker[Data, Data] {
+object VariantLevelQC extends WorkerObsolete[Data, Data] {
 
-  implicit val name = new WorkerName("variant")
+  implicit val name = WorkerName("variant")
 
   def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
     val (geno, pheno) = data

@@ -5,13 +5,15 @@ import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Phenotype, VCF, Variant}
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.{LoggerFactory, Logger}
-
+import scalaz._
 /**
  * Pipeline worker
  */
-object Worker {
+
+object WorkerObsolete {
   //type RawVar = Variant[String]
   //type Var = Variant[Byte]
   //type RawVCF = RDD[RawVar]
@@ -19,7 +21,10 @@ object Worker {
   type AnnoVCF = RDD[(String, (Constant.Annotation.Feature.Feature, Var))]
   type Data = (VCF, Phenotype)
 
-  val slaves = Map[String, Worker[Data, Data]](
+  type Work[A] = Reader[SeqContext, (Phenotype, RDD[Variant[A]])]
+
+
+  val slaves = Map[String, WorkerObsolete[Data, Data]](
     "genotype" -> GenotypeLevelQC,
     "sample" -> SampleLevelQC,
     "variant" -> VariantLevelQC,
@@ -27,6 +32,7 @@ object Worker {
     "annotation" -> Annotation,
     "association" -> Association
   )
+
 
   def recurSlaves(input: Data, sl: List[String])(implicit cnf: RootConfig, sc: SparkContext): Data = {
     if (sl.isEmpty)
@@ -37,7 +43,7 @@ object Worker {
 }
 
 /** An abstract class that only contains a run method */
-trait Worker[A, B] {
+trait WorkerObsolete[A, B] {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
   val name: WorkerName
   def apply(input: A)(implicit cnf: RootConfig, sc: SparkContext): B

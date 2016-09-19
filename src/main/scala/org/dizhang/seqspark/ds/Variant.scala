@@ -24,10 +24,24 @@ object Variant {
       SparseVariant(meta, Map.empty[Int, A], default, size)
     }
   }
+  def fromImpute2(line: String, default: (Double, Double, Double)): Variant[(Double, Double, Double)] = {
+    val s = line.split("\\s")
+    val meta = Array(s(0), s(2), s(1), s(3), s(4), ".", ".", ".")
+    val geno = s.slice(5, s.length).map(_.toDouble)
+    val iseq = for (i <- 0 until geno.length/3)
+      yield (geno(i), geno(i+1), geno(i+2))
+    fromIndexedSeq(meta, iseq, default)
+  }
 
-  def fromString(line: String, default: String): Variant[String] = {
+  def fromString(line: String, default: String, noSample: Boolean = false): Variant[String] = {
     val s = line.split("\t")
-    fromIndexedSeq(s.slice(0, 9), s.slice(9, s.length), default)
+    if (s.length == 8) {
+      fill(s, 0)(default)
+    } else if (noSample) {
+      fill(s.slice(0,9), 0)(default)
+    } else {
+      fromIndexedSeq(s.slice(0, 9), s.slice(9, s.length), default)
+    }
   }
 
   def fromIndexedSeq[A](meta: Array[String], iseq: IndexedSeq[A], default: A): Variant[A] = {
@@ -119,7 +133,7 @@ sealed trait Variant[A] extends Serializable {
   def qual: String = meta(5)
   def filter: String = meta(6)
   def info: String = meta(7)
-  def format: String = meta(8)
+  def format: String = if (meta.length == 9) meta(8) else ""
 
   def alleles: Array[String] = Array(ref) ++ alt.split(",")
 

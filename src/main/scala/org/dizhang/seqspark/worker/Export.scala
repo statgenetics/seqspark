@@ -5,13 +5,13 @@ import org.dizhang.seqspark.annot.{RefGene, Regions}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 
 /**
  * Export genotype data
  */
 
-object Export extends Worker[Data, Unit] {
+object Export extends WorkerObsolete[Data, Unit] {
 
   implicit val name = new WorkerName("export")
   type Buffer = Array[Byte]

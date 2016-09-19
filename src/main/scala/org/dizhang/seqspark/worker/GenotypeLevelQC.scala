@@ -10,17 +10,17 @@ import org.dizhang.seqspark.ds.{Variant, ByteGenotype, Counter}
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.{GenotypeLevelQCConfig, RootConfig}
-import org.dizhang.seqspark.worker.Worker.Data
+import org.dizhang.seqspark.worker.WorkerObsolete.Data
 import sys.process._
 
 /**
  * Genotype level QC
  */
 
-object GenotypeLevelQC extends Worker[Data, Data] {
+object GenotypeLevelQC extends WorkerObsolete[Data, Data] {
 
   import UnPhased._
-  implicit val name = new WorkerName("genotypeLevelQC")
+  implicit val name = WorkerName("genotypeLevelQC")
 
   def apply(data: Data)(implicit cnf: RootConfig, sc: SparkContext): Data = {
 

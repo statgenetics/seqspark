@@ -73,7 +73,7 @@ object SingleStudy {
 
     val current = Import({})
 
-    val last = Worker.recurSlaves(current, pipeline)
+    val last = WorkerObsolete.recurSlaves(current, pipeline)
 
     Export(last)
     //PropertyConfigurator.configure("log4j.properties")

@@ -5,6 +5,7 @@ import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.stat.ScoreTest
 import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.util.Constant
+import RareMetalWorker._
 /**
   * raremetal worker
   * generate the summary statistics
@@ -22,19 +23,22 @@ sealed trait RareMetalWorker extends AssocMethod {
   def nullModel: ScoreTest.NullModel
   def sampleSize: Int = nullModel.responses.length
   def x: Encode
-  def common: Encode.Common
-  def rare: Encode.Rare
+  def common: Option[Encode.Common]
+  def rare: Option[Encode.Rare]
   def model: ScoreTest
   def score: DV[Double]
   def variance: DM[Double]
   def result: RareMetalWorker.Result = {
     nullModel match {
       case nm: ScoreTest.LinearModel =>
-        RareMetalWorker.ContinuousResult(Array(sampleSize), common.vars ++ rare.vars, score, variance)
+        RareMetalWorker.DefaultResult(binary = false, Array(sampleSize),
+          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
       case nm: ScoreTest.LogisticModel =>
-        RareMetalWorker.DichotomousResult(Array(sampleSize), common.vars ++ rare.vars, score, variance)
+        RareMetalWorker.DefaultResult(binary = true, Array(sampleSize),
+          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
       case _ =>
-        RareMetalWorker.ContinuousResult(Array(sampleSize), common.vars ++ rare.vars, score, variance)
+        RareMetalWorker.DefaultResult(binary = false, Array(sampleSize),
+          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
     }
   }
 }
@@ -64,6 +68,7 @@ object RareMetalWorker {
     def segmentId: Int = {
       segment.chr.toInt * SegmentSize + segment.start/SegmentSize
     }
+    def binary: Boolean
     def sampleSizes: Array[Int]
     def vars: Array[Variation]
     def score: DV[Double]
@@ -79,9 +84,9 @@ object RareMetalWorker {
       val s2 = rearrange(index2, that.score)
       val v1 = rearrange(index1, this.variance)
       val v2 = rearrange(index2, that.variance)
-      this match {
-        case r: ContinuousResult => ContinuousResult(sizes, allVars, s1 + s2, v1 + v2)
-        case r: DichotomousResult => DichotomousResult(sizes, allVars, s1 + s2, v1 + v2)
+      this.binary match {
+        case false => DefaultResult(binary = false, sizes, allVars, s1 + s2, v1 + v2)
+        case true => DefaultResult(binary = true, sizes, allVars, s1 + s2, v1 + v2)
       }
     }
 
@@ -104,39 +109,43 @@ object RareMetalWorker {
         val v12 = v(0 until n1, n1 until v.cols)
         val v21 = v(n1 until v.rows, 0 until n1)
         val v22 = v(n1 until v.rows, n1 until v.cols)
-        this match {
-          case r: ContinuousResult =>
+        this.binary match {
+          case false =>
             val numSample = getMaf(vars.head)._2
             val aa = 1.0 - u1.t * v11Inv * u1 / numSample
             val newScore = (u2 - v21 * v11Inv * u1)/aa
             val newVariance = (v22 - v21 * v11Inv * v12)/aa
-            ContinuousResult(this.sampleSizes, newVars, newScore, newVariance)
-          case r: DichotomousResult =>
+            DefaultResult(binary = false, this.sampleSizes, newVars, newScore, newVariance)
+          case true =>
             val newScore = u2 - v21 * v11Inv * u1
             val newVariance = v22 - v21 * v11Inv * v12
-            DichotomousResult(this.sampleSizes, newVars, newScore, newVariance)
-          case _ =>
-            this
+            DefaultResult(binary = true, this.sampleSizes, newVars, newScore, newVariance)
         }
       }
     }
   }
 
-  case class ContinuousResult(sampleSizes: Array[Int],
-                              vars: Array[Variation],
-                              score: DV[Double],
-                              variance: DM[Double]) extends Result
+  case class DefaultResult(binary: Boolean,
+                           sampleSizes: Array[Int],
+                           vars: Array[Variation],
+                           score: DV[Double],
+                           variance: DM[Double]) extends Result
 
-  case class DichotomousResult(sampleSizes: Array[Int],
-                               vars: Array[Variation],
-                               score: DV[Double],
-                               variance: DM[Double]) extends Result
 
   def getMaf(v: Variation): (Int, Int) = {
     val regex = s"${IK.maf}=(\\d+),(\\d+)".r
     v.info.get match {
       case regex(ac, an) => (ac.toInt, an.toInt)
       case _ => (0, 0)
+    }
+  }
+
+  def commonAndRare(v1: Option[Array[Variation]], v2: Option[Array[Variation]]): Array[Variation] = {
+    (v1, v2) match {
+      case (None, None) => Array[Variation]()
+      case (Some(x), None) => x
+      case (None, Some(y)) => y
+      case (Some(x), Some(y)) => x ++ y
     }
   }
 

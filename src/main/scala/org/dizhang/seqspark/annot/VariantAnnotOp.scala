@@ -1,10 +1,9 @@
 package org.dizhang.seqspark.annot
 import org.apache.spark.broadcast.Broadcast
-import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene, dbNSFP}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant
 import VariantAnnotOp._
-
+import scala.language.implicitConversions
 /**
   * Created by zhangdi on 8/16/16.
   */

@@ -219,7 +219,6 @@ object SKATO {
     }
   }
 
-
   case class SmallSampleAdjust(nullModel: LogisticModel,
                                x: Encode,
                                resampled: DM[Double]) extends LiuPValue {
@@ -232,7 +231,7 @@ object SKATO {
     val pValues = {
       rhos.indices.map{i =>
         val simQs = simScores(*, ::).map(s => s.t * kernels(i) * s)
-        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.variance, simQs).cdf(qScores(i))
+        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.variance, simQs).cdf(qScores(i)).pvalue
       }.toArray
     }
 

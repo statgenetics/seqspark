@@ -9,6 +9,7 @@ import org.dizhang.seqspark.util.{Constant, SingleStudyContext}
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.geno.Genotype
 import AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.worker.Data
@@ -134,7 +135,7 @@ object AssocMaster {
     lazy val snm = sc.broadcast(SKATO.NullModel(reg))
     config.`type` match {
       case MethodType.skat =>
-        encode.map(p => (p._1, SKAT(nm.value, p._2).result))
+        encode.map(p => (p._1, SKAT(nm.value, p._2, 0.0).result))
       case MethodType.skato =>
         encode.map(p => (p._1, SKATO(snm.value, p._2).result))
       case _ =>
@@ -157,6 +158,9 @@ object AssocMaster {
 
 
   case class SimpleMaster(genotype: Data[Byte], ssc: SingleStudyContext) extends AssocMaster[Byte] {
+
+    def geno: Genotype[Byte] = Genotype.Simple
+
     def samples(input: Data[Byte], indicator: Array[Boolean]) = {
       input.samples(indicator)(ssc.sparkContext)
     }
@@ -166,6 +170,9 @@ object AssocMaster {
   }
 
   case class ImputedMaster(genotype: Data[Imputed], ssc: SingleStudyContext) extends AssocMaster[Imputed] {
+
+    def geno: Genotype[Imputed] = Genotype.Imputed
+
     def samples(input: Data[Imputed], indicator: Array[Boolean]) = {
       input.samples(indicator)(ssc.sparkContext)
     }
@@ -178,6 +185,7 @@ object AssocMaster {
 }
 
 trait AssocMaster[A]{
+  def geno: Genotype[A]
   def genotype: Data[A]
   def ssc: SingleStudyContext
   def samples(input: Data[A], indicator: Array[Boolean]): Data[A]
@@ -208,19 +216,26 @@ trait AssocMaster[A]{
           val indicator = sc.broadcast(phenotype.indicate(traitName))
           val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
             .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-          val currentGenotype = samples(genotype, indicator.value)
+          val currentGenotype = samples(genotype, indicator.value).cache()
           val traitConfig = assocConf.`trait`(traitName)
-          val currentCov = sc.broadcast(
+          val forPCA = variantsFilter(currentGenotype, List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))
+          val pc = if (traitConfig.pc == 0) {
+            None
+          } else {
+            Some(new PCA(forPCA)(geno).pc(traitConfig.pc))
+          }
+          val cov =
             if (traitConfig.covariates.nonEmpty) {
               phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
                 case Left(msg) =>
-                  logger.error(s"failed getting covariates for $traitName, use None")
+                  logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
                   None
                 case Right(dm) => Some(dm)
               }
             } else
-              None)
-          methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m))
+              None
+          val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
+          methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
       }
     } catch {
       case e: Exception => logger.warn(e.getStackTrace.toString)

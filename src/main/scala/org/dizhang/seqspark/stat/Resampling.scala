@@ -2,13 +2,9 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseMatrix, DenseVector, shuffle}
 import breeze.stats.distributions.Bernoulli
-import org.apache.spark.ml.regression.LinearRegression
 import org.dizhang.seqspark.assoc.Encode
-import org.dizhang.seqspark.assoc.Encode.Coding
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
-import org.dizhang.seqspark.util.InputOutput.Var
-import org.dizhang.seqspark.util.UserConfig.MethodConfig
 
 /**
   * resampling class
@@ -51,10 +47,10 @@ object Resampling {
     /** re-compute the statistic for the new null model and newX */
     def makeNewStatistic(newNullModel: NullModel, newX: Encode): Double = {
       newX.getCoding.get match {
-        case Encode.Fixed(c) =>
+        case Encode.Fixed(c, _) =>
           val st = ScoreTest(newNullModel, c)
           transformer(st)
-        case Encode.VT(c) =>
+        case Encode.VT(c, _) =>
           val st = ScoreTest(newNullModel, c)
           transformer(st)
         case _ => refStatistic
@@ -89,11 +85,11 @@ sealed trait Resampling extends HypoTest {
     nullModel match {
       case LinearModel(y, e, c, i) =>
         val newY = e + shuffle(nullModel.residuals)
-        val reg = new LinearRegression(newY, c(::, 1 until c.cols))
+        val reg = LinearRegression(newY, c(::, 1 until c.cols))
         LinearModel(newY, reg.estimates, c, i)
       case LogisticModel(y, e, c, i) =>
         val newY = e.map(p => if (new Bernoulli(p).draw()) 1.0 else 0.0)
-        val reg = new LogisticRegression(newY, c(::, 1 until c.cols))
+        val reg = LogisticRegression(newY, c(::, 1 until c.cols))
         LogisticModel(newY, reg.estimates, c, reg.information)
       case _ => nullModel
     }

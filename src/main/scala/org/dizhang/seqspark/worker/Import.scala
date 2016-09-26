@@ -37,7 +37,7 @@ object Import {
       s2
     } else {
       imConf.samples match {
-        case Left(UC.Samples.all) => s2
+        case Left(_) => s2
         case Right(s) =>
           val samples = pheno.indicate(s)
           s2.samples(samples)(sc)

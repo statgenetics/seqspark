@@ -61,7 +61,7 @@ package object annot {
     val build = dbConf.getString("build")
     val coordFile = dbConf.getString("coordFile")
     val seqFile = dbConf.getString("seqFile")
-    val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile))
+    val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
     input.map(v => v.annotateByVariant(refSeq))
   }
 

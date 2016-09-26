@@ -45,7 +45,6 @@ object GeneralizedVCF {
   */
 
 
-
   implicit def toRawVCF(vars: RDD[Variant[String]]): RawVCF = {
     RawVCF(vars)
   }

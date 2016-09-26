@@ -24,7 +24,7 @@ object Encode {
   type Imputed = (Double, Double, Double)
   type Var = Variant[_]
 
-  def makeMaf(x: _): (Double, Double) = {
+  def makeMaf(x: Any): (Double, Double) = {
     x match {
       case g: Byte => g.maf
       case g: Imputed => g.maf
@@ -32,7 +32,7 @@ object Encode {
     }
   }
 
-  def cmcMakeNaAdjust(x: _, maf: Double): Double = {
+  def cmcMakeNaAdjust(x: Any, maf: Double): Double = {
     x match {
       case g: Byte => g.toCMC(maf)
       case g: Imputed => g.toCMC(maf)
@@ -55,7 +55,7 @@ object Encode {
       else
         1.0 - (1.0 - a) * (1.0 - b)}
 
-  def brvMakeNaAdjust(x: _, maf: Double): Double = {
+  def brvMakeNaAdjust(x: Any, maf: Double): Double = {
     x match {
       case g: Byte => g.toBRV(maf)
       case g: Imputed => g.toBRV(maf)
@@ -76,8 +76,6 @@ object Encode {
     else
       0.1 + 0.9 * (n - 2000) / 98000
   }
-
-
 
   def apply(vars: Iterable[Var],
             controls: Option[Array[Boolean]] = None,
@@ -102,7 +100,7 @@ object Encode {
   def apply(varsIter: Iterable[Var], config: MethodConfig): Encode = {
     val vars = varsIter.toArray
     config.`type` match {
-      case MethodType.single => DefaultSingle(vars, config)
+      case MethodType.snv => DefaultSingle(vars, config)
       case MethodType.cmc => DefaultCMC(vars, config)
       case MethodType.brv => SimpleBRV(vars, config)
       case MethodType.skat => SimpleBRV(vars, config)
@@ -114,7 +112,7 @@ object Encode {
   def apply(varsIter: Iterable[Var], controls: Array[Boolean], config: MethodConfig): Encode = {
     val vars = varsIter.toArray
     config.`type` match {
-      case MethodType.single => ControlsMafSingle(vars, controls, config)
+      case MethodType.snv => ControlsMafSingle(vars, controls, config)
       case MethodType.cmc => ControlsMafCMC(vars, controls, config)
       case MethodType.brv => ControlsMafSimpleBRV(vars, controls, config)
       case MethodType.skat => ControlsMafSimpleBRV(vars, controls, config)
@@ -149,6 +147,7 @@ object Encode {
     def isDefined = maf.exists(_ > 0.0)
     def getFixed(cutoff: Double = fixedCutoff) = None
     override def getCoding = None
+    def weight(cutoff: Double = fixedCutoff) = DenseVector.fill(1)(0.0)
   }
 
   sealed trait Single extends Encode {
@@ -223,7 +222,8 @@ object Encode {
         case WeightMethod.wss =>
           pow(mafDV :* mafDV.map(1.0 - _), -0.5)
         case WeightMethod.skat =>
-          mafDV.map(m => 1.0/exp(lbeta(1, 25)) * pow(1 - m, 24.0))
+          val beta = lbeta(1.0, 25.0)
+          mafDV.map(m => 1.0/exp(beta) * pow(1 - m, 24.0))
         case _ => DenseVector.fill[Double](mafDV.length)(1.0)
       }
     }
@@ -252,11 +252,11 @@ object Encode {
   }
 
   case class DefaultRaw(vars: Array[Var],
-                        config: MethodConfig) extends Encode with Raw with PooledOrAnnotationMaf with SimpleWeight
+                        config: MethodConfig) extends Encode with Raw with PooledOrAnnotationMaf
 
   case class ControlsMafRaw(vars: Array[Var],
                             controls: Array[Boolean],
-                            config: MethodConfig) extends Encode with Raw with ControlsMaf with SimpleWeight
+                            config: MethodConfig) extends Encode with Raw with ControlsMaf
 
   case class DefaultSingle(vars: Array[Var],
                            config: MethodConfig) extends Encode with Single with PooledOrAnnotationMaf

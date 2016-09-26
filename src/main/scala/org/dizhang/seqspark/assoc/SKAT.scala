@@ -18,7 +18,7 @@ object SKAT {
 
   def apply(nullModel: NullModel,
             x: Encode,
-            rho: Double = 0.0): SKAT = {
+            rho: Double): SKAT = {
     val method = x.config.misc.getString("method")
     method match {
       case "liu.mod" => LiuModified(nullModel, x, rho)
@@ -30,7 +30,7 @@ object SKAT {
   def apply(nullModel: LogisticModel,
             x: Encode,
             resampled: DM[Double],
-            rho: Double = 0.0): SKAT = {
+            rho: Double): SKAT = {
     SmallSampleAdjust(nullModel, x, resampled, rho)
   }
 

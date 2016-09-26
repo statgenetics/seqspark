@@ -114,7 +114,7 @@ trait Phenotype {
           winsorize(raw, limit)
       }
       if (res.forall(_.isDefined)) {
-        Right(DM.horzcat(res.map(x => DV(x.get)): _*))
+        Right(DV.horzcat(res.map(x => DV(x.get)): _*))
       } else {
         val msg = cov.zip(res).filter(p => p._2.isEmpty).map(p => s"invalid value in covariate ${p._1}")
         Left(msg.mkString(";"))

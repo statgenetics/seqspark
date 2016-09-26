@@ -11,7 +11,6 @@ import org.dizhang.seqspark.util.UserConfig.{MetaConfig, RootConfig}
 sealed trait SeqContext {
   def userConfig: UserConfig
   def sparkContext: SparkContext
-  def phenotype: Phenotype
 }
 
 case class SingleStudyContext(userConfig: RootConfig,
@@ -19,15 +18,14 @@ case class SingleStudyContext(userConfig: RootConfig,
                               phenotype: Phenotype) extends SeqContext
 
 case class MetaAnalysisContext(userConfig: MetaConfig,
-                               sparkContext: SparkContext,
-                               phenotype: Phenotype) extends SeqContext
+                               sparkContext: SparkContext) extends SeqContext
 
 
 object SeqContext {
-  def apply(cnf: UserConfig, sc: SparkContext, sdb: Phenotype): SeqContext = {
-    cnf match {
-      case c: RootConfig => SingleStudyContext(c, sc, sdb)
-      case c: MetaConfig => MetaAnalysisContext(c, sc, sdb)
-    }
+  def apply(cnf: RootConfig, sc: SparkContext, sdb: Phenotype): SeqContext = {
+    SingleStudyContext(cnf, sc, sdb)
   }
+
+  def apply(cnf: MetaConfig, sc: SparkContext): SeqContext =
+    MetaAnalysisContext(cnf, sc)
 }

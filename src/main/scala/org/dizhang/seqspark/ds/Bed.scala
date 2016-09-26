@@ -1,7 +1,6 @@
 package org.dizhang.seqspark.ds
 
 import org.dizhang.seqspark.util.Constant
-import Constant.UnPhased._
 
 @SerialVersionUID(7737230001L)
 class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
@@ -21,15 +20,9 @@ object Bed {
 
   def apply(v: Variant[Byte]): Bed = {
     def makeBed (g: Byte): Byte = {
-      //val s = g split (":")
-      g match {
-        case Bt.mis => 1.toByte
-        case Bt.ref => 0.toByte
-        case Bt.het1 => 2.toByte
-        case Bt.het2 => 2.toByte
-        case Bt.mut => 3.toByte
-        case _ => 1.toByte
-      }
+      /** not function right now */
+      0
+
     }
     val id = "%s-%s" format(v.chr, v.pos)
     val bim: Array[Byte] =

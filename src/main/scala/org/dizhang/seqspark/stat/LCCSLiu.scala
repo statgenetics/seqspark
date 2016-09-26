@@ -20,7 +20,7 @@ object LCCSLiu {
     override def toString = "Pvalue:   %10f".format(pvalue)
   }
 
-  private trait CentralOneDF extends LCCSLiu {
+  trait CentralOneDF extends LCCSLiu {
     def degreeOfFreedom = DV.ones[Double](size)
     def nonCentrality = DV.zeros[Double](size)
     override def ck(k: Int): Double = {
@@ -28,11 +28,11 @@ object LCCSLiu {
     }
   }
 
-  private trait Old extends LCCSLiu {
+  trait Old extends LCCSLiu {
     val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s1
     val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else c2.cube/c3.square
   }
-  private trait New extends LCCSLiu {
+  trait New extends LCCSLiu {
     val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s2.sqrt
     val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
   }

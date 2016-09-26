@@ -6,12 +6,16 @@ import org.dizhang.seqspark.ds.{SummaryStatistic, Variation}
 import org.dizhang.seqspark.util.UserConfig.{MetaConfig, TraitConfig}
 import org.slf4j.LoggerFactory
 import MetaMaster._
+import org.dizhang.seqspark.util.MetaAnalysisContext
 
 /**
   * Created by zhangdi on 6/13/16.
   */
-class MetaMaster(metaConfig: MetaConfig) {
+class MetaMaster(metaContext: MetaAnalysisContext) {
   val logger = LoggerFactory.getLogger(this.getClass)
+
+  def metaConfig = metaContext.userConfig
+  def sc = metaContext.sparkContext
 
   def run(): Unit = {
     val traits = metaConfig.traitList
@@ -23,9 +27,9 @@ class MetaMaster(metaConfig: MetaConfig) {
     val conditionals = traitConfig.conditional.map(x => Variation(x))
     val studies = metaConfig.studies
     require(studies.length > 1, "you need at least two studies to run meta analysis")
-    var res = loadSummaryStatistic(name, traitConfig, studies.head, conditionals)
+    var res = loadSummaryStatistic(name, traitConfig, studies.head, conditionals)(sc)
     studies.tail.foreach{ study =>
-      val cur = loadSummaryStatistic(name, traitConfig, study, conditionals)
+      val cur = loadSummaryStatistic(name, traitConfig, study, conditionals)(sc)
       res = res ++ cur
     }
   }
@@ -38,15 +42,15 @@ object MetaMaster {
                            study: String,
                            conditionals: Array[Variation])(implicit sc: SparkContext): SummaryStatistic = {
 
-    val path = s"$study/$`trait`/rmw"
+    val path = s"$study/${`trait`}/rmw"
     if (traitConfig.binary) {
-      val stats = sc.objectFile[RareMetalWorker.DichotomousResult](path)
-        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DichotomousResult])
-      SummaryStatistic.DichotomousStatistic(`trait`, stats)
+      val stats = sc.objectFile[RareMetalWorker.DefaultResult](path)
+        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultResult])
+      SummaryStatistic.DefaultStatistics(`trait`, stats)
     } else {
-      val stats = sc.objectFile[RareMetalWorker.ContinuousResult](path)
-        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.ContinuousResult])
-      SummaryStatistic.ContinuousStatistic(`trait`, stats)
+      val stats = sc.objectFile[RareMetalWorker.DefaultResult](path)
+        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultResult])
+      SummaryStatistic.DefaultStatistics(`trait`, stats)
     }
   }
 }

@@ -27,7 +27,7 @@ case class SimpleVCF(self: RDD[Variant[Byte]]) extends GeneralizedVCF[Byte] {
     Variants.filter[Byte](self, myCond, batch, controls, _.maf, _.callRate, _.hwe)
   }
 
-  def checkSex(): Unit = {
+  def checkSex(implicit ssc: SingleStudyContext): Unit = {
     def isHet(g: Byte): (Double, Double) = {
       if (g.isMis) {
         (0, 0)
@@ -37,7 +37,7 @@ case class SimpleVCF(self: RDD[Variant[Byte]]) extends GeneralizedVCF[Byte] {
         (0, 1)
       }
     }
-    Samples.checkSex[Byte](self, isHet, _.callRate)
+    Samples.checkSex[Byte](self, isHet, _.callRate)(ssc)
   }
 }
 

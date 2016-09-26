@@ -3,7 +3,7 @@ package org.dizhang.seqspark.assoc
 import breeze.linalg._
 import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
-import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.General.{RichDouble}
 
 
 /**

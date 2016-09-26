@@ -24,7 +24,7 @@ case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) extends Gene
     Variants.filter[(Double, Double, Double)](self, myCond, batch, controls, _.maf, _.callRate, x => x)
   }
 
-  def checkSex(): Unit = {
+  def checkSex(implicit ssc: SingleStudyContext): Unit = {
     def isHet(g: (Double, Double, Double)): (Double, Double) = {
       if (g == (0, 0, 0)) {
         (0, 0)
@@ -32,7 +32,7 @@ case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) extends Gene
         (g._2, 1)
       }
     }
-    Samples.checkSex[(Double, Double, Double)](self, isHet, _.callRate)
+    Samples.checkSex[(Double, Double, Double)](self, isHet, _.callRate)(ssc)
   }
 
 }

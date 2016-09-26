@@ -16,7 +16,7 @@ object QualityControl {
     val simpleVCF: Data[Byte] = annotated.genotypeQC(conf.qualityControl.genotypes).toSimpleVCF.cache()
 
     /** sample QC */
-    simpleVCF.checkSex()
+    simpleVCF.checkSex(ssc)
 
     /** Variant QC */
     simpleVCF.variantsFilter(conf.qualityControl.variants)(ssc)
@@ -28,7 +28,7 @@ object QualityControl {
     val annotated = linkVariantDB(input)(conf, sc).cache()
 
     /** sample QC */
-    annotated.checkSex()
+    annotated.checkSex(ssc)
 
     /** Variant QC */
     annotated.variantsFilter(conf.qualityControl.variants)(ssc)

@@ -73,6 +73,8 @@ object Variants {
     val names: Set[String] = LogicalExpression.analyze(variants)
     self.filter{v =>
       val varMap = names.toArray.map{
+        case "chr" => "chr" -> v.chr
+        case "maf" => "maf" -> maf(v, controls, makeMaf).toString
         case "missingRate" => "missingRate" -> (1 - callRate(v, makeCall)).toString
         case "batchMissingRate" => "batchMissingRate" -> (1 - batchCallRate(v, batch, makeCall).values.max).toString
         case "alleleNum" => "alleleNum" -> v.alleleNum.toString

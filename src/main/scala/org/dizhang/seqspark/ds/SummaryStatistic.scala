@@ -10,7 +10,7 @@ import SummaryStatistic._
 trait SummaryStatistic {
 
   def `trait`: String
-  def statistic: RDD[RareMetalWorker.Result]
+  def statistic: RDD[RareMetalWorker.DefaultResult]
   def ++(that: SummaryStatistic): SummaryStatistic = {
     val p1 = this.statistic.map(r => (r.segmentId, r))
     val p2 = that.statistic.map(r => (r.segmentId, r))
@@ -19,12 +19,9 @@ trait SummaryStatistic {
       case (k, (Some(a), None)) => a
       case (k, (None, Some(b))) => b
     }
-    this match {
-      case c: ContinuousStatistic =>
-        ContinuousStatistic(`trait`, sum.asInstanceOf[RDD[RareMetalWorker.ContinuousResult]])
-      case d: DichotomousStatistic =>
-        DichotomousStatistic(`trait`, sum.asInstanceOf[RDD[RareMetalWorker.DichotomousResult]])
-    }
+
+    DefaultStatistics(`trait`, sum.asInstanceOf[RDD[RareMetalWorker.DefaultResult]])
+
   }
 
 }
@@ -37,10 +34,8 @@ object SummaryStatistic {
     }
   }
 
-  case class ContinuousStatistic(`trait`: String,
-                                 statistic: RDD[RareMetalWorker.ContinuousResult]) extends SummaryStatistic
-  case class DichotomousStatistic(`trait`: String,
-                                  statistic: RDD[RareMetalWorker.DichotomousResult]) extends SummaryStatistic
+  case class DefaultStatistics(`trait`: String,
+                               statistic: RDD[RareMetalWorker.DefaultResult]) extends SummaryStatistic
 
   
 }

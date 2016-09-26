@@ -165,6 +165,12 @@ object UserConfig {
       Array[String]()
     }
 
+    def pc: Int = if (config.hasPath("pc")) {
+      config.getInt("pc")
+    } else {
+      0
+    }
+
     def conditional = if (config.hasPath("conditional")) {
       config.getStringList("conditional").asScala.toArray
     } else {

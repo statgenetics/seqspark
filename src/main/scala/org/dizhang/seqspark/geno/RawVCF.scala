@@ -19,7 +19,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
     self.flatMap(v => decomposeVariant(v))
   }
 
-  def checkSex(): Unit = {
+  def checkSex(implicit ssc: SingleStudyContext): Unit = {
     def isHet(g: String): (Double, Double) = {
       if (g.startsWith(".")) {
         (0,0)
@@ -29,7 +29,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
         (0, 1)
       }
     }
-    Samples.checkSex[String](self, isHet, _.callRate)
+    Samples.checkSex[String](self, isHet, _.callRate)(ssc)
 
   }
 
@@ -110,7 +110,7 @@ object RawVCF {
           case (k, v) =>
             val vs = v.split(",")
             if (vs == 2) {
-              Array((k + "_1", vs(0)), (k + "_2", vs(1)), (k + "_ratio", vs(0).toDouble/vs(1).toDouble))
+              Array((k + "_1", vs(0)), (k + "_2", vs(1)), (k + "_ratio", (vs(0).toDouble/vs(1).toDouble).toString))
             } else {
               Array((k, v))
             }

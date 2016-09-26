@@ -32,7 +32,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     }
   }
 
-  def annotateByGene(v: Variant[A], dict: Broadcast[RefGene]): Array[Variant[A]] = {
+  def annotateByGene(dict: Broadcast[RefGene]): Array[Variant[A]] = {
     /** the argument RefGene is the whole set of all genes involved
       * the output RefGene each represents a single gene
       * */
@@ -52,7 +52,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     all
   }
 
-  def annotateByRegion(v: Variant[A], windowSize: Int, overlapSize: Int): Array[Variant[A]] = {
+  def annotateByRegion(windowSize: Int, overlapSize: Int): Array[Variant[A]] = {
     require(overlapSize < 0.5 * windowSize, "overlap must be less than half of the window size")
     val variantRegion = v.toRegion
     val unitSize = windowSize - overlapSize

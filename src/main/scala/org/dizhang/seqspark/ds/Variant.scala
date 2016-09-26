@@ -248,7 +248,7 @@ case class DummyVariant[A](var meta: Array[String], default: A)
   def size = 0
   def select(indicator: Array[Boolean]): DummyVariant[A] = this
   def denseSize = 0
-  def map[B](f: A => B): DummyVariant[B] = DummyVariant(meta, f(default))
+  def map[B](f: A => B): DummyVariant[B] = DummyVariant(meta.clone(), f(default))
   def apply(i: Int): A = default
 }
 
@@ -277,7 +277,7 @@ case class DenseVariant[A](var meta: Array[String],
 
   def map[B](f: A => B): Variant[B] = {
     val iseq = elems.map(f)
-    Variant.fromIndexedSeq(meta, iseq, f(default))
+    Variant.fromIndexedSeq(meta.clone(), iseq, f(default))
   }
 
 }
@@ -303,7 +303,7 @@ case class SparseVariant[A](var meta: Array[String],
   def map[B](f: A => B): Variant[B] = {
     val newDefault = f(default)
     val newElems: Map[Int, B] = elems.map{case (k, v) => k -> f(v)}
-    Variant.fromMap(meta, newElems, newDefault, size)
+    Variant.fromMap(meta.clone(), newElems, newDefault, size)
   }
 
   def select(indicator: Array[Boolean]): Variant[A] = {

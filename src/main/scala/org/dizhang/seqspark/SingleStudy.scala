@@ -6,8 +6,11 @@ import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import java.io.File
+
+import org.dizhang.seqspark.pheno.Phenotype
+import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
+import org.dizhang.seqspark.worker.QualityControl
 import org.slf4j.LoggerFactory
-import worker._
 import util.General._
 
 /**
@@ -24,24 +27,18 @@ object SingleStudy {
       System.exit(1)
     }
 
-
     /** quick run */
     val userConfFile = new File(args(0))
     require(userConfFile.exists())
     try {
-
-      implicit val userConf = ConfigFactory
+      val userConf = ConfigFactory
         .parseFile(userConfFile)
-        .withFallback(ConfigFactory.load().getConfig("seqa"))
+        .withFallback(ConfigFactory.load().getConfig("seqspark"))
         .resolve()
 
-      //userConf.root().foreach{case (k, v) => println(s"$k: ${v.toString}")}
-
-      implicit val rootConf = RootConfig(userConf)
-
-      val modules = if (args.length == 2) args(1) else "1-4"
-      checkConf
-      run
+      val rootConf = RootConfig(userConf)
+      if (checkConf(rootConf))
+        run(rootConf)
     } catch {
       case e: Exception => {
         e.printStackTrace()
@@ -50,32 +47,67 @@ object SingleStudy {
   }
 
 
-  def checkConf(implicit cnf: Config) {
-    logger.info("Conf file fine")
+  def checkConf(conf: RootConfig): Boolean = {
+    if (! annot.CheckDatabase.qcTermsInDB(conf)) {
+      logger.error("conf error in qualityControl")
+      false
+    } else if (! annot.CheckDatabase.annTermsInDB(conf)) {
+      logger.error("conf error in annotation")
+      false
+    } else if (conf.pipeline.last == "association" && ! annot.CheckDatabase.assTermsInDB(conf)) {
+      logger.error("conf error in association method variants")
+      false
+    } else {
+      logger.info("Conf file fine")
+      true
+    }
   }
 
-  def run(implicit cnf: RootConfig) {
+  def run(cnf: RootConfig) {
     val project = cnf.project
 
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqA-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[Pair]]))
-    implicit val sc: SparkContext = new SparkContext(scConf)
+    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
+    val sc: SparkContext = new SparkContext(scConf)
 
     val pipeline = cnf.pipeline
 
+    val phenotype = Phenotype(cnf.input.phenotype.path, sc)
+
+    implicit val ssc = SingleStudyContext(cnf, sc, phenotype)
+
+    if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
+      runVCF
+    } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
+      runImputed
+    } else {
+      logger.error(s"unrecognized genotype format ${cnf.input.genotype.format.toString}")
+    }
+
+    /**
     val binder = org.slf4j.impl.StaticLoggerBinder.getSingleton
     logger.debug("hellor world")
     logger.debug(binder.getLoggerFactoryClassStr)
-
     logger.info(s"pipeline: ${(("import" :: pipeline) ::: List("export")).mkString(" ")}")
+    */
+    //val current = Import({})
 
-    val current = Import({})
+    //val last = WorkerObsolete.recurSlaves(current, pipeline)
 
-    val last = WorkerObsolete.recurSlaves(current, pipeline)
-
-    Export(last)
+    //Export(last)
     //PropertyConfigurator.configure("log4j.properties")
   }
+
+  def runVCF(implicit ssc: SingleStudyContext): Unit = {
+    val input = worker.Import.fromVCF(ssc)
+    QualityControl.cleanVCF(input)
+  }
+
+  def runImputed(implicit ssc: SingleStudyContext): Unit = {
+    val input = worker.Import.fromImpute2(ssc)
+    QualityControl.cleanImputed(input)
+  }
+
 }

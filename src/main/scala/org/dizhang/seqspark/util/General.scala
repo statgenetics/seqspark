@@ -1,7 +1,8 @@
 package org.dizhang.seqspark.util
 
-import breeze.linalg.{*, CSCMatrix, DenseMatrix => DM, DenseVector, eigSym}
+import breeze.linalg.{*, CSCMatrix, DenseVector, eigSym, DenseMatrix => DM}
 import breeze.numerics._
+import scala.annotation.tailrec
 
 /**
   * some useful functions
@@ -26,6 +27,10 @@ object General {
 
                """
     print(mesg)
+  }
+
+  implicit class DoubleDouble(val x: (Double, Double)) extends AnyVal {
+    def ratio: Double = x._1/x._2
   }
 
   implicit class RichDouble(val x: Double) extends AnyVal {
@@ -69,6 +74,24 @@ object General {
     val values = de.eigenvalues
     val vectors = de.eigenvectors
     (vectors(*, ::) :* pow(values, 0.5)) * vectors.t
+  }
+
+  def insert(array: Array[Int], x: Int): Int = {
+    @tailrec
+    def rec(low: Int, up: Int): Int = {
+      if (low == up) {
+        low
+      } else if (x >= array(up)) {
+        up
+      } else if (x == array((low + up)/2)) {
+        (low + up)/2
+      } else if (x < array((low + up)/2)) {
+        rec(low, (low + up)/2 - 1)
+      } else {
+        rec((low + up)/2, up)
+      }
+    }
+    rec(0, array.length - 1)
   }
 
 }

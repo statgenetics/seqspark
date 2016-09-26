@@ -8,8 +8,5 @@ import scalaz._
   * Created by zhangdi on 8/13/16.
   */
 package object geno {
-  type Data[A] = RDD[Variant[A]]
-
-
 
 }

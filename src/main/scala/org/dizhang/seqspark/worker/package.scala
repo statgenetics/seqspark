@@ -2,15 +2,13 @@ package org.dizhang.seqspark
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.Variant
-import org.dizhang.seqspark.util.SeqContext
+import org.dizhang.seqspark.util.SingleStudyContext
 
-import scalaz.Reader
-
+import scalaz._
 /**
-  * Created by zhangdi on 9/15/16.
+  * Created by zhangdi on 9/19/16.
   */
 package object worker {
-  //type Data[A] = RDD[Variant[A]]
-  //type Worker[A] = Reader[SeqContext, Data[A]]
+  type Data[A] = RDD[Variant[A]]
 
 }

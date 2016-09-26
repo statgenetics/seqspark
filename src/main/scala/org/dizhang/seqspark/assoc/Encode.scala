@@ -5,12 +5,12 @@ import breeze.numerics.{exp, lbeta, pow}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
-import org.dizhang.seqspark.util.Constant.UnPhased.Bt
-import org.dizhang.seqspark.util.InputOutput.Var
+import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.worker.GenotypeLevelQC.{getMaf, makeMaf}
 import Encode._
 import org.dizhang.seqspark.util.Constant.Variant.InfoKey
+import org.dizhang.seqspark.geno.SimpleVCF.SimpleGenotype
+import org.dizhang.seqspark.geno.ImputedVCF.ImputedGenotype
 
 /**
   * How to code variants, either in one group (gene) or in a region
@@ -21,12 +21,24 @@ import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 
 object Encode {
 
-  def cmcMakeNaAdjust(x: Byte, maf: Double): Double = x match {
-      case Bt.ref => 0.0
-      case Bt.het1 => 1.0
-      case Bt.het2 => 1.0
-      case Bt.mut => 1.0
-      case _ => 1.0 - math.pow(1.0 - maf, 2)}
+  type Imputed = (Double, Double, Double)
+  type Var = Variant[_]
+
+  def makeMaf(x: _): (Double, Double) = {
+    x match {
+      case g: Byte => g.maf
+      case g: Imputed => g.maf
+      case _ => (-9.0, 1.0)
+    }
+  }
+
+  def cmcMakeNaAdjust(x: _, maf: Double): Double = {
+    x match {
+      case g: Byte => g.toCMC(maf)
+      case g: Imputed => g.toCMC(maf)
+      case _ => -9.0
+    }
+  }
 
   object CmcAddNaAdjust extends Counter.CounterElementSemiGroup[Double] {
     def zero = 0.0
@@ -43,16 +55,15 @@ object Encode {
       else
         1.0 - (1.0 - a) * (1.0 - b)}
 
-  def brvMakeNaAdjust(x: Byte, maf: Double): Double = x match {
-      case Bt.ref => 0.0
-      case Bt.het1 => 1.0
-      case Bt.het2 => 1.0
-      case Bt.mut => 2.0
-      case _ => 2 * maf
+  def brvMakeNaAdjust(x: _, maf: Double): Double = {
+    x match {
+      case g: Byte => g.toBRV(maf)
+      case g: Imputed => g.toBRV(maf)
+      case _ => -9.0
     }
+  }
 
   val BrvAddNaAdjust = Counter.CounterElementSemiGroup.AtomDouble
-
 
   def erecDelta(n: Int): Double = {
     /** The authors just said the sample size needed is very large, but not how large
@@ -66,20 +77,22 @@ object Encode {
       0.1 + 0.9 * (n - 2000) / 98000
   }
 
+
+
   def apply(vars: Iterable[Var],
             controls: Option[Array[Boolean]] = None,
             y: Option[DenseVector[Double]],
             cov: Option[DenseMatrix[Double]],
             config: MethodConfig): Encode = {
     val codingScheme = config.`type`
-    val mafSource = config.mafSource
+    val mafSource = config.maf.getString("source")
     val weightMethod = config.weight
     (codingScheme, mafSource, weightMethod) match {
-      case (MethodType.brv, MafSource.controls, WeightMethod.erec) =>
+      case (MethodType.brv, "controls", WeightMethod.erec) =>
         apply(vars, controls.get, y.get, cov, config)
       case (MethodType.brv, _, WeightMethod.erec) =>
         apply(vars, y.get, cov, config)
-      case (_, MafSource.controls, _) =>
+      case (_, "controls", _) =>
         apply(vars, controls.get, config)
       case (_, _, _) =>
         apply(vars, config)
@@ -183,21 +196,21 @@ object Encode {
   }
 
   sealed trait PooledOrAnnotationMaf extends Encode {
-    lazy val mafCount = vars.map(v => v.toCounter(makeMaf, (0, 2)).reduce)
+    lazy val mafCount = vars.map(v => v.toCounter(makeMaf, (0.0, 2.0)).reduce)
 
     lazy val maf = {
-      config.mafSource match {
-        case MafSource.annotation =>
-          vars.map(v => v.parseInfo(Constant.Variant.InfoKey.maf).toDouble)
-        case _ => mafCount.map(getMaf(_))
+      config.maf.getString("source") match {
+        case "pooled" => mafCount.map(_.ratio)
+        case key =>
+          vars.map(v => v.parseInfo(key).toDouble)
       }
     }
   }
 
   sealed trait ControlsMaf extends Encode {
     def controls: Array[Boolean]
-    lazy val mafCount = vars.map(v => v.select(controls).toCounter(makeMaf, (0, 2)).reduce)
-    lazy val maf = mafCount.map(getMaf(_))
+    lazy val mafCount = vars.map(v => v.select(controls).toCounter(makeMaf, (0.0, 2.0)).reduce)
+    lazy val maf = mafCount.map(_.ratio)
   }
 
   sealed trait SimpleWeight extends BRV {
@@ -228,10 +241,10 @@ object Encode {
       }
       val beta =
         if (y.toArray.count(_ == 0.0) + y.toArray.count(_ == 1.0) == y.length) {
-          val model = new LogisticRegression(y, combined)
+          val model = LogisticRegression(y, combined)
           model.estimates.map(x => x + erecDelta(y.length))
         } else {
-          val model = new LinearRegression(y, combined)
+          val model = LinearRegression(y, combined)
           model.estimates.map(x => x + 2 * erecDelta(y.length))
         }
       beta(1 to n)
@@ -284,11 +297,11 @@ object Encode {
 @SerialVersionUID(7727390001L)
 sealed trait Encode extends Serializable {
   def vars: Array[Var]
-  def mafCount: Array[(Int, Int)]
+  def mafCount: Array[(Double, Double)]
   def maf: Array[Double]
   def sampleSize: Int = if (vars.isEmpty) 0 else vars.head.length
   def config: MethodConfig
-  lazy val fixedCutoff: Double = config.mafCutoff
+  lazy val fixedCutoff: Double = config.maf.getDouble("cutoff")
   def thresholds: Option[Array[Double]] = {
     val n = sampleSize
     /** this is to make sure 90% call rate sites is considered the same with the 100% cr ones
@@ -311,7 +324,7 @@ sealed trait Encode extends Serializable {
   def getVT: Option[Encode.VT] = {
     thresholds.map{th =>
       val cm = SparseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)
-      val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => getMaf(p._2) <= th.max).map{
+      val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => p._2.ratio <= th.max).map{
         case (v, mc) =>
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
       }
@@ -320,7 +333,7 @@ sealed trait Encode extends Serializable {
   }
 
   def getCoding: Option[Encode.Coding] = {
-    if (config.mafFixed)
+    if (config.maf.getBoolean("fixed"))
       this.getFixed()
     else
       this.getVT
@@ -333,7 +346,7 @@ sealed trait Encode extends Serializable {
       val res = DenseVector.horzcat(vars.zip(maf).filter(v => v._2 >= cutoff).map {
         case (v, m) => DenseVector(v.toArray.map(brvMakeNaAdjust(_, m)): _*)
       }: _*)
-      val info = vars.zip(mafCount).filter(v => getMaf(v._2) >= cutoff).map{
+      val info = vars.zip(mafCount).filter(v => v._2.ratio >= cutoff).map{
         case (v, m) =>
           v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
       }
@@ -356,7 +369,7 @@ sealed trait Encode extends Serializable {
         v._1.toCounter(brvMakeNaAdjust(_, v._2), 0.0).toMap}
       cnt.zipWithIndex.foreach{ case (elems, col) =>
           elems.foreach{case (row, v) => builder.add(row, col, v)}}
-      val info = vars.zip(mafCount).filter(v => getMaf(v._2) >= cutoff).map{
+      val info = vars.zip(mafCount).filter(v => v._2.ratio >= cutoff).map{
         case (v, m) =>
           v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
       }

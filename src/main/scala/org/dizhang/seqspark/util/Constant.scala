@@ -60,8 +60,8 @@ object Constant {
       val Synonymous = Value("Synonymous")
       val CDS = Value("CDS")
       val Exonic = Value("Exonic")
-      val UTR5 = Value("5-UTR")
-      val UTR3 = Value("3-UTR")
+      val UTR5 = Value("5UTR")
+      val UTR3 = Value("3UTR")
       val Intronic = Value("Intronic")
       val Upstream = Value("Upstream")
       val Downstream = Value("Downstream")
@@ -112,19 +112,6 @@ object Constant {
 
   }
 
-  implicit class RawGenotype(val value: String) extends AnyVal {
-    import UnPhased._
-    def gt = value.split(":")(0).replace('|', '/')
-    def bt = Gt.conv(gt)
-  }
-
-  implicit class InnerGenotype(val value: Byte) extends AnyVal {
-    import UnPhased._
-    def isHet = value == Bt.het1 || value == Bt.het2
-    def isHom = value == Bt.ref || value == Bt.mut
-    def toUnPhased = Bt.conv(value)
-    def toPhased = toUnPhased.replace('/', '|')
-  }
 
   object Genotype {
     object Raw {

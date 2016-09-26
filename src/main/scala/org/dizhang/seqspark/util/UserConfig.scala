@@ -50,7 +50,7 @@ object UserConfig {
     val meta = Value("meta")
     val cmc = Value("cmc")
     val brv = Value("burden")
-    val single = Value("single")
+    val snv = Value("snv")
   }
 
   object WeightMethod extends Enumeration {

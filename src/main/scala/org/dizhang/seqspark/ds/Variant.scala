@@ -239,7 +239,6 @@ sealed trait Variant[A] extends Serializable {
         DummyVariant(Array[String]() ++ meta, default)
     }
   }
-
 }
 
 @SerialVersionUID(7737820101L)

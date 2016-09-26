@@ -2,8 +2,10 @@ package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.ds.Variant
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.util.{LogicalExpression, SingleStudyContext}
 import breeze.stats.distributions.ChiSquared
+import org.apache.spark.rdd.RDD
 /**
   * Created by zhangdi on 9/20/16.
   */
@@ -55,6 +57,11 @@ object Variants {
     res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
   }
 
+  def isFunctional[A](v: Variant[A]): Int = {
+    val genes = parseAnnotation(v.parseInfo(IK.anno))
+    if (genes.exists(p => FM(p._2) <= 4)) 1 else 0
+  }
+
   def filter[A](self: Data[A],
                 variants: String,
                 batch: Array[String],
@@ -71,32 +78,11 @@ object Variants {
         case "alleleNum" => "alleleNum" -> v.alleleNum.toString
         case "batchSpecific" => "batchSpecific" -> batchSpecific(v, batch, makeMaf).values.max.toString
         case "hwePvalue" => "hwePvalue" -> hwePvalue(v, controls, makeHWE).toString
+        case "isFunctional" => "isFunctional" -> isFunctional(v).toString
         case x => x -> v.parseInfo.getOrElse(x, "0")
       }.toMap
       LogicalExpression.judge(varMap)(variants)
     }
-
-    /** assume input valid
-    val names: Set[String] = LogicalExpression.analyze(variants)
-
-    val dbField = """(\w+).(\w+)""".r
-    val inValid = names.flatMap{
-      case "missingRate" => Set[String]()
-      case "batchMissingRate" => Set[String]()
-      case "allelNum" => Set[String]()
-      case "batchSpecific" => Set[String]()
-      case "hwePvalue" => Set[String]()
-      case dbField(db, field) => Set[String]()
-      case x => Set[String](x)
-    }
-
-    if (inValid.isEmpty) {
-      self.map{v =>
-        val varMap =
-      }
-    }
-*/
-
   }
 
 }

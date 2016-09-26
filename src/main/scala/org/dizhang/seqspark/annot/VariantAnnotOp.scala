@@ -26,13 +26,11 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
           .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
           .mkString(",,")
         v.addInfo(IK.anno, merge)
-        v.addInfo(IK.gene, consensus._1)
-        v.addInfo(IK.func, consensus._2.toString)
         v
     }
   }
 
-  def annotateByGene(dict: Broadcast[RefGene]): Array[Variant[A]] = {
+  def groupByGene(onlyFunctional: Boolean = true): Array[(String, Variant[A])] = {
     /** the argument RefGene is the whole set of all genes involved
       * the output RefGene each represents a single gene
       * */
@@ -40,19 +38,19 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
 
     val variation = v.toVariation()
 
-    val all = IntervalTree.lookup(dict.value.loci, variation)
-      .map(l => (l.geneName, l.annotate(variation, dict.value.seq(l.mRNAName))))
-      .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
-      .toArray.map{x =>
-      val newV = v.copy
-      newV.addInfo(IK.gene, x._1)
-      newV.addInfo(IK.func, x._2.toString)
-      newV
+    val genes = parseAnnotation(v.parseInfo(IK.anno))
+
+    val res = if (onlyFunctional) {
+      genes.filter(p => FM(p._2) <= 4)
+    } else {
+      genes
     }
-    all
+    res.map{
+      case (g, _) => g -> v.copy
+    }
   }
 
-  def annotateByRegion(windowSize: Int, overlapSize: Int): Array[Variant[A]] = {
+  def groupByRegion(windowSize: Int, overlapSize: Int): Array[(String, Variant[A])] = {
     require(overlapSize < 0.5 * windowSize, "overlap must be less than half of the window size")
     val variantRegion = v.toRegion
     val unitSize = windowSize - overlapSize
@@ -66,13 +64,13 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
         startRegion
       }
     if ((unit == 0 || unitPos > overlapSize) && startRegion == endRegion) {
-      v.addInfo("Region", startRegion.toString)
-      Array(v)
+      //v.addInfo("Region", startRegion.toString)
+      Array(startRegion.toString -> v)
     } else {
       val v2 = v.copy
-      v.addInfo("Region", startRegion.toString)
-      v2.addInfo("Region", endRegion.toString)
-      Array(v, v2)
+      //v.addInfo("Region", startRegion.toString)
+      //v2.addInfo("Region", endRegion.toString)
+      Array(startRegion.toString -> v, endRegion.toString -> v2)
     }
   }
 }
@@ -85,5 +83,16 @@ object VariantAnnotOp {
   type Genes = Map[String, List[Location]]
   implicit def addAnnotOp[A](v: Variant[A]): VariantAnnotOp[A] = {
     new VariantAnnotOp[A](v)
+  }
+  def parseAnnotation(value: String) = {
+    val geneRegex = """(\w+)::(\S+)""".r
+    val trsRegex = """(\w+):(\S+)""".r
+    val genes = value.split(",,").map{
+      case geneRegex(gene, rest) => gene -> rest.split(",").map{
+        case trsRegex(_, func) => F.withName(func)
+      }.reduce((a, b) => if (FM(a) < FM(b)) a else b)
+    }
+    /** an array of genes, and their most deleterious function annotation */
+    genes
   }
 }

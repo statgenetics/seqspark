@@ -9,6 +9,7 @@ import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.{Constant, LogicalExpression, SingleStudyContext}
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.worker.Data
+import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
@@ -55,7 +56,16 @@ package object annot {
     }
   }
 
-  def annotate[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
+  def linkGeneDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
+    val dbConf = conf.annotation.RefSeq
+    val build = dbConf.getString("build")
+    val coordFile = dbConf.getString("coordFile")
+    val seqFile = dbConf.getString("seqFile")
+    val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile))
+    input.map(v => v.annotateByVariant(refSeq))
+  }
+
+  def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
     val dbTerms = getDBs(conf)
     val paired = input.map(v => (v.toVariation(), v))
     dbTerms.foreach{

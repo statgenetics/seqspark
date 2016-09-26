@@ -10,7 +10,7 @@ import org.dizhang.seqspark.util.General._
 /**
   * Created by zhangdi on 9/16/16.
   */
-case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) {
+case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) extends GeneralizedVCF[(Double, Double, Double)] {
 
   def variantsFilter(cond: List[String])(ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
     val conf = ssc.userConfig

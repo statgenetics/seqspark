@@ -5,16 +5,17 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.stat._
-import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.util.{Constant, SingleStudyContext}
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.annot.VariantAnnotOp._
 import AssocMaster._
-import org.dizhang.seqspark.annot.RefGene
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.geno.GeneralizedVCF._
+import scala.collection.JavaConverters._
+
 /**
   * asymptotic test
   */
@@ -25,7 +26,7 @@ object AssocMaster {
   val F = Constant.Annotation.Feature
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
   val IK = Constant.Variant.InfoKey
-  val Imputed = (Double, Double, Double)
+  type Imputed = (Double, Double, Double)
 
   def makeEncode[A](currentGenotype: Data[A],
                     y: Broadcast[DenseVector[Double]],
@@ -38,20 +39,17 @@ object AssocMaster {
       * e.g. to learning weight from data */
     val sampleSize = y.value.length
     val codingScheme = config.`type`
+    val groupBy = config.misc.getStringList("groupBy").asScala.toList
     val annotated = codingScheme match {
-      case MethodType.single =>
+      case MethodType.snv =>
         currentGenotype.map(v => (s"${v.chr}:${v.pos}", v)).groupByKey()
       case MethodType.meta =>
         currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ =>
-        val refSeqConf = cnf.annotation.RefSeq
-        val build = refSeqConf.getString("build")
-        val coordFile = refSeqConf.getString("coordFile")
-        val seqFile = refSeqConf.getString("seqFile")
-        val refGene = sc.broadcast(RefGene(build, coordFile, seqFile))
-        currentGenotype.map{v => v.annotateByGene(refGene); v}
-          .map(v => (v.parseInfo(IK.gene), v))
-          .groupByKey()
+        (groupBy match {
+          case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s(0).toInt, s(1).toInt))
+          case _ => currentGenotype.flatMap(v => v.groupByGene(onlyFunctional = true))
+        }).groupByKey()
     }
 
     annotated.map(p =>
@@ -157,31 +155,33 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
-  def runTraitWithMethod[A](currentGenotype: Data[A],
-                         currentTrait: (String, Broadcast[DenseVector[Double]]),
-                         cov: Broadcast[Option[DenseMatrix[Double]]],
-                         controls: Broadcast[Array[Boolean]],
-                         method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
-    val config = cnf.association
-    val methodConfig = config.method(method)
-    val encode = makeEncode(currentGenotype, currentTrait._2, cov, controls, methodConfig)
-    val permutation = methodConfig.resampling
-    val test = methodConfig.test
-    val binary = config.`trait`(currentTrait._1).binary
 
-    if (methodConfig.`type` == MethodType.meta) {
-      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
-    } else if (permutation) {
-      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
-    } else {
-      asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
+  case class SimpleMaster(genotype: Data[Byte], ssc: SingleStudyContext) extends AssocMaster[Byte] {
+    def samples(input: Data[Byte], indicator: Array[Boolean]) = {
+      input.samples(indicator)(ssc.sparkContext)
+    }
+    def variantsFilter(input: Data[Byte], cond: List[String]) = {
+      input.variantsFilter(cond)(ssc)
     }
   }
+
+  case class ImputedMaster(genotype: Data[Imputed], ssc: SingleStudyContext) extends AssocMaster[Imputed] {
+    def samples(input: Data[Imputed], indicator: Array[Boolean]) = {
+      input.samples(indicator)(ssc.sparkContext)
+    }
+    def variantsFilter(input: Data[Imputed], cond: List[String]) = {
+      input.variantsFilter(cond)(ssc)
+    }
+  }
+
+
 }
 
-class AssocMaster[A](genotype: Data[A])
-                 (implicit ssc: SingleStudyContext) extends {
-
+trait AssocMaster[A]{
+  def genotype: Data[A]
+  def ssc: SingleStudyContext
+  def samples(input: Data[A], indicator: Array[Boolean]): Data[A]
+  def variantsFilter(input: Data[A], cond: List[String]): Data[A]
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = ssc.phenotype
@@ -208,7 +208,7 @@ class AssocMaster[A](genotype: Data[A])
           val indicator = sc.broadcast(phenotype.indicate(traitName))
           val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
             .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-          val currentGenotype = genotype.map(v => v.select(indicator.value))
+          val currentGenotype = samples(genotype, indicator.value)
           val traitConfig = assocConf.`trait`(traitName)
           val currentCov = sc.broadcast(
             if (traitConfig.covariates.nonEmpty) {
@@ -224,6 +224,29 @@ class AssocMaster[A](genotype: Data[A])
       }
     } catch {
       case e: Exception => logger.warn(e.getStackTrace.toString)
+    }
+  }
+
+  def runTraitWithMethod(currentGenotype: Data[A],
+                         currentTrait: (String, Broadcast[DenseVector[Double]]),
+                         cov: Broadcast[Option[DenseMatrix[Double]]],
+                         controls: Broadcast[Array[Boolean]],
+                         method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
+    val config = cnf.association
+    val methodConfig = config.method(method)
+    val cond = methodConfig.misc.getStringList("variants").asScala.toList
+    val chosenVars = variantsFilter(currentGenotype, cond)
+    val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
+    val permutation = methodConfig.resampling
+    val test = methodConfig.test
+    val binary = config.`trait`(currentTrait._1).binary
+
+    if (methodConfig.`type` == MethodType.meta) {
+      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
+    } else if (permutation) {
+      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
+    } else {
+      asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
     }
   }
 }

@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.annot
 
-import org.dizhang.seqspark.ds.Region
+import org.dizhang.seqspark.ds._
 import org.slf4j.LoggerFactory
 
 import scala.io.Source
@@ -8,7 +8,7 @@ import scala.collection.mutable.{Map => MMap}
 /**
   * Created by zhangdi on 9/28/16.
   */
-class Chain(val map: Map[String, IntervalTree[Region.Named]]) {
+class Chain(val map: Map[String, IntervalTree[Named]]) {
   val logger = LoggerFactory.getLogger(this.getClass)
   def liftOver(chr: String, start: Int, end: Int): (String, Int, Int) = {
     if (! map.contains(chr)) {
@@ -38,22 +38,22 @@ class Chain(val map: Map[String, IntervalTree[Region.Named]]) {
 object Chain {
   val logger = LoggerFactory.getLogger(this.getClass)
 
-  def hg19Tohg38: Map[String, IntervalTree[Region.Named]] = {
+  def hg19Tohg38: Map[String, IntervalTree[Named]] = {
     val instream = getClass.getResourceAsStream("hg19ToHg38.over.chain")
     val raw = Source.fromInputStream(instream).getLines().toArray.filterNot(_ == "")
     //val headers = raw.filter(_.startsWith("chain")).map(_.split("\\s+"))
     build(raw)
   }
 
-  def build(data: Array[String]): Map[String, IntervalTree[Region.Named]] = {
-    val res = MMap[String, IntervalTree[Region.Named]]()
+  def build(data: Array[String]): Map[String, IntervalTree[Named]] = {
+    val res = MMap[String, IntervalTree[Named]]()
     var cur: Head = new Head(Array.empty[String])
     data.foreach{l =>
       val s = l.split("\\s+")
       if (s(0) == "chain" && List(12,13).contains(s.length)) {
         cur = new Head(s)
         if (! res.contains(cur.sourceName)) {
-          res(cur.sourceName) = Leaf[Region.Named]()
+          res(cur.sourceName) = Leaf[Named]()
         }
       } else if (s(0) != "chain" && s.length == 3) {
         val size = s(0).toInt
@@ -61,12 +61,12 @@ object Chain {
         val tgap = s(2).toInt
         if (cur.targetStrand == "+") {
           val target = s"${cur.targetStrand},${cur.targetName}:${cur.tfrom}-${cur.tfrom + size}"
-          val region = Region.Named(0, cur.sfrom, cur.sfrom + size, target)
+          val region = Named(0, cur.sfrom, cur.sfrom + size, target)
           res(cur.sourceName) = IntervalTree.insert(res(cur.sourceName), region)
         } else {
           val taget = s"${cur.targetStrand},${cur.targetName}:${cur.targetSize - cur.tfrom - size}" +
             s"${cur.targetSize - cur.tfrom}"
-          val region = Region.Named(0, cur.sfrom, cur.sfrom + size, taget)
+          val region = Named(0, cur.sfrom, cur.sfrom + size, taget)
         }
         cur.sfrom += size + sgap
         cur.tfrom += size + tgap
@@ -74,12 +74,12 @@ object Chain {
         val size = s(0).toInt
         if (cur.targetStrand == "+") {
           val target = s"${cur.targetStrand},${cur.targetName}:${cur.tfrom}-${cur.tfrom + size}"
-          val region = Region.Named(0, cur.sfrom, cur.sfrom + size, target)
+          val region = Named(0, cur.sfrom, cur.sfrom + size, target)
           res(cur.sourceName) = IntervalTree.insert(res(cur.sourceName), region)
         } else {
           val taget = s"${cur.targetStrand},${cur.targetName}:${cur.targetSize - cur.tfrom - size}" +
             s"${cur.targetSize - cur.tfrom}"
-          val region = Region.Named(0, cur.sfrom, cur.sfrom + size, taget)
+          val region = Named(0, cur.sfrom, cur.sfrom + size, taget)
         }
       } else {
         logger.error(s"invalid chain format: $l")

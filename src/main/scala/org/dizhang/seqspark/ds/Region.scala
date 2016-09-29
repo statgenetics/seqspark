@@ -56,75 +56,75 @@ trait Region extends Serializable {
     if (! (this < that)) true else false
   }
 }
+case class Single(chr: Byte, pos: Int) extends Region {
+  val start = pos
+  val end = pos + 1
+  override def toString = s"$chr:$pos"
+}
+case class ZeroLength(chr: Byte, pos: Int) extends Region {
+  val start = pos
+  val end = pos
+  override def overlap(that: Region) = false
+}
+case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
+case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
+
+case class Variation(chr: Byte, start: Int, end: Int,
+                     ref: String, alt: String, var info: Option[String] = None) extends Region {
+  def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
+    this(region.chr, region.start, region.end, ref, alt, info)
+  }
+  def mutType = Variant.mutType(ref, alt)
+  override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
+  def ==(that: Variation): Boolean = {
+    this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
+  }
+  def addInfo(k: String, v: String): Variation = {
+    info match {
+      case None => this.info = Some(s"$k=$v")
+      case Some(i) => this.info = Some(s"$i;$k=$v")
+    }
+    this
+  }
+}
+
+object Variation {
+  import Region.Chromosome
+  def apply(x: String): Variation = {
+    val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
+    x match {
+      case p(c, s, e, r, a) =>
+        Variation(c.byte, s.toInt, e.toInt, r, a)
+    }
+  }
+  implicit object VariationOrdering extends Ordering[Variation] {
+    def compare(x: Variation, y: Variation): Int = {
+      val c = Region.ord.compare(x, y)
+      if (c == 0) {
+        x.alt compare y.alt
+      } else {
+        c
+      }
+    }
+  }
+}
+
+object Single {
+  implicit object SingleOrdering extends Ordering[Single] {
+    def compare(x: Single, y: Single): Int = {
+      if (x.chr != y.chr) {
+        x.chr compare y.chr
+      } else {
+        x.pos compare y.pos
+      }
+    }
+  }
+}
 
 
 object Region {
-  case class Single(chr: Byte, pos: Int) extends Region {
-    val start = pos
-    val end = pos + 1
-    override def toString = s"$chr:$pos"
-  }
-  case class ZeroLength(chr: Byte, pos: Int) extends Region {
-    val start = pos
-    val end = pos
-    override def overlap(that: Region) = false
-  }
-  case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
-  case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
-
-  case class Variation(chr: Byte, start: Int, end: Int,
-                       ref: String, alt: String, var info: Option[String] = None) extends Region {
-    def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
-      this(region.chr, region.start, region.end, ref, alt, info)
-    }
-    def mutType = Variant.mutType(ref, alt)
-    override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
-    def ==(that: Variation): Boolean = {
-      this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
-    }
-    def addInfo(k: String, v: String): Variation = {
-      info match {
-        case None => this.info = Some(s"$k=$v")
-        case Some(i) => this.info = Some(s"$i;$k=$v")
-      }
-      this
-    }
-  }
-
-  object Variation {
-    import Region.Chromosome
-    def apply(x: String): Variation = {
-      val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
-      x match {
-        case p(c, s, e, r, a) =>
-          Variation(c.byte, s.toInt, e.toInt, r, a)
-      }
-    }
-    implicit object VariationOrdering extends Ordering[Variation] {
-      def compare(x: Variation, y: Variation): Int = {
-        val c = Region.ord.compare(x, y)
-        if (c == 0) {
-          x.alt compare y.alt
-        } else {
-          c
-        }
-      }
-    }
-  }
-
-  object Single {
-    implicit object SingleOrdering extends Ordering[Single] {
-      def compare(x: Single, y: Single): Int = {
-        if (x.chr != y.chr) {
-          x.chr compare y.chr
-        } else {
-          x.pos compare y.pos
-        }
-      }
-    }
-  }
   implicit def ord[A <: Region] = new Ordering[A] {
     def compare(x: A, y: A): Int = {
       if (x.chr != y.chr) {

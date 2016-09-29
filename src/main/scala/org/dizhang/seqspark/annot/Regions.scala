@@ -54,7 +54,7 @@ object Regions {
     val header = iter.next().split("\t")
     val raw = iter.filterNot(l => l.split("\t")(2).contains("_"))
       .map(l => RefGene.makeExons(l, header))
-      .flatMap(x => x)
+      .flatten
     apply(raw)
   }
 }

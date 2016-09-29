@@ -123,7 +123,7 @@ object IntervalTree {
         acc
       }
     }
-    rec(iter, Leaf())
+    rec(iter, Leaf[A]())
   }
 }
 

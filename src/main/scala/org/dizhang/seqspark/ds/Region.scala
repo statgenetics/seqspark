@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{max, min}
-
+import Region._
 /**
   * Region on chromosome
   * position is 0-based and the interval is half open half closed
@@ -57,74 +57,74 @@ trait Region extends Serializable {
   }
 }
 
-case class Single(chr: Byte, pos: Int) extends Region {
-  val start = pos
-  val end = pos + 1
-  override def toString = s"$chr:$pos"
-}
-case class ZeroLength(chr: Byte, pos: Int) extends Region {
-  val start = pos
-  val end = pos
-  override def overlap(that: Region) = false
-}
-case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
-case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
-
-case class Variation(chr: Byte, start: Int, end: Int,
-                     ref: String, alt: String, var info: Option[String] = None) extends Region {
-  def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
-    this(region.chr, region.start, region.end, ref, alt, info)
-  }
-  def mutType = Variant.mutType(ref, alt)
-  override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
-  def ==(that: Variation): Boolean = {
-    this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
-  }
-  def addInfo(k: String, v: String): Variation = {
-    info match {
-      case None => this.info = Some(s"$k=$v")
-      case Some(i) => this.info = Some(s"$i;$k=$v")
-    }
-    this
-  }
-}
-
-object Variation {
-  import Region.Chromosome
-  def apply(x: String): Variation = {
-    val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
-    x match {
-      case p(c, s, e, r, a) =>
-        Variation(c.byte, s.toInt, e.toInt, r, a)
-    }
-  }
-  implicit object VariationOrdering extends Ordering[Variation] {
-    def compare(x: Variation, y: Variation): Int = {
-      val c = Region.ord.compare(x, y)
-      if (c == 0) {
-        x.alt compare y.alt
-      } else {
-        c
-      }
-    }
-  }
-}
-
-object Single {
-  implicit object SingleOrdering extends Ordering[Single] {
-    def compare(x: Single, y: Single): Int = {
-      if (x.chr != y.chr) {
-        x.chr compare y.chr
-      } else {
-        x.pos compare y.pos
-      }
-    }
-  }
-}
 
 object Region {
+  case class Single(chr: Byte, pos: Int) extends Region {
+    val start = pos
+    val end = pos + 1
+    override def toString = s"$chr:$pos"
+  }
+  case class ZeroLength(chr: Byte, pos: Int) extends Region {
+    val start = pos
+    val end = pos
+    override def overlap(that: Region) = false
+  }
+  case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
+  case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
+
+  case class Variation(chr: Byte, start: Int, end: Int,
+                       ref: String, alt: String, var info: Option[String] = None) extends Region {
+    def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
+      this(region.chr, region.start, region.end, ref, alt, info)
+    }
+    def mutType = Variant.mutType(ref, alt)
+    override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
+    def ==(that: Variation): Boolean = {
+      this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
+    }
+    def addInfo(k: String, v: String): Variation = {
+      info match {
+        case None => this.info = Some(s"$k=$v")
+        case Some(i) => this.info = Some(s"$i;$k=$v")
+      }
+      this
+    }
+  }
+
+  object Variation {
+    import Region.Chromosome
+    def apply(x: String): Variation = {
+      val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
+      x match {
+        case p(c, s, e, r, a) =>
+          Variation(c.byte, s.toInt, e.toInt, r, a)
+      }
+    }
+    implicit object VariationOrdering extends Ordering[Variation] {
+      def compare(x: Variation, y: Variation): Int = {
+        val c = Region.ord.compare(x, y)
+        if (c == 0) {
+          x.alt compare y.alt
+        } else {
+          c
+        }
+      }
+    }
+  }
+
+  object Single {
+    implicit object SingleOrdering extends Ordering[Single] {
+      def compare(x: Single, y: Single): Int = {
+        if (x.chr != y.chr) {
+          x.chr compare y.chr
+        } else {
+          x.pos compare y.pos
+        }
+      }
+    }
+  }
   implicit def ord[A <: Region] = new Ordering[A] {
     def compare(x: A, y: A): Int = {
       if (x.chr != y.chr) {
@@ -136,47 +136,7 @@ object Region {
       }
     }
   }
-  /**
-    * implicit object RegionOrdering extends Ordering[Region] {
-    * def compare(x: Region, y: Region): Int = {
-    * if (x.chr != y.chr) {
-    * x.chr compare y.chr
-    * } else if (x.start != y.start) {
-    * x.start compare y.start
-    * } else {
-    * x.end compare y.end
-    * }
-    * }
-    * }
-  */
-  /**
-    * implicit object StartOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.start compare b.start
-    * }
-    * }
-    *
-    * implicit object MidOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.mid compare b.mid
-    * }
-    * }
-    *
-    * implicit object EndOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.end compare b.end
-    * }
-    * }
-    */
+
   implicit class Chromosome(val self: String) extends AnyVal {
     def byte: Byte = {
       val num = """(\d+)""".r
@@ -184,9 +144,9 @@ object Region {
         case num(x) => x.toByte
         case "X" => 23.toByte
         case "Y" => 24.toByte
-        case "XY" => 25.toByte
-        case "M" => 26.toByte
-        case "MT" => 26.toByte
+        case "M" => 25.toByte
+        case "MT" => 25.toByte
+        case "XY" => 26.toByte
         case _ => 0.toByte
       }
     }
@@ -223,18 +183,4 @@ object Region {
     }
   }
 
-/**
-  * def apply[A](vars: Iterable[Variant[A]], n: Option[String] = None): Region = {
-  * val r = vars.map(v => Region(v.chr, v.pos.toInt - 1, v.pos.toInt))
-  * .reduce((a, b) => )
-  * n match {
-  * case None => r
-  * case Some(s) =>
-  * }
-  * }
-*/
-  /**
-    * def collapse(regs: List[Region]): List[Region] = {
-    * }
-    */
 }

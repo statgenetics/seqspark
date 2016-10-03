@@ -4,9 +4,12 @@ use strict;
 use warnings;
 use Getopt::Long;
 
+
 my $prefix = $ENV{HOME} . "/seqspark";
 my $help = 0;
 my $db_dir = 'seqspark';
+
+if (scalar @ARGV == 0) {&help;}
 
 GetOptions(
 	'prefix=s' => \$prefix,
@@ -15,7 +18,7 @@ GetOptions(
 );
 
 sub build {
-	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/recources/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
+	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
 	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 
@@ -55,8 +58,7 @@ sub download_dbs {
 	if ($db_dir) {
 		print STDERR "going to download refseq and dbsnp to $db_dir\n";
 		for my $db (@db) {
-			!system("curl", "http://www.dizhang.org/seqspark/$db", "|", 
-					"hdfs", "dfs", "-put", "-", "$db_dir/") 
+			!system("curl http://www.dizhang.org/seqspark/$db | hdfs dfs -put - $db_dir/") 
 				or die "Failed to download\n";
 		}
 		
@@ -70,17 +72,11 @@ sub help {
 Options:
 	--help,-h            Show this help message
 	--prefix=[dir]       Set install directory. [~/seqspark]
-	--db-dir=[dir]       HDFS path to store the database files. [seqspark]";
+	--db-dir=[dir]       HDFS path to store the database files. [seqspark]\n";
 	exit;
 }
 
 sub main {
-	if (scalar @ARGV == 0) {$help = 1;}
-	&help if $help;
-	my $dbs_des;
-	if ($dbs) {$dbs_des = "--db";} else {$dbs_des = "--nodb";}
-	my $env_des;
-	if ($env) {$env_des = "--env";} else {$env_des = "--noenv";}
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
 	--db-dir		 $db_dir";	

@@ -58,7 +58,11 @@ sub download_dbs {
 	if ($db_dir) {
 		print STDERR "going to download refseq and dbsnp to $db_dir\n";
 		for my $db (@db) {
-			!system("curl http://www.dizhang.org/seqspark/$db | hdfs dfs -put - $db_dir/") 
+			if (!system("hdfs dfs -test -f $db_dir/$db")) {
+				print STDERR "database $db already exists, skip downloading\n";
+				next;
+			}
+			!system("curl http://seqspark.dizhang.org/$db | hdfs dfs -put - $db_dir/") 
 				or die "Failed to download\n";
 		}
 		
@@ -79,7 +83,7 @@ Options:
 sub main {
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
-	--db-dir		 $db_dir";	
+	--db-dir		 $db_dir\n";	
 	&build;
 	&install;
 	&download_dbs;

@@ -5,19 +5,18 @@ use warnings;
 use Getopt::Long;
 
 my $prefix = $ENV{HOME} . "/seqspark";
-my $dbs = 1;
-my $env = 1;
 my $help = 0;
+my $db_dir = 'seqspark';
 
 GetOptions(
 	'prefix=s' => \$prefix,
-	'db!' => \$dbs,
-	'env!' => \$env,
+	'db-dir=s' => \$db_dir,
 	'h|help!' => \$help
 );
 
 sub build {
-	!system("sbt", "assembly") or die "Failed to build jar\n";
+	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/recources/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
+	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 
 sub install {
@@ -44,39 +43,30 @@ sub install {
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
 }
 
-sub set_env {
-	my $env_vars = "#Environment variables for SeqSpark
-export PATH=$prefix/bin:\$PATH
-export CLASSPATH=$prefix/conf:\$CLASSPATH
-export SEQSPARK_HOME=$prefix\n";
-	if ($env) {
-		print STDERR "Going to add these environment variables to ~/.bashrc";
-		print STDERR $env_vars;
-		open my $fh, ">>~/.bashrc" or die "cannot open ~/.bashrc: $!\n";
-		print $fh $env_vars;		
-		close $fh or die "cannot close ~/.bashrc: $!\n";
-	} else {
-		print STDERR "Please set these environment variables before using seqspark";
-		print STDERR $env_vars;
-	}
-
-}
-
 sub download_dbs {
-	if ($dbs) {
-		!system("wget", "http://www.dizhang.org/seqspark/") or die "Failed to download\n";
+	
+	!system("hdfs", "dfs", "-mkdir", "-p", "$db_dir") 
+		or die "Cannot create dir $db_dir on HDFS, you need to mannually download databases later\n";
+	my @db = qw/refFlat_table.bz2 refGene_mRNA.bz2 dbSNP-138.vcf.bz2/;
+	if ($db_dir) {
+		print STDERR "going to download refseq and dbsnp to $db_dir\n";
+		for my $db (@db) {
+			!system("curl", "http://www.dizhang.org/seqspark/$db", "|", 
+					"hdfs", "dfs", "-put", "-", "$db_dir/") 
+				or die "Failed to download\n";
+		}
+		
 	} else {
-		print "You choose to not download refgene database, please prepare gene definition and sequence files brefore using annotation or rare variant association module\n";
+		die "You didn't specify a valid HDFS path\n";
 	}
 }
 
 sub help {
 		print "Usage: ./install [options]
 Options:
-	--help,-h            show this help message
-	--prefix=[dir]       set prefix directory [~/seqspark]
-	--db,--nodb          download refgene for annotation or not [--db]
-	--env,--noenv        add environemnt variables to ~/.bashrc or not [--env]\n";
+	--help,-h            Show this help message
+	--prefix=[dir]       Set install directory. [~/seqspark]
+	--db-dir=[dir]       HDFS path to store the database files. [seqspark]";
 	exit;
 }
 
@@ -89,11 +79,9 @@ sub main {
 	if ($env) {$env_des = "--env";} else {$env_des = "--noenv";}
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
-	$dbs_des
-	$env_des";
+	--db-dir		 $db_dir";	
 	&build;
 	&install;
-	&env;
 	&download_dbs;
 }
 

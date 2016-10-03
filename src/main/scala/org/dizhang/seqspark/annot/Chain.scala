@@ -2,12 +2,13 @@ package org.dizhang.seqspark.annot
 
 import org.dizhang.seqspark.ds._
 import org.slf4j.LoggerFactory
-
 import scala.io.Source
 import scala.collection.mutable.{Map => MMap}
+
 /**
   * Created by zhangdi on 9/28/16.
   */
+
 class Chain(val map: Map[String, IntervalTree[Named]]) {
   val logger = LoggerFactory.getLogger(this.getClass)
   def liftOver(chr: String, start: Int, end: Int): (String, Int, Int) = {
@@ -35,6 +36,7 @@ class Chain(val map: Map[String, IntervalTree[Named]]) {
     }
   }
 }
+
 object Chain {
   val logger = LoggerFactory.getLogger(this.getClass)
 

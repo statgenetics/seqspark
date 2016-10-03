@@ -6,6 +6,7 @@ import IntervalTree._
 import org.slf4j.LoggerFactory
 
 import annotation.tailrec
+
 /**
   * location tree to hold locations
   */

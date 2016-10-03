@@ -1,0 +1,15 @@
+#!/bin/bash
+
+Mode=$1
+Conf=$2
+shift
+shift
+Opts=$@
+
+echo "     run mode:   $Mode"
+echo "    conf file:   $Conf"
+echo "spark options:   $Opts"
+
+spark-submit --class org.dizhang.seqspark.$Mode $Opts $SEQSPARK_HOME/SeqSpark.jar
+
+exit 0

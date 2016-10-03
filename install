@@ -22,21 +22,25 @@ sub build {
 sub install {
 	open my $fh, "build.sbt" or die "Failed to open build.sbt: $!\n";
 	my $jar;	
+	my $scalaVersion = "2.11";
 	while (<$fh>) {
 		chomp;
 		if (m/(SeqSpark.*\.jar)/) {
 			$jar = $1;
 			last;
 		}
+		if (m/scalaVersion.+?(2\.1[01])\./) {
+			$scalaVersion = $1;
+		}
 	}
-	my $target = "target/scala-2.10/$jar";
+	my $target = "target/scala-$scalaVersion/$jar";
 	if (! $jar) {
 		die "Cannot get the jar file name from build.sbt";
 	} elsif (! -f $target) {
 		die "Cannot find $target, compiling failed?";
 	}
-	my $scripts = "src/bin";
-	my $conf = "src/conf";
+	my $scripts = "bin";
+	my $conf = "conf";
 	!system("mkdir", "-p", "$prefix/db") or die "Failed to create $prefix/\n";
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
 	!system("cp", "-r", $conf, $prefix) or die "Failed to copy conf folder to $prefix/\n";

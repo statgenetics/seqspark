@@ -62,7 +62,7 @@ sub download_dbs {
 				print STDERR "database $db already exists, skip downloading\n";
 				next;
 			}
-			!system("curl http://seqspark.dizhang.org/$db | hdfs dfs -put - $db_dir/") 
+			!system("curl http://seqspark.dizhang.org/$db | hdfs dfs -appendToFile - $db_dir/") 
 				or die "Failed to download\n";
 		}
 		

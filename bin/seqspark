@@ -6,8 +6,26 @@ shift
 shift
 Opts=$@
 
-echo "     run mode:   $Mode"
-echo "    conf file:   $Conf"
+if [[ -z $Mode || -z $Conf ]]
+then
+	echo "************************************************"
+	echo "* run mode and configuration file must be set  *"
+	echo "* Usage: seqspark mode conf                    *"
+	echo "*  mode -- Must be SingleStudy or MetaAnalysis *"
+	echo "*  conf -- File containing the parameters      *"
+	echo "************************************************"
+	exit
+fi
+
+if [ -z $SEQSPARK_HOME ]
+then
+	SEQSPARK_HOME=$(dirname $0)
+fi
+export CLASSPATH=${SEQSPARK_HOME}/conf:$CLASSPATH
+
+
+echo "run mode:        $Mode"
+echo "conf file:       $Conf"
 echo "spark options:   $Opts"
 
 spark-submit --class org.dizhang.seqspark.$Mode $Opts $SEQSPARK_HOME/SeqSpark.jar

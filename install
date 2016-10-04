@@ -84,9 +84,14 @@ sub main {
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
 	--db-dir		 $db_dir\n";	
+	
 	&build;
 	&install;
-	&download_dbs;
+	if ($db_dir) {
+		&download_dbs;
+	} else {
+		print STDERR "No db-dir specified, skip downloading database.\n";
+	}
 }
 
 &main;

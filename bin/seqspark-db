@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+use strict;
+
+my $dbmap = {
+	RefSeq => "refFlat_table.bz2,refGene_mRNA.bz2",
+	ExAC => "ExAC-0.3.1.vcf.bz2",
+	dbSNP => "dbSNP-138.vcf.bz2",
+	dbNSFP => "dbNSFP-3.2.tsv.bz2",
+	CADD => "cadd.tsv.bz2"
+};
+
+sub download_db {
+	my $dir = shift;
+	my $db = shift;
+	my @file = split /,/, $dbmap->{$db};
+	for my $f (@file) {
+		&download_file($dir, $f);
+	}
+}
+
+sub download_file {
+	my $dir = shift;
+	my $file = shift;
+	my $test = system("hdfs dfs -test -e $dir/$file");
+	if (!$test) {
+		print STDERR "$file already exists, skip\n";
+		return;
+	}
+	my $res = system("curl http://seqspark.dizhang.org/$file | hdfs dfs -appendToFile $dir/$file");
+	if (!$res) {
+		print STDERR "Something wrong when downloading $file, exit code: $res\n";
+	}
+}
+
+sub main {
+	my $dir = shift;
+	my $list = shift;
+	if (! $dir) {
+		print STDERR "You need to specify the HDFS path to store the databases.\n";
+		&usage;
+		exit;
+	}
+	! system("hdfs dfs -mkdir -p $dir") or die "Cannot create HDFS path $dir\n";
+	if (! $list) {
+		print STDERR "You need to specify at least one database to download.\n";
+		&usage;
+		exit;
+	}
+	my @db = split /,/, $list;
+	for my $db (@db) {
+		if (exists $dbmap->{$db}) {
+			&download_db($dir, $db);
+		} else {
+			print STDERR "Unrecognized database $db\, skip\n";
+			&usage;
+		}
+	}
+}
+
+sub usage {
+	print STDERR "Usage: seqspark-db hdfs_path db_list
+  hdfs_path:  HDFS path to store the databases. This script will try to create it.
+  db_list:    comma separated database names. Existing databases will be skipped.
+              If you really want to download them, please mannually delete them first.
+                RefSeq -- Reference Sequence
+                dbSNP  -- dbSNP
+                dbNSFP -- Non-synonymous SNVs and their Functional Predictions
+                ExAC   -- Exome Aggregation Consortium
+                CADD   -- Combined Annotation Dependent Depletion
+  example:    seqspark-db ref dbNSFP,ExAC
+";
+}
+
+&main;

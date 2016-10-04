@@ -4,97 +4,94 @@ use strict;
 use warnings;
 use Getopt::Long;
 
+
 my $prefix = $ENV{HOME} . "/seqspark";
-my $dbs = 1;
-my $env = 1;
 my $help = 0;
+my $db_dir = 'seqspark';
+
+if (scalar @ARGV == 0) {&help;}
 
 GetOptions(
 	'prefix=s' => \$prefix,
-	'db!' => \$dbs,
-	'env!' => \$env,
+	'db-dir=s' => \$db_dir,
 	'h|help!' => \$help
 );
 
 sub build {
-	!system("sbt", "assembly") or die "Failed to build jar\n";
+	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
+	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 
 sub install {
 	open my $fh, "build.sbt" or die "Failed to open build.sbt: $!\n";
 	my $jar;	
+	my $scalaVersion = "2.11";
 	while (<$fh>) {
 		chomp;
 		if (m/(SeqSpark.*\.jar)/) {
 			$jar = $1;
 			last;
 		}
+		if (m/scalaVersion.+?(2\.1[01])\./) {
+			$scalaVersion = $1;
+		}
 	}
-	my $target = "target/scala-2.10/$jar";
+	my $target = "target/scala-$scalaVersion/$jar";
 	if (! $jar) {
 		die "Cannot get the jar file name from build.sbt";
 	} elsif (! -f $target) {
 		die "Cannot find $target, compiling failed?";
 	}
-	my $scripts = "src/bin";
-	my $conf = "src/conf";
+	my $scripts = "bin";
+	my $conf = "conf";
 	!system("mkdir", "-p", "$prefix/db") or die "Failed to create $prefix/\n";
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
 	!system("cp", "-r", $conf, $prefix) or die "Failed to copy conf folder to $prefix/\n";
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
 }
 
-sub set_env {
-	my $env_vars = "#Environment variables for SeqSpark
-export PATH=$prefix/bin:\$PATH
-export CLASSPATH=$prefix/conf:\$CLASSPATH
-export SEQSPARK_HOME=$prefix\n";
-	if ($env) {
-		print STDERR "Going to add these environment variables to ~/.bashrc";
-		print STDERR $env_vars;
-		open my $fh, ">>~/.bashrc" or die "cannot open ~/.bashrc: $!\n";
-		print $fh $env_vars;		
-		close $fh or die "cannot close ~/.bashrc: $!\n";
-	} else {
-		print STDERR "Please set these environment variables before using seqspark";
-		print STDERR $env_vars;
-	}
-
-}
-
 sub download_dbs {
-	if ($dbs) {
-		!system("wget", "http://www.dizhang.org/seqspark/") or die "Failed to download\n";
+	
+	!system("hdfs", "dfs", "-mkdir", "-p", "$db_dir") 
+		or die "Cannot create dir $db_dir on HDFS, you need to mannually download databases later\n";
+	my @db = qw/refFlat_table.bz2 refGene_mRNA.bz2 dbSNP-138.vcf.bz2/;
+	if ($db_dir) {
+		print STDERR "going to download refseq and dbsnp to $db_dir\n";
+		for my $db (@db) {
+			if (!system("hdfs dfs -test -f $db_dir/$db")) {
+				print STDERR "database $db already exists, skip downloading\n";
+				next;
+			}
+			!system("curl http://seqspark.dizhang.org/$db | hdfs dfs -appendToFile - $db_dir/$db") 
+				or die "Failed to download\n";
+		}
+		
 	} else {
-		print "You choose to not download refgene database, please prepare gene definition and sequence files brefore using annotation or rare variant association module\n";
+		die "You didn't specify a valid HDFS path\n";
 	}
 }
 
 sub help {
 		print "Usage: ./install [options]
 Options:
-	--help,-h            show this help message
-	--prefix=[dir]       set prefix directory [~/seqspark]
-	--db,--nodb          download refgene for annotation or not [--db]
-	--env,--noenv        add environemnt variables to ~/.bashrc or not [--env]\n";
+	--help,-h            Show this help message
+	--prefix=[dir]       Set install directory. [~/seqspark]
+	--db-dir=[dir]       HDFS path to store the database files. [seqspark]\n";
 	exit;
 }
 
 sub main {
-	if (scalar @ARGV == 0) {$help = 1;}
-	&help if $help;
-	my $dbs_des;
-	if ($dbs) {$dbs_des = "--db";} else {$dbs_des = "--nodb";}
-	my $env_des;
-	if ($env) {$env_des = "--env";} else {$env_des = "--noenv";}
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
-	$dbs_des
-	$env_des";
+	--db-dir		 $db_dir\n";	
+	
 	&build;
 	&install;
-	&env;
-	&download_dbs;
+	if ($db_dir) {
+		&download_dbs;
+	} else {
+		print STDERR "No db-dir specified, skip downloading database.\n";
+	}
 }
 
 &main;

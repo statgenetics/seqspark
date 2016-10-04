@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{max, min}
-
+import Region._
 /**
   * Region on chromosome
   * position is 0-based and the interval is half open half closed
@@ -56,7 +56,6 @@ trait Region extends Serializable {
     if (! (this < that)) true else false
   }
 }
-
 case class Single(chr: Byte, pos: Int) extends Region {
   val start = pos
   val end = pos + 1
@@ -123,6 +122,7 @@ object Single {
   }
 }
 
+
 object Region {
 
   implicit def ord[A <: Region] = new Ordering[A] {
@@ -136,47 +136,7 @@ object Region {
       }
     }
   }
-  /**
-    * implicit object RegionOrdering extends Ordering[Region] {
-    * def compare(x: Region, y: Region): Int = {
-    * if (x.chr != y.chr) {
-    * x.chr compare y.chr
-    * } else if (x.start != y.start) {
-    * x.start compare y.start
-    * } else {
-    * x.end compare y.end
-    * }
-    * }
-    * }
-  */
-  /**
-    * implicit object StartOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.start compare b.start
-    * }
-    * }
-    *
-    * implicit object MidOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.mid compare b.mid
-    * }
-    * }
-    *
-    * implicit object EndOrdering extends Ordering[Region] {
-    * def compare(a: Region, b: Region): Int = {
-    * if (a.chr != b.chr)
-    * a.chr compare b.chr
-    * else
-    * a.end compare b.end
-    * }
-    * }
-    */
+
   implicit class Chromosome(val self: String) extends AnyVal {
     def byte: Byte = {
       val num = """(\d+)""".r
@@ -184,9 +144,9 @@ object Region {
         case num(x) => x.toByte
         case "X" => 23.toByte
         case "Y" => 24.toByte
-        case "XY" => 25.toByte
-        case "M" => 26.toByte
-        case "MT" => 26.toByte
+        case "M" => 25.toByte
+        case "MT" => 25.toByte
+        case "XY" => 26.toByte
         case _ => 0.toByte
       }
     }
@@ -223,18 +183,4 @@ object Region {
     }
   }
 
-/**
-  * def apply[A](vars: Iterable[Variant[A]], n: Option[String] = None): Region = {
-  * val r = vars.map(v => Region(v.chr, v.pos.toInt - 1, v.pos.toInt))
-  * .reduce((a, b) => )
-  * n match {
-  * case None => r
-  * case Some(s) =>
-  * }
-  * }
-*/
-  /**
-    * def collapse(regs: List[Region]): List[Region] = {
-    * }
-    */
 }

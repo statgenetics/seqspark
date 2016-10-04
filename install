@@ -7,7 +7,7 @@ use Getopt::Long;
 
 my $prefix = $ENV{HOME} . "/seqspark";
 my $help = 0;
-my $db_dir = 'seqspark';
+my $db_dir = '';
 
 if (scalar @ARGV == 0) {&help;}
 

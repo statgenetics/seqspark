@@ -7,8 +7,6 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.dizhang.seqspark.pheno.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
-
-import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -18,11 +16,22 @@ object Phenotype {
 
   def apply(path: String, sc: SparkContext): Phenotype = {
     val sqlContext = new SQLContext(sc)
+
+    val raw = sc.textFile(path).cache()
+    val head = raw.first()
+    val ped = raw.zipWithUniqueId().filter(_._2 != 0).map(_._1)
+
     val scheme =
       StructType(
-        Source.fromFile(path).getLines().next().split(Pheno.delim)
+        head.split(Pheno.delim)
         .map(fieldName => StructField(fieldName, StringType, nullable = true)))
-    val rowRDD = sc.textFile(s"file://$path").map(_.split(Pheno.delim)).map(p => Row(p: _*))
+    val rowRDD = ped.map{l =>
+      val p = l.split(Pheno.delim)
+      Row.fromSeq(p.map{
+        case Pheno.mis => null
+        case x => x
+      })
+    }
     val dataFrame = sqlContext.createDataFrame(rowRDD, scheme)
     Distributed(dataFrame)
   }

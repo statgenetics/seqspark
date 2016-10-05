@@ -19,7 +19,7 @@ fi
 
 if [ -z $SEQSPARK_HOME ]
 then
-	SEQSPARK_HOME=$(dirname $0)
+	SEQSPARK_HOME=$(dirname $(dirname $0))
 fi
 export CLASSPATH=${SEQSPARK_HOME}/conf:$CLASSPATH
 

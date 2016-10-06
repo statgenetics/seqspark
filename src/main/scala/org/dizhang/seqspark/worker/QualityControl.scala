@@ -17,8 +17,8 @@ object QualityControl {
     val annotated =  linkVariantDB(input.decompose())(conf, sc).cache()
 
     //annotated.statGdGq(ssc)
-    val cond = conf.qualityControl.genotypes.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")
-    val simpleVCF: Data[Byte] = annotated.genotypeQC(cond).toSimpleVCF.cache()
+
+    val simpleVCF: Data[Byte] = annotated.genotypeQC(conf.qualityControl.genotypes).toSimpleVCF.cache()
 
     /** sample QC */
     simpleVCF.checkSex(ssc)

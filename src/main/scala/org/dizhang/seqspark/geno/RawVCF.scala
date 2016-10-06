@@ -74,17 +74,24 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
     writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")
   }
 
-  def genotypeQC(cond: String): RDD[Variant[String]] = {
-    self.map{v =>
-      v.map{g =>
-        val mis = if (g.gt.contains('|')) {
-          Raw.diploidPhasedMis
-        } else if (g.gt.contains('/')) {
-          Raw.diploidUnPhasedMis
-        } else {
-          Raw.monoploidMis
+  def genotypeQC(cond: List[String]): RDD[Variant[String]] = {
+    val all = cond.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")
+    if (all.isEmpty) {
+      self
+    } else {
+      self.map { v =>
+        v.map { g =>
+          val mis = if (g.gt.contains('|')) {
+            Raw.diploidPhasedMis
+          } else if (g.gt.contains('/')) {
+            Raw.diploidUnPhasedMis
+          } else {
+            Raw.monoploidMis
+          }
+          g.qc(v.format, all, mis)
         }
-        g.qc(v.format, cond, mis)}}
+      }
+    }
   }
 
   def toSimpleVCF: Data[Byte] = {

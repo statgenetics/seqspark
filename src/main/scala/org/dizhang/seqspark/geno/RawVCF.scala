@@ -51,6 +51,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
 
   def statGdGq(ssc: SingleStudyContext): Unit = {
     logger.info("count genotype by DP and GQ ...")
+
     val sc = ssc.sparkContext
     val conf = ssc.userConfig
     val phenotype = ssc.phenotype

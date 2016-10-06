@@ -50,6 +50,7 @@ object Samples {
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: String)
                    (ssc: SingleStudyContext): Unit = {
 
+    logger.info(s"outFile is $outFile")
     val pheno = ssc.phenotype
     val fid = pheno.select("fid").map(_.get)
     val iid = pheno.select("iid").map(_.get)
@@ -61,9 +62,11 @@ object Samples {
     pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
     val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
     val y: Counter[(Double, Double)] = data._2.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
+    logger.info(s"this should be the sample size: ${iid.length} ${x.length} ${y.length}")
     for (i <- iid.indices) {
       pw.write("%s,%s,%s,%f,%f,%f,%f\n" format (fid(i), iid(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
     }
     pw.close()
+    logger.info("are we done now?")
   }
 }

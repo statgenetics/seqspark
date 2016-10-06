@@ -38,12 +38,13 @@ object RefGene {
   }
 
   def apply(build: String, coordFile: String, seqFile: String)(implicit sc: SparkContext): RefGene = {
-    val locIter = Source.fromFile(coordFile).getLines()
-    val header = locIter.next().split("\t")
-    val loci = IntervalTree(locIter.map(l => makeLocation(l, header)))
-    val seqIter = Source.fromFile(seqFile).getLines()
+
+    val locRaw = sc.textFile(coordFile).cache()
+    val header = locRaw.first().split("\t")
+    val locRdd = locRaw.zipWithUniqueId().filter(_._2 > 0).map(_._1)
+    val loci = IntervalTree(locRdd.map(l => makeLocation(l, header)).toLocalIterator)
     val seqName = """>(\w+_\d+)\.\d+""".r
-    val seqLines = sc.textFile(s"file://$seqFile")
+    val seqLines = sc.textFile(seqFile)
 
     val seq = seqLines.map{
       case seqName(n) => Array((n, ""))

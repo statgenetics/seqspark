@@ -53,8 +53,7 @@ object Regions {
     val locRaw = sc.textFile(coordFile).cache()
     val header = locRaw.first().split("\t")
     val locRdd = locRaw.zipWithUniqueId().filter(_._2 > 0).map(_._1)
-
-    val iter = scala.io.Source.fromFile(coordFile).getLines()
+    //val iter = scala.io.Source.fromFile(coordFile).getLines()
     val raw = locRdd.filter(l => ! l.split("\t")(2).contains("_"))
       .flatMap(l => RefGene.makeExons(l, header)).toLocalIterator
     apply(raw)

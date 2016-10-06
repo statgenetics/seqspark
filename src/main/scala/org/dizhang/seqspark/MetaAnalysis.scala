@@ -12,7 +12,7 @@ import util.General._
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def main(args: Array[String]): Unit = {
+  def meta(args: Array[String]): Unit = {
 
     if (badArgs(args)) {
       logger.error(s"bad arguments format: '${args.mkString(" ")}'")

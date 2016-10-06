@@ -44,7 +44,7 @@ object Samples {
     val outdir = new File(ssc.userConfig.localDir + "/output")
     outdir.mkdir()
     logger.info("write checksex result")
-    writeCheckSex((xHet, yCall), outdir.toString + "checkSex.txt")(ssc)
+    writeCheckSex((xHet, yCall), outdir.toString + "/checkSex.txt")(ssc)
     logger.info("done with checksex")
   }
 

@@ -105,6 +105,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
 }
 
 object RawVCF {
+  val logger = LoggerFactory.getLogger(getClass)
 
   implicit class RawGenotype(val g: String) extends AnyVal {
 
@@ -211,6 +212,9 @@ object RawVCF {
   }
 
   def writeBcnt(b: Map[Int, Int2IntOpenHashMap], batchKeys: Array[String], outFile: String) {
+    logger.info(s"write result to $outFile")
+    logger.info(s"we have batch(es): ${b.keys.mkString(",")}")
+
     val pw = new PrintWriter(new File(outFile))
     pw.write("batch\tdp\tgq\tcont\n")
     for ((i, cnt) <- b) {
@@ -224,6 +228,7 @@ object RawVCF {
       }
     }
     pw.close()
+    logger.info("are we done now?")
   }
 
 }

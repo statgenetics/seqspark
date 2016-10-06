@@ -81,7 +81,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
     } else {
       logger.info("start genotype qc")
       val all = cond.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")
-      self.map { v =>
+      val res = self.map { v =>
         v.map { g =>
           val mis = if (g.gt.contains('|')) {
             Raw.diploidPhasedMis
@@ -94,6 +94,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
         }
       }
       logger.info("done with genotype qc")
+      res
     }
   }
 

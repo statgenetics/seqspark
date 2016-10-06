@@ -35,7 +35,9 @@ object CheckDatabase {
         case (k, v) => k -> v.flatten.toArray
       }
       terms.forall{
-        case (db, fields) => checkDB(conf, db, fields)
+        case (db, fields) =>
+          logger.info(s"$db: ${fields.mkString(",")}")
+          checkDB(conf, db, fields)
       }
     } else {
       logger.info("no need to add info to VCF from databases")

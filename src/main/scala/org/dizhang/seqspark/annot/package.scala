@@ -23,12 +23,13 @@ package object annot {
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = conf.qualityControl.variants.map{s => getDBs(s)}
     val annDBs = getDBs(conf.annotation.variants)
-    val assDBs = conf.association.methodList.flatMap(m =>
-      conf.association.method(m).misc.getStringList("variants").asScala.map{
-        s => getDBs(s)
-      }
-    ).toList
+
     if (conf.pipeline.last == "association") {
+      val assDBs = conf.association.methodList.flatMap(m =>
+        conf.association.method(m).misc.getStringList("variants").asScala.map{
+          s => getDBs(s)
+        }
+      ).toList
       ((annDBs :: qcDBs) ::: assDBs).reduce((a, b) => addMap(a, b))
     } else {
       (annDBs :: qcDBs).reduce((a, b) => addMap(a, b))

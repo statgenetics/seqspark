@@ -60,8 +60,8 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
       (batchKeys, (i: Int) => batchIdx(i))
     }
     val all = self.map(v =>
-      v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1))).reduceByKey(keyFunc))
-    val res = all.reduce((a, b) => Counter.addByKey(a, b))
+      v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1))).reduceByKey(keyFunc)(Counter.CounterElementSemiGroup.MapI2I))
+    val res = all.reduce((a, b) => Counter.addByKey(a, b)(Counter.CounterElementSemiGroup.MapI2I))
     val outdir = new File(conf.localDir + "/output")
     outdir.mkdir()
     writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")

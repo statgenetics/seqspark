@@ -161,7 +161,7 @@ object RawVCF {
       Array(v)
     } else {
       val alleles = v.alleles
-      (1 to v.alleleNum).toArray.map{i =>
+      (1 until v.alleleNum).toArray.map{i =>
         val newV = v.map{g =>
           val s = g.split(":")
           val gt = s(0).split("[|/]")

@@ -47,7 +47,7 @@ object SingleStudy {
         run(rootConf)
     } catch {
       case e: Exception => {
-        logger.error("Something is wrong, exit")
+        logger.error("Something went wrong, exit")
         e.printStackTrace()
       }
     }

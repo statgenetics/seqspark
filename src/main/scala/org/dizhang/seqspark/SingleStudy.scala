@@ -25,8 +25,8 @@ object SingleStudy {
   def main(args: Array[String]) {
     /** check args */
     if (badArgs(args)) {
-      logger.error("bad argument")
-      System.exit(1)
+      logger.error(s"bad argument ${args.mkString(" ")}")
+      //System.exit(1)
     }
 
     /** quick run */

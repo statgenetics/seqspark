@@ -28,7 +28,7 @@ object Import {
       case Left(UC.Variants.all) => s1
       case Left(UC.Variants.exome) =>
         val coord = conf.annotation.RefSeq.getString("coord")
-        val exome = sc.broadcast(Regions.makeExome(coord))
+        val exome = sc.broadcast(Regions.makeExome(coord)(sc))
         s1 filter (v => exome.value.overlap(v.toRegion))
       case Left(_) => s1
       case Right(tree) => s1 filter (v => tree.overlap(v.toRegion))

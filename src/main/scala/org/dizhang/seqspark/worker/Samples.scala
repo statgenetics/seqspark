@@ -7,11 +7,13 @@ import org.dizhang.seqspark.ds.Counter
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 9/20/16.
   */
 object Samples {
+  val logger = LoggerFactory.getLogger(getClass)
 
   def checkSex[A](self:Data[A], isHet: A => (Double, Double), callRate: A => (Double, Double))(ssc: SingleStudyContext): Unit = {
     val gb = ssc.userConfig.input.genotype.genomeBuild
@@ -40,7 +42,9 @@ object Samples {
     }
     val outdir = new File(ssc.userConfig.localDir + "/output")
     outdir.mkdir()
+    logger.info("write checksex result")
     writeCheckSex((xHet, yCall), outdir.toString + "checkSex.txt")(ssc)
+    logger.info("done with checksex")
   }
 
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: String)

@@ -38,6 +38,10 @@ object SingleStudy {
         .withFallback(ConfigFactory.load().getConfig("seqspark"))
         .resolve()
 
+      val show = userConf.root().render()
+
+      print("Conf detail:\n" + show + "\n")
+
       val rootConf = RootConfig(userConf)
       if (checkConf(rootConf))
         run(rootConf)

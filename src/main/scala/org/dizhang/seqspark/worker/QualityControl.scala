@@ -16,7 +16,7 @@ object QualityControl {
     val sc = ssc.sparkContext
     val annotated =  linkVariantDB(input.decompose())(conf, sc).cache()
 
-    annotated.statGdGq(ssc)
+    //annotated.statGdGq(ssc)
     val simpleVCF: Data[Byte] = annotated.genotypeQC(conf.qualityControl.genotypes).toSimpleVCF.cache()
 
     /** sample QC */

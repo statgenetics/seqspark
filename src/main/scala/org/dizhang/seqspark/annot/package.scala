@@ -1,7 +1,7 @@
 package org.dizhang.seqspark
 
 import com.typesafe.config.Config
-import org.apache.spark.SparkContext
+import org.apache.spark.{Partitioner, SparkContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene, dbNSFP}
@@ -21,6 +21,22 @@ import scalaz._
   */
 package object annot {
   val logger = LoggerFactory.getLogger(getClass)
+
+  val CHRLEN = Array[Int](250, 244, 199, 191, 181, 172, 160, 147, 142, 136, 136,
+    134, 116, 108, 103, 91, 82, 79, 60, 64,49, 52, 156, 60)
+
+  object VariationPartitioner extends Partitioner {
+    def numPartitions = CHRLEN.sum + 1
+    def getPartition(key: Any): Int = key match {
+      case Variation(chr, start, _, _, _, _) =>
+        if (chr == 0) {
+          CHRLEN.sum
+        } else {
+          CHRLEN.slice(0, chr - 1).sum + start/1000000
+        }
+      case _ => CHRLEN.sum
+    }
+  }
 
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = conf.qualityControl.variants.map{s => getDBs(s)}
@@ -72,12 +88,13 @@ package object annot {
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
     logger.info("link variant database ...")
     val dbTerms = getDBs(conf)
-    val paired = input.map(v => (v.toVariation(), v))
+    val paired = input.map(v => (v.toVariation(), v)).partitionBy(VariationPartitioner)
     dbTerms.foreach{
       case (k, v) =>
         val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
-        paired.leftOuterJoin(db.info).map{
-          case (va, (vt, Some(info))) => db.header.zip(info).foreach{
+        val info = db.info.partitionBy(VariationPartitioner)
+        paired.leftOuterJoin(info).map{
+          case (va, (vt, Some(i))) => db.header.zip(i).foreach{
             case (ik, iv) =>  vt.addInfo(ik, iv)
           }
           case (va, (vt, None)) => {}

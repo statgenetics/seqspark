@@ -75,10 +75,10 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
   }
 
   def genotypeQC(cond: List[String]): RDD[Variant[String]] = {
-    val all = cond.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")
-    if (all.isEmpty) {
+    if (cond.isEmpty) {
       self
     } else {
+      val all = cond.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")
       self.map { v =>
         v.map { g =>
           val mis = if (g.gt.contains('|')) {

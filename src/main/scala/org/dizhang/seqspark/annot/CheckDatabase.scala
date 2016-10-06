@@ -1,8 +1,10 @@
 package org.dizhang.seqspark.annot
 
+import com.typesafe.config.ConfigValue
 import org.dizhang.seqspark.util.LogicalExpression
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.LoggerFactory
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
@@ -30,7 +32,7 @@ object CheckDatabase {
     val annConf = conf.annotation.variants
     if (annConf.hasPath("addInfo")) {
       val terms = annConf.getObject("addInfo").flatMap{
-        case (k, v) => v.toString.split("/").map(_.replaceAll(" ", ""))
+        case (k, _) => annConf.getString(s"addInfo.$k").split("/").map(_.replaceAll(" ", ""))
       }.map(_.split("\\.")).groupBy(_.apply(0)).map{
         case (k, v) => k -> v.flatten.toArray
       }

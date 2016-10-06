@@ -40,7 +40,7 @@ object SingleStudy {
 
       val show = userConf.root().render()
 
-      print("Conf detail:\n" + show)
+      logger.debug("Conf detail:\n" + show)
 
       val rootConf = RootConfig(userConf)
       if (checkConf(rootConf))

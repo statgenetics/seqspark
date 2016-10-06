@@ -124,7 +124,7 @@ object UserConfig {
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
-    def genotypes = config.getString("genotypes")
+    def genotypes = config.getStringList("genotypes").asScala.toList
     def variants = config.getStringList("variants").asScala.toList
   }
 

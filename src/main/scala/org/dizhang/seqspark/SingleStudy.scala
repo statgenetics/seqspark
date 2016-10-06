@@ -4,7 +4,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.dizhang.seqspark.ds.{Bed, Counter}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import java.io.File
 
 import org.dizhang.seqspark.assoc.AssocMaster
@@ -25,6 +25,7 @@ object SingleStudy {
   def main(args: Array[String]) {
     /** check args */
     if (badArgs(args)) {
+      logger.error("bad argument")
       System.exit(1)
     }
 

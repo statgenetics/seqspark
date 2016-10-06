@@ -4,18 +4,21 @@ import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.Variant
 import SimpleVCF._
 import org.dizhang.seqspark.util.SingleStudyContext
-import org.dizhang.seqspark.worker.{Samples, Variants, Data}
+import org.dizhang.seqspark.worker.{Data, Samples, Variants}
 import org.dizhang.seqspark.util.General._
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 9/16/16.
   */
 case class SimpleVCF(self: RDD[Variant[Byte]]) extends GeneralizedVCF[Byte] {
+
   def toRawVCF: Data[String] = {
     self.map(v => v.map(g => g.toRaw))
   }
 
   def variantsFilter(cond: List[String])(ssc: SingleStudyContext): Data[Byte] = {
+    logger.info("filter variants ...")
     val conf = ssc.userConfig
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
@@ -28,6 +31,7 @@ case class SimpleVCF(self: RDD[Variant[Byte]]) extends GeneralizedVCF[Byte] {
   }
 
   def checkSex(implicit ssc: SingleStudyContext): Unit = {
+    logger.info("check sex ...")
     def isHet(g: Byte): (Double, Double) = {
       if (g.isMis) {
         (0, 0)

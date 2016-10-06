@@ -13,6 +13,7 @@ import org.dizhang.seqspark.util.General._
 case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) extends GeneralizedVCF[(Double, Double, Double)] {
 
   def variantsFilter(cond: List[String])(ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
+    logger.info("filter variants ...")
     val conf = ssc.userConfig
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
@@ -25,6 +26,7 @@ case class ImputedVCF(self: RDD[Variant[(Double, Double, Double)]]) extends Gene
   }
 
   def checkSex(implicit ssc: SingleStudyContext): Unit = {
+    logger.info("check sex ...")
     def isHet(g: (Double, Double, Double)): (Double, Double) = {
       if (g == (0, 0, 0)) {
         (0, 0)

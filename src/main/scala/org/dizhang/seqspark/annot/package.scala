@@ -20,6 +20,8 @@ import scalaz._
   * Created by zhangdi on 8/15/16.
   */
 package object annot {
+  val logger = LoggerFactory.getLogger(getClass)
+
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = conf.qualityControl.variants.map{s => getDBs(s)}
     val annDBs = getDBs(conf.annotation.variants)
@@ -58,6 +60,7 @@ package object annot {
   }
 
   def linkGeneDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
+    logger.info("link gene database ...")
     val dbConf = conf.annotation.RefSeq
     val build = dbConf.getString("build")
     val coordFile = dbConf.getString("coordFile")
@@ -67,6 +70,7 @@ package object annot {
   }
 
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
+    logger.info("link variant database ...")
     val dbTerms = getDBs(conf)
     val paired = input.map(v => (v.toVariation(), v))
     dbTerms.foreach{

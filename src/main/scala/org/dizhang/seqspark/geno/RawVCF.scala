@@ -9,17 +9,20 @@ import org.dizhang.seqspark.util.Constant.Genotype._
 import org.dizhang.seqspark.util.{General, LogicalExpression, SingleStudyContext}
 import RawVCF._
 import org.dizhang.seqspark.worker._
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 8/15/16.
   */
 case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
 
+
   def decompose(): Data[String] = {
     self.flatMap(v => decomposeVariant(v))
   }
 
   def checkSex(implicit ssc: SingleStudyContext): Unit = {
+    logger.info("check sex ...")
     def isHet(g: String): (Double, Double) = {
       if (g.startsWith(".")) {
         (0,0)
@@ -34,6 +37,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
   }
 
   def variantsFilter(cond: List[String])(ssc: SingleStudyContext): Data[String] = {
+    logger.info("filter variant ...")
     val conf = ssc.userConfig
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
@@ -46,6 +50,7 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
   }
 
   def statGdGq(ssc: SingleStudyContext): Unit = {
+    logger.info("count genotype by DP and GQ ...")
     val sc = ssc.sparkContext
     val conf = ssc.userConfig
     val phenotype = ssc.phenotype
@@ -60,7 +65,8 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
       (batchKeys, (i: Int) => batchIdx(i))
     }
     val all = self.map(v =>
-      v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1))).reduceByKey(keyFunc)(Counter.CounterElementSemiGroup.MapI2I))
+      v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1)))
+        .reduceByKey(keyFunc)(Counter.CounterElementSemiGroup.MapI2I))
     val res = all.reduce((a, b) => Counter.addByKey(a, b)(Counter.CounterElementSemiGroup.MapI2I))
     val outdir = new File(conf.localDir + "/output")
     outdir.mkdir()

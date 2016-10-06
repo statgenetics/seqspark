@@ -29,7 +29,7 @@ object Import {
     val default = "0/0"
     val s1 = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default, noSample = noSample))
     s1.cache()
-    logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
+    //logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
     val s2 = imConf.variants match {
       case Left(UC.Variants.all) => s1
       case Left(UC.Variants.exome) =>
@@ -41,7 +41,7 @@ object Import {
     }
     s2.cache()
     s1.unpersist()
-    logger.info(s"imported variants: ${s2.count()}")
+    //logger.info(s"imported variants: ${s2.count()}")
     val s3 = if (noSample) {
       s2
     } else {
@@ -81,7 +81,7 @@ object Import {
       case (r, (v, None)) =>
         v
     }.cache()
-    logger.info(s"imported variants: ${res.count()}")
+    //logger.info(s"imported variants: ${res.count()}")
     res.unpersist()
     res
   }

@@ -4,6 +4,7 @@ import java.io.{File, PrintWriter}
 
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.Counter
+import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild

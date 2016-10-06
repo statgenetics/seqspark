@@ -7,6 +7,7 @@ import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import java.io.File
 
+import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.pheno.Phenotype
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
 import org.dizhang.seqspark.worker.QualityControl
@@ -102,12 +103,18 @@ object SingleStudy {
 
   def runVCF(implicit ssc: SingleStudyContext): Unit = {
     val input = worker.Import.fromVCF(ssc)
-    QualityControl.cleanVCF(input)
+    val clean = QualityControl.cleanVCF(input)
+    if (ssc.userConfig.pipeline.length > 1) {
+      AssocMaster.SimpleMaster(clean, ssc).run()
+    }
   }
 
   def runImputed(implicit ssc: SingleStudyContext): Unit = {
     val input = worker.Import.fromImpute2(ssc)
-    QualityControl.cleanImputed(input)
+    val clean = QualityControl.cleanImputed(input)
+    if (ssc.userConfig.pipeline.length > 1) {
+      AssocMaster.ImputedMaster(clean, ssc).run()
+    }
   }
 
 }

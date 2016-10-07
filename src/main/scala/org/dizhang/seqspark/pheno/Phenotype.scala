@@ -56,7 +56,7 @@ object Phenotype {
     def select(field: String): Array[Option[String]] = {
       val spark = df.sparkSession
       import spark.implicits._
-      df.select(field).as[String].map(r => Option(r)).collect()
+      df.select(field).map(r => Option(r(0)).map(_.toString)).collect()
     }
   }
 

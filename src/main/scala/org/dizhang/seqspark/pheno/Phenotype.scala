@@ -4,9 +4,10 @@ import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import breeze.stats._
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
 import org.dizhang.seqspark.pheno.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
+
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -17,6 +18,18 @@ object Phenotype {
   def apply(path: String, sc: SparkContext): Phenotype = {
     val sqlContext = new SQLContext(sc)
 
+    val spark = SparkSession
+      .builder()
+      .appName("SeqSpark Phenotype")
+      .getOrCreate()
+
+    val options = Map(
+      "nullValue" -> Pheno.mis,
+      "sep" -> Pheno.delim
+    )
+
+    val dataFrame = spark.read.options(options).csv(path)
+    /**
     val raw = sc.textFile(path).cache()
     val head = raw.first()
     val ped = raw.zipWithUniqueId().filter(_._2 != 0).map(_._1)
@@ -33,6 +46,7 @@ object Phenotype {
       })
     }
     val dataFrame = sqlContext.createDataFrame(rowRDD, scheme)
+    */
     Distributed(dataFrame)
   }
 

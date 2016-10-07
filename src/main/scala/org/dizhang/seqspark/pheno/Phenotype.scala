@@ -55,9 +55,13 @@ object Phenotype {
 
   case class Distributed(private val df: DataFrame) extends Phenotype {
     def select(field: String): Array[Option[String]] = {
-      val spark = df.sparkSession
-      import spark.implicits._
-      df.select(field).map(r => Option(r(0)).map(_.toString)).collect()
+      if (df.columns.contains(field)) {
+        val spark = df.sparkSession
+        import spark.implicits._
+        df.select(field).map(r => Option(r(0)).map(_.toString)).collect()
+      } else {
+        Array.fill(df.count().toInt)(None)
+      }
     }
   }
 

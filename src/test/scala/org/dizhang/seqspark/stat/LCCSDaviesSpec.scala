@@ -4,7 +4,6 @@ import java.util.logging
 
 import breeze.linalg.DenseVector
 import org.scalatest._
-import org.dizhang.seqspark.stat.{LCCSDavies}
 
 /**
   * Test the linear combination chi-square distribution class

@@ -53,6 +53,7 @@ object Samples {
 
     logger.info(s"outFile is $outFile")
     val pheno = ssc.phenotype
+    logger.info(s"phenotype ")
     val fid = pheno.select("fid").map(_.get)
     logger.info(s"fid ${fid.length}")
     val iid = pheno.select("iid").map(_.get)

@@ -56,7 +56,7 @@ trait LCCSLiu extends LinearCombinationChiSquare {
   val s2 = c4/c2.square
   val muQ = c1
   val sigmaQ = (2 * c2).sqrt
-  private val squareOfS1LargerThanS2: Boolean = {
+  protected val squareOfS1LargerThanS2: Boolean = {
     s1.square > s2
   }
   val a: Double

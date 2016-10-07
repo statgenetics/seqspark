@@ -52,10 +52,7 @@ object Phenotype {
 
   case class Distributed(private val df: DataFrame) extends Phenotype {
     def select(field: String): Array[Option[String]] = {
-      df.select(field).map{
-        case null => None
-        case r => Some(r(0).toString)
-      }.collect()
+      df.select(field).map(r => Option(r(0)).map(_.toString)).collect()
     }
   }
 

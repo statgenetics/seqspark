@@ -9,8 +9,8 @@ import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
 import Encode._
 import org.dizhang.seqspark.util.Constant.Variant.InfoKey
-import org.dizhang.seqspark.geno.SimpleVCF.SimpleGenotype
-import org.dizhang.seqspark.geno.ImputedVCF.ImputedGenotype
+import org.dizhang.seqspark.geno.Genotype
+
 
 /**
   * How to code variants, either in one group (gene) or in a region
@@ -24,20 +24,12 @@ object Encode {
   type Imputed = (Double, Double, Double)
   type Var = Variant[_]
 
-  def makeMaf(x: Any): (Double, Double) = {
-    x match {
-      case g: Byte => g.maf
-      case g: Imputed => g.maf
-      case _ => (-9.0, 1.0)
-    }
+  def makeMaf[A](x: A)(implicit geno: Genotype[A]): (Double, Double) = {
+    geno.maf(x)
   }
 
-  def cmcMakeNaAdjust(x: Any, maf: Double): Double = {
-    x match {
-      case g: Byte => g.toCMC(maf)
-      case g: Imputed => g.toCMC(maf)
-      case _ => -9.0
-    }
+  def cmcMakeNaAdjust[A](x: A, maf: Double)(implicit geno: Genotype[A]): Double = {
+    geno.toCMC(x, maf)
   }
 
   object CmcAddNaAdjust extends Counter.CounterElementSemiGroup[Double] {
@@ -55,12 +47,8 @@ object Encode {
       else
         1.0 - (1.0 - a) * (1.0 - b)}
 
-  def brvMakeNaAdjust(x: Any, maf: Double): Double = {
-    x match {
-      case g: Byte => g.toBRV(maf)
-      case g: Imputed => g.toBRV(maf)
-      case _ => -9.0
-    }
+  def brvMakeNaAdjust[A](x: A, maf: Double)(implicit geno: Genotype[A]): Double = {
+    geno.toBRV(x, maf)
   }
 
   val BrvAddNaAdjust = Counter.CounterElementSemiGroup.AtomDouble

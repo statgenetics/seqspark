@@ -40,7 +40,7 @@ object Samples {
     }
     val outdir = new File(ssc.userConfig.localDir + "/output")
     outdir.mkdir()
-    writeCheckSex((xHet, yCall), outdir.toString + "checkSex.txt")(ssc)
+    writeCheckSex((xHet, yCall), outdir.toString + "/checkSex.txt")(ssc)
   }
 
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: String)

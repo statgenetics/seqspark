@@ -6,7 +6,7 @@ import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
 import SKAT._
 import org.apache.spark.SparkContext
-
+import scala.language.existentials
 /**
   * variance component test
   *
@@ -17,7 +17,7 @@ import org.apache.spark.SparkContext
 object SKAT {
 
   def apply(nullModel: NullModel,
-            x: Encode,
+            x: Encode[_],
             rho: Double): SKAT = {
     val method = x.config.misc.getString("method")
     method match {
@@ -28,7 +28,7 @@ object SKAT {
   }
 
   def apply(nullModel: LogisticModel,
-            x: Encode,
+            x: Encode[_],
             resampled: DM[Double],
             rho: Double): SKAT = {
     SmallSampleAdjust(nullModel, x, resampled, rho)
@@ -57,7 +57,7 @@ object SKAT {
 
   @SerialVersionUID(7727750101L)
   final case class Davies(nullModel: NullModel,
-                          x: Encode,
+                          x: Encode[_],
                           rho: Double = 0.0) extends SKAT {
 
     def pValue: Double = {
@@ -66,7 +66,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750201L)
   final case class Liu(nullModel: NullModel,
-                       x: Encode,
+                       x: Encode[_],
                        rho: Double = 0.0) extends SKAT {
 
     def pValue: Double = {
@@ -75,7 +75,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750301L)
   final case class LiuModified(nullModel: NullModel,
-                               x: Encode,
+                               x: Encode[_],
                                rho: Double = 0.0) extends SKAT {
 
     def pValue: Double = {
@@ -84,7 +84,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750401L)
   final case class SmallSampleAdjust(nullModel: LogisticModel,
-                                     x: Encode,
+                                     x: Encode[_],
                                      resampled: DM[Double],
                                      rho: Double = 0.0) extends SKAT {
     /** resampled is a 10000 x n matrix, storing re-sampled residuals */
@@ -105,7 +105,7 @@ object SKAT {
 @SerialVersionUID(7727750001L)
 trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
-  def x: Encode
+  def x: Encode[_]
   def isDefined: Boolean = x.isDefined
   def rho: Double
   lazy val weight = x.weight()

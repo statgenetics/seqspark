@@ -1,10 +1,11 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{DenseMatrix, DenseVector, shuffle}
+import breeze.linalg.{DenseVector, shuffle}
 import breeze.stats.distributions.Bernoulli
 import org.dizhang.seqspark.assoc.Encode
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
+import scala.language.existentials
 
 /**
   * resampling class
@@ -31,21 +32,15 @@ object Resampling {
     *  */
   @SerialVersionUID(7778770201L)
   final case class Test(refStatistic: Double, min: Int, max: Int,
-                        nullModel: NullModel, x: Encode, transformer: ScoreTest => Double) extends Resampling {
+                        nullModel: NullModel, x: Encode[_], transformer: ScoreTest => Double) extends Resampling {
 
     /** if weight is learned from data, re-generate the genotype coding based on newY */
-    def makeNewX(newY: DenseVector[Double]): Encode = {
-      x match {
-        case Encode.ErecBRV(vars, _, cov, config) =>
-          Encode.ErecBRV(vars, newY, cov, config)
-        case Encode.ControlsMafErecBRV(vars, controls, _, cov, config) =>
-          Encode.ControlsMafErecBRV(vars, controls, newY, cov, config)
-        case _ => x
-      }
+    def makeNewX(newY: DenseVector[Double]): Encode[_] = {
+      x.getNew(newY)
     }
 
     /** re-compute the statistic for the new null model and newX */
-    def makeNewStatistic(newNullModel: NullModel, newX: Encode): Double = {
+    def makeNewStatistic(newNullModel: NullModel, newX: Encode[_]): Double = {
       newX.getCoding.get match {
         case Encode.Fixed(c, _) =>
           val st = ScoreTest(newNullModel, c)

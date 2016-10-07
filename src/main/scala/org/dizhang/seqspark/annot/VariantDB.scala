@@ -48,7 +48,7 @@ object VariantDB {
       val s = l.split(delim)
       val rec = sourceHeader.zip(s).toMap
       val region = Region(rec("chr"), rec("pos").toInt)
-      val variation = Variation(region.chr, region.start, region.end, rec("ref"), rec("alt"))
+      val variation = Variation(region.chr, region.start, region.end, rec("ref"), rec("alt"), None)
       variation -> targetHeader.map(f => rec(f))
     }
 

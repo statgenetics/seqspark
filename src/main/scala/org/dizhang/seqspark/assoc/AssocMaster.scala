@@ -29,11 +29,11 @@ object AssocMaster {
   val IK = Constant.Variant.InfoKey
   type Imputed = (Double, Double, Double)
 
-  def makeEncode[A](currentGenotype: Data[A],
+  def makeEncode[A: Genotype](currentGenotype: Data[A],
                     y: Broadcast[DenseVector[Double]],
                     cov: Broadcast[Option[DenseMatrix[Double]]],
                     controls: Broadcast[Array[Boolean]],
-                    config: MethodConfig)(implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode)] = {
+                    config: MethodConfig)(implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode[_])] = {
 
     /** this is quite tricky
       * some encoding methods require phenotype information
@@ -77,7 +77,7 @@ object AssocMaster {
       thisLoopLimit
   }
 
-  def expand(data: RDD[(String, Encode)], cur: Int, target: Int): RDD[(String, Encode)] = {
+  def expand(data: RDD[(String, Encode[_])], cur: Int, target: Int): RDD[(String, Encode[_])] = {
     if (target == cur)
       data
     else
@@ -85,7 +85,7 @@ object AssocMaster {
   }
 
 
-  def permutationTest(encode: RDD[(String, Encode)],
+  def permutationTest(encode: RDD[(String, Encode[_])],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
@@ -125,7 +125,7 @@ object AssocMaster {
     pCount.value.map(x => (x._1, TestResult(None, None, x._2._2.toDouble, x._2._1.toDouble/x._2._2)))
   }
 
-  def asymptoticTest(encode: RDD[(String, Encode)],
+  def asymptoticTest(encode: RDD[(String, Encode[_])],
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
@@ -146,7 +146,7 @@ object AssocMaster {
     }
   }
 
-  def rareMetalWorker(encode: RDD[(String, Encode)],
+  def rareMetalWorker(encode: RDD[(String, Encode[_])],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
@@ -156,10 +156,7 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
-
   case class SimpleMaster(genotype: Data[Byte], ssc: SingleStudyContext) extends AssocMaster[Byte] {
-
-    def geno: Genotype[Byte] = Genotype.Simple
 
     def samples(input: Data[Byte], indicator: Array[Boolean]) = {
       input.samples(indicator)(ssc.sparkContext)
@@ -170,8 +167,6 @@ object AssocMaster {
   }
 
   case class ImputedMaster(genotype: Data[Imputed], ssc: SingleStudyContext) extends AssocMaster[Imputed] {
-
-    def geno: Genotype[Imputed] = Genotype.Imputed
 
     def samples(input: Data[Imputed], indicator: Array[Boolean]) = {
       input.samples(indicator)(ssc.sparkContext)
@@ -184,8 +179,8 @@ object AssocMaster {
 
 }
 
-trait AssocMaster[A]{
-  def geno: Genotype[A]
+abstract class AssocMaster[A: Genotype]{
+  def geno: Genotype[A] = implicitly[Genotype[A]]
   def genotype: Data[A]
   def ssc: SingleStudyContext
   def samples(input: Data[A], indicator: Array[Boolean]): Data[A]

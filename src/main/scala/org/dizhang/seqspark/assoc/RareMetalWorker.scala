@@ -6,6 +6,7 @@ import org.dizhang.seqspark.stat.ScoreTest
 import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.util.Constant
 import RareMetalWorker._
+import scala.language.existentials
 /**
   * raremetal worker
   * generate the summary statistics
@@ -22,7 +23,7 @@ import RareMetalWorker._
 sealed trait RareMetalWorker extends AssocMethod {
   def nullModel: ScoreTest.NullModel
   def sampleSize: Int = nullModel.responses.length
-  def x: Encode
+  def x: Encode[_]
   def common: Option[Encode.Common]
   def rare: Option[Encode.Rare]
   def model: ScoreTest
@@ -50,7 +51,7 @@ object RareMetalWorker {
 
   @SerialVersionUID(7727790101L)
   final case class Analytic(nullModel: ScoreTest.NullModel,
-                            x: Encode) extends RareMetalWorker {
+                            x: Encode[_]) extends RareMetalWorker {
     val common = x.getCommon()
     val rare = x.getRare()
     val model = ScoreTest (nullModel, common.map(_.coding), rare.map(_.coding))

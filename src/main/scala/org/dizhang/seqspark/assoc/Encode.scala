@@ -23,7 +23,6 @@ object Encode {
 
   type Imputed = (Double, Double, Double)
 
-
   object CmcAddNaAdjust extends Counter.CounterElementSemiGroup[Double] {
     def zero = 0.0
 
@@ -55,11 +54,11 @@ object Encode {
       0.1 + 0.9 * (n - 2000) / 98000
   }
 
-  def apply[A](vars: Iterable[Variant[A]],
+  def apply[A: Genotype](vars: Iterable[Variant[A]],
             controls: Option[Array[Boolean]] = None,
             y: Option[DenseVector[Double]],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A]= {
+            config: MethodConfig): Encode[A] = {
     val codingScheme = config.`type`
     val mafSource = config.maf.getString("source")
     val weightMethod = config.weight
@@ -75,7 +74,7 @@ object Encode {
     }
   }
 
-  def apply[A](varsIter: Iterable[Variant[A]], config: MethodConfig): Encode[A]= {
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]], config: MethodConfig): Encode[A]= {
     val vars = varsIter.toArray
     config.`type` match {
       case MethodType.snv => DefaultSingle(vars, config)
@@ -87,7 +86,7 @@ object Encode {
     }
   }
 
-  def apply[A](varsIter: Iterable[Variant[A]], controls: Array[Boolean], config: MethodConfig): Encode[A]= {
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]], controls: Array[Boolean], config: MethodConfig): Encode[A]= {
     val vars = varsIter.toArray
     config.`type` match {
       case MethodType.snv => ControlsMafSingle(vars, controls, config)
@@ -99,18 +98,18 @@ object Encode {
     }
   }
 
-  def apply[A](varsIter: Iterable[Variant[A]],
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A]= {
+            config: MethodConfig): Encode[A] = {
     ErecBRV(varsIter.toArray, y, cov, config)
   }
 
-  def apply[A](varsIter: Iterable[Variant[A]],
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]],
             controls: Array[Boolean],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A]= {
+            config: MethodConfig): Encode[A] = {
     val vars = varsIter.toArray
     ControlsMafErecBRV(vars, controls, y, cov, config)
   }
@@ -138,6 +137,7 @@ object Encode {
   sealed trait CMC[A] extends Encode[A] {
     def weight(cutoff: Double) = DenseVector[Double]()
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
+
       definedIndices(_ < cutoff).map{idx =>
         val sv = idx.map{i =>
           vars(i).toCounter(genotype.toCMC(_, maf(i)), 0.0)
@@ -229,46 +229,49 @@ object Encode {
     }
   }
 
-  case class DefaultRaw[A](vars: Array[Variant[A]],
-                        config: MethodConfig) extends Encode[A] with Raw[A] with PooledOrAnnotationMaf[A]
+  case class DefaultRaw[A: Genotype](vars: Array[Variant[A]],
+                           config: MethodConfig) extends Encode[A] with Raw[A] with PooledOrAnnotationMaf[A]
 
-  case class ControlsMafRaw[A](vars: Array[Variant[A]],
+  case class ControlsMafRaw[A: Genotype](vars: Array[Variant[A]],
                             controls: Array[Boolean],
-                            config: MethodConfig) extends Encode[A] with Raw[A] with ControlsMaf[A]
+                            config: MethodConfig)
+    extends Encode[A] with Raw[A] with ControlsMaf[A]
 
-  case class DefaultSingle[A](vars: Array[Variant[A]],
-                           config: MethodConfig) extends Encode[A] with Single[A] with PooledOrAnnotationMaf[A]
+  case class DefaultSingle[A: Genotype](vars: Array[Variant[A]],
+                           config: MethodConfig)
+    extends Encode[A] with Single[A] with PooledOrAnnotationMaf[A]
 
-  case class ControlsMafSingle[A](vars: Array[Variant[A]],
+  case class ControlsMafSingle[A: Genotype](vars: Array[Variant[A]],
                                controls: Array[Boolean],
                                config: MethodConfig)
     extends Encode[A] with Single[A] with ControlsMaf[A]
 
-  case class DefaultCMC[A](vars: Array[Variant[A]],
-                        config: MethodConfig) extends Encode[A] with CMC[A] with PooledOrAnnotationMaf[A]
+  case class DefaultCMC[A: Genotype](vars: Array[Variant[A]],
+                        config: MethodConfig)
+    extends Encode[A] with CMC[A] with PooledOrAnnotationMaf[A]
 
-  case class ControlsMafCMC[A](vars: Array[Variant[A]],
+  case class ControlsMafCMC[A: Genotype](vars: Array[Variant[A]],
                             controls: Array[Boolean],
                             config: MethodConfig)
     extends Encode[A] with CMC[A] with ControlsMaf[A]
 
-  case class SimpleBRV[A](vars: Array[Variant[A]],
+  case class SimpleBRV[A: Genotype](vars: Array[Variant[A]],
                        config: MethodConfig)
     extends Encode[A] with BRV[A] with PooledOrAnnotationMaf[A] with SimpleWeight[A]
 
 
-  case class ControlsMafSimpleBRV[A](vars: Array[Variant[A]],
+  case class ControlsMafSimpleBRV[A: Genotype](vars: Array[Variant[A]],
                                   controls: Array[Boolean],
                                   config: MethodConfig)
     extends Encode[A] with BRV[A] with ControlsMaf[A] with SimpleWeight[A]
 
-  case class ErecBRV[A](vars: Array[Variant[A]],
+  case class ErecBRV[A: Genotype](vars: Array[Variant[A]],
                      y: DenseVector[Double],
                      cov: Option[DenseMatrix[Double]],
                      config: MethodConfig)
     extends Encode[A] with BRV[A] with PooledOrAnnotationMaf[A] with LearnedWeight[A]
 
-  case class ControlsMafErecBRV[A](vars: Array[Variant[A]],
+  case class ControlsMafErecBRV[A: Genotype](vars: Array[Variant[A]],
                                 controls: Array[Boolean],
                                 y: DenseVector[Double],
                                 cov: Option[DenseMatrix[Double]],
@@ -279,10 +282,17 @@ object Encode {
 }
 
 @SerialVersionUID(7727390001L)
-abstract class Encode[A : Genotype] extends Serializable {
+abstract class Encode[A: Genotype] extends Serializable {
 
   def genotype = implicitly[Genotype[A]]
 
+  def getNew(newY: DenseVector[Double]): Encode[A] = this match {
+    case Encode.ErecBRV(vars, _, cov, config) =>
+      Encode.ErecBRV(vars, newY, cov, config)
+    case Encode.ControlsMafErecBRV(vars, controls, _, cov, config) =>
+      Encode.ControlsMafErecBRV(vars, controls, newY, cov, config)
+    case x => x
+  }
   def vars: Array[Variant[A]]
   def mafCount: Array[(Double, Double)]
   def maf: Array[Double]
@@ -331,7 +341,7 @@ abstract class Encode[A : Genotype] extends Serializable {
       None
     } else {
       val res = DenseVector.horzcat(vars.zip(maf).filter(v => v._2 >= cutoff).map {
-        case (v, m) => DenseVector(v.toArray.map(genotype.toBRV(_, m)): _*)
+        case (v, m) => DenseVector(v.toIndexedSeq.map(genotype.toBRV(_, m)): _*)
       }: _*)
       val info = vars.zip(mafCount).filter(v => v._2.ratio >= cutoff).map{
         case (v, m) =>

@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 object Phenotype {
 
   def apply(path: String, sc: SparkContext): Phenotype = {
-    val sqlContext = new SQLContext(sc)
+    //val sqlContext = new SQLContext(sc)
 
     val spark = SparkSession
       .builder()
@@ -54,6 +54,8 @@ object Phenotype {
 
   case class Distributed(private val df: DataFrame) extends Phenotype {
     def select(field: String): Array[Option[String]] = {
+      val spark = df.sparkSession
+      import spark.implicits._
       df.select(field).as[String].map(r => Option(r)).collect()
     }
   }

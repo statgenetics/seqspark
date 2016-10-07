@@ -4,6 +4,7 @@ import breeze.stats.distributions.Gaussian
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
+import scala.language.existentials
 
 /**
   * Created by zhangdi on 5/20/16.
@@ -11,14 +12,14 @@ import org.dizhang.seqspark.stat.ScoreTest.NullModel
 @SerialVersionUID(7727280001L)
 trait Burden extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode
+  def x: Encode[_]
   def result: AssocMethod.Result
 }
 
 object Burden {
 
   def apply(nullModel: NullModel,
-            x: Encode): Burden = {
+            x: Encode[_]): Burden = {
     AnalyticTest(nullModel, x)
   }
 
@@ -28,7 +29,7 @@ object Burden {
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode) extends Burden with AssocMethod.AnalyticTest {
+                                x: Encode[_]) extends Burden with AssocMethod.AnalyticTest {
     val geno = x.getFixed().get
     val scoreTest = ScoreTest(nullModel, geno.coding)
     val statistic = getStatistic(scoreTest)
@@ -47,7 +48,7 @@ object Burden {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode) extends Burden with AssocMethod.ResamplingTest {
+                                  x: Encode[_]) extends Burden with AssocMethod.ResamplingTest {
     def pCount = Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     def result: AssocMethod.ResamplingResult = {
       AssocMethod.ResamplingResult(x.getFixed().get.vars, refStatistic, pCount)

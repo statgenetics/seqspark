@@ -12,7 +12,7 @@ import org.dizhang.seqspark.util.General._
 import collection.JavaConverters._
 import breeze.integrate._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
-
+import scala.language.existentials
 /**
   * optimal SKAT test
   *
@@ -25,7 +25,7 @@ object SKATO {
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 1.0)
 
   def apply(nullModel: NullModel,
-            x: Encode): SKATO = {
+            x: Encode[_]): SKATO = {
     val method = x.config.misc.getString("method")
     method match {
       case "davies" => Davies(nullModel, x)
@@ -170,7 +170,7 @@ object SKATO {
 
   @SerialVersionUID(7727760101L)
   case class Davies(nullModel: NullModel,
-                    x: Encode) extends SKATO with AsymptoticKur {
+                    x: Encode[_]) extends SKATO with AsymptoticKur {
     lazy val term2 = new ChiSquared(1.0)
 
     def integralFunc(x: Double): Double = {
@@ -213,14 +213,14 @@ object SKATO {
 
   @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
-                         x: Encode) extends LiuPValue with AsymptoticKur {
+                         x: Encode[_]) extends LiuPValue with AsymptoticKur {
     lazy val kurQ = {
       12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
     }
   }
 
   case class SmallSampleAdjust(nullModel: LogisticModel,
-                               x: Encode,
+                               x: Encode[_],
                                resampled: DM[Double]) extends LiuPValue {
 
     val param = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
@@ -250,7 +250,7 @@ object SKATO {
 @SerialVersionUID(7727760001L)
 trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
-  def x: Encode
+  def x: Encode[_]
   lazy val geno: CM[Double] = x.getRare().get.coding
   lazy val weight = x.weight()
   def numVars = weight.length

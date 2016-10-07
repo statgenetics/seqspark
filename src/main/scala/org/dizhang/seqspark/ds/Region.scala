@@ -71,7 +71,7 @@ case class Interval(chr: Byte, start: Int, end: Int) extends Region
 case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 
 case class Variation(chr: Byte, start: Int, end: Int,
-                     ref: String, alt: String, var info: Option[String] = None) extends Region {
+                     ref: String, alt: String, var info: Option[String]) extends Region {
   def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
     this(region.chr, region.start, region.end, ref, alt, info)
   }
@@ -95,7 +95,7 @@ object Variation {
     val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
     x match {
       case p(c, s, e, r, a) =>
-        Variation(c.byte, s.toInt, e.toInt, r, a)
+        Variation(c.byte, s.toInt, e.toInt, r, a, None)
     }
   }
   implicit object VariationOrdering extends Ordering[Variation] {

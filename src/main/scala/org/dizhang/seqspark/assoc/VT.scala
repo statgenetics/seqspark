@@ -4,7 +4,7 @@ import breeze.linalg._
 import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
 import org.dizhang.seqspark.util.General.{RichDouble}
-
+import scala.language.existentials
 
 /**
   * Variable threshold association method
@@ -12,7 +12,7 @@ import org.dizhang.seqspark.util.General.{RichDouble}
 @SerialVersionUID(7727880001L)
 trait VT extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode
+  def x: Encode[_]
   def result: AssocMethod.Result
 }
 
@@ -25,7 +25,7 @@ object VT {
 
   @SerialVersionUID(7727880101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode) extends VT with AssocMethod.AnalyticTest {
+                                x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
     val geno = x.getVT.get
     val scoreTest = ScoreTest(nullModel, geno.coding)
     val statistic = getStatistic(scoreTest)
@@ -45,7 +45,7 @@ object VT {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode) extends VT with AssocMethod.ResamplingTest {
+                                  x: Encode[_]) extends VT with AssocMethod.ResamplingTest {
     def pCount = {
       Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     }

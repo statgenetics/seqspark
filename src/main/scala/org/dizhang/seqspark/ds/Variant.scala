@@ -2,7 +2,6 @@ package org.dizhang.seqspark.ds
 
 import scala.annotation.tailrec
 import org.dizhang.seqspark.util.UserConfig.MutType
-
 import scala.reflect.ClassTag
 
 /**

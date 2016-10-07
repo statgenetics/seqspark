@@ -28,4 +28,14 @@ resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositori
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
+assemblyMergeStrategy in assembly := {
+	case "reference.conf"                            => MergeStrategy.concat
+	case "pom.xml"                                => MergeStrategy.discard
+	case "pom.properties"                                => MergeStrategy.discard
+	case x =>
+		val oldStrategy = (assemblyMergeStrategy in assembly).value
+		oldStrategy(x)
+}
+
 assemblyJarName in assembly := "SeqSpark.jar"
+

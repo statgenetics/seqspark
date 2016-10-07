@@ -7,10 +7,10 @@ import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
 import org.dizhang.seqspark.pheno.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
-
 import scala.util.{Failure, Success, Try}
 
-/**
+
+ /**
   * Created by zhangdi on 9/13/16.
   */
 object Phenotype {
@@ -22,6 +22,8 @@ object Phenotype {
       .builder()
       .appName("SeqSpark Phenotype")
       .getOrCreate()
+
+    import spark.implicits._
 
     val options = Map(
       "nullValue" -> Pheno.mis,

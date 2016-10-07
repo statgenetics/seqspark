@@ -54,13 +54,17 @@ object Samples {
     logger.info(s"outFile is $outFile")
     val pheno = ssc.phenotype
     val fid = pheno.select("fid").map(_.get)
+    logger.info(s"fid ${fid.length}")
     val iid = pheno.select("iid").map(_.get)
+    logger.info(s"fid ${iid.length}")
     val sex = pheno.select("sex").map{
       case None => "NA"
       case Some(s) => s
     }
+    logger.info(s"sex ${sex.length}")
     val pw = new PrintWriter(new File(outFile))
     pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
+    logger.info(s"before counter")
     val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
     val y: Counter[(Double, Double)] = data._2.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
     logger.info(s"this should be the sample size: ${iid.length} ${x.length} ${y.length}")

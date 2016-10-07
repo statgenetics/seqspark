@@ -27,7 +27,8 @@ object Phenotype {
 
     val options = Map(
       "nullValue" -> Pheno.mis,
-      "sep" -> Pheno.delim
+      "sep" -> Pheno.delim,
+      "header" -> "true"
     )
 
     val dataFrame = spark.read.options(options).csv(path)

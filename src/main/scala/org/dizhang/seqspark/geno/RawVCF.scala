@@ -65,13 +65,13 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
       val batchIdx = batchStr.map(b => batchMap(b))
       (batchKeys, (i: Int) => batchIdx(i))
     }
-    logger.info("still all right?")
+    //logger.info("still all right?")
     val all = self.map(v =>
       v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1)))
         .reduceByKey(keyFunc))
-    logger.info("going to reduce")
+    //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
-    logger.info("what about now")
+    //logger.info("what about now")
     val outdir = new File(conf.localDir + "/output")
     outdir.mkdir()
     writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")

@@ -79,7 +79,7 @@ object General {
   def insert(array: Array[Int], x: Int): Int = {
     @tailrec
     def rec(low: Int, up: Int): Int = {
-      println(s"low: $low up: $up")
+
       if (low == up) {
         low
       } else if (x >= array(up)) {

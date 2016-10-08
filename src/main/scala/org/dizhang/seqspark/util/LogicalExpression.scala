@@ -45,8 +45,11 @@ object LogicalExpression {
   }
 
   def analyze(input: String): Set[String] = {
-    logger.info(s"start analyzing $input")
-    Analyzer.names(input)
+
+    //println(s"start analyzing $input")
+    val res = Analyzer.names(input)
+    //res.foreach(println(_))
+    res
   }
 
   case object Analyzer extends JavaTokenParsers {
@@ -67,7 +70,7 @@ object LogicalExpression {
         case name~(">="|"<="|"=="|"!="|">"|"<")~value => Set(name)
       }
     def existence: Parser[Set[String]] =
-      """[a-zA-Z_]\w*""" ^^ (name => Set(name))
+      """[a-zA-Z_]\w*""".r ^^ (name => Set(name))
     def parse(input: String) = this.parseAll(expr, input)
     def names(input: String) = this.parse(input).get
   }

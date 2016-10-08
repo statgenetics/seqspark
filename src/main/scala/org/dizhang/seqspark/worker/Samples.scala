@@ -14,6 +14,10 @@ import org.dizhang.seqspark.util.UserConfig.GenomeBuild
   */
 object Samples {
 
+  def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
+    
+  }
+
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
     val geno = implicitly[Genotype[A]]
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>

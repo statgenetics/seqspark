@@ -138,7 +138,7 @@ object RawVCF {
     }
 
     def qc(format: String, cond: String, mis: String): String = {
-      val varMap = fields(format)
+      val varMap = fields(format).withDefaultValue("0")
       if (LogicalExpression.judge(varMap)(cond)) {
         g
       } else {

@@ -202,8 +202,8 @@ object RawVCF {
     if (g.startsWith(".")) {
       new Int2IntOpenHashMap(Array(0), Array(1))
     } else {
-      val gd = General.insert(gdTicks, f.getOrElse("DP", "1").toInt)
-      val gq = f.getOrElse("GQ", "0").toInt / 5
+      val gd = General.insert(gdTicks, math.max(f.getOrElse("DP", "1").toInt, 1))
+      val gq = math.min(f.getOrElse("GQ", "0").toInt, 19) / 5
       val key = 20 * gd + gq
       new Int2IntOpenHashMap(Array(key), Array(1))
     }
@@ -217,7 +217,7 @@ object RawVCF {
       while (iter.hasNext) {
         val key = iter.next
         val gd: Int = gdTicks(key / 20)
-        val gq: Int = gqTicks(key - gd * 20)
+        val gq: Int = gqTicks(key % 20)
         val c = cnt.get(key)
         pw.write("%s\t%d\t%d\t%d\n" format (batchKeys(i), gd, gq, c))
       }

@@ -9,7 +9,7 @@ import org.dizhang.seqspark.util.Constant.Genotype._
 import org.dizhang.seqspark.util.{General, LogicalExpression, SingleStudyContext}
 import RawVCF._
 import org.dizhang.seqspark.worker._
-import org.slf4j.LoggerFactory
+
 
 /**
   * Created by zhangdi on 8/15/16.
@@ -65,10 +65,13 @@ case class RawVCF(self: RDD[Variant[String]]) extends GeneralizedVCF[String] {
       val batchIdx = batchStr.map(b => batchMap(b))
       (batchKeys, (i: Int) => batchIdx(i))
     }
+    logger.info("still all right?")
     val all = self.map(v =>
       v.toCounter(makeGdGq(_, v.format), new Int2IntOpenHashMap(Array(0), Array(1)))
-        .reduceByKey(keyFunc)(Counter.CounterElementSemiGroup.MapI2I))
-    val res = all.reduce((a, b) => Counter.addByKey(a, b)(Counter.CounterElementSemiGroup.MapI2I))
+        .reduceByKey(keyFunc))
+    logger.info("going to reduce")
+    val res = all.reduce((a, b) => Counter.addByKey(a, b))
+    logger.info("what about now")
     val outdir = new File(conf.localDir + "/output")
     outdir.mkdir()
     writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")

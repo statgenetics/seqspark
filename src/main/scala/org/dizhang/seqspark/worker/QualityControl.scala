@@ -27,6 +27,8 @@ object QualityControl {
     /** sample QC */
     simpleVCF.checkSex(ssc)
 
+    Samples.titv(simpleVCF)(ssc)
+
     /** Variant QC */
     simpleVCF.variantsFilter(conf.qualityControl.variants)(ssc)
     annotated.unpersist()

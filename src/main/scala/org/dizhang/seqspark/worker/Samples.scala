@@ -1,8 +1,10 @@
 package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
+
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.Counter
+import org.dizhang.seqspark.geno.Genotype
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
@@ -11,6 +13,28 @@ import org.dizhang.seqspark.util.UserConfig.GenomeBuild
   * Created by zhangdi on 9/20/16.
   */
 object Samples {
+
+  def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
+    val geno = implicitly[Genotype[A]]
+    val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
+      if (v.isTi) {
+        v.toCounter(g => (geno.maf(g)._1, 0.0), (0.0, 0.0))
+      } else {
+        v.toCounter(g => (0.0, geno.maf(g)._1), (0.0, 0.0))
+      }
+    }.reduce((a, b) => a ++ b)
+    val pheno = ssc.phenotype
+    val fid = pheno.select("fid").map(_.get)
+    val iid = pheno.select("iid").map(_.get)
+    val outFile = "output/titv.txt"
+    val pw = new PrintWriter(new File(outFile))
+    pw.write("fid,iid,ti,tv\n")
+    for (i <- iid.indices) {
+      val c = cnt(i)
+      pw.write("%s,%s,%.2f,%.2f\n" format (fid(i), iid(i), c._1, c._2))
+    }
+    pw.close()
+  }
 
   def checkSex[A](self:Data[A], isHet: A => (Double, Double), callRate: A => (Double, Double))
                  (ssc: SingleStudyContext): Unit = {

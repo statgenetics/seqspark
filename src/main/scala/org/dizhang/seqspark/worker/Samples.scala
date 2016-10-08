@@ -1,7 +1,6 @@
 package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
-
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.Counter
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
@@ -13,7 +12,8 @@ import org.dizhang.seqspark.util.UserConfig.GenomeBuild
   */
 object Samples {
 
-  def checkSex[A](self:Data[A], isHet: A => (Double, Double), callRate: A => (Double, Double))(ssc: SingleStudyContext): Unit = {
+  def checkSex[A](self:Data[A], isHet: A => (Double, Double), callRate: A => (Double, Double))
+                 (ssc: SingleStudyContext): Unit = {
     val gb = ssc.userConfig.input.genotype.genomeBuild
     val pseudo = if (gb == GenomeBuild.hg19) {
       Hg19.pseudo
@@ -21,9 +21,11 @@ object Samples {
       Hg38.pseudo
     }
     val chrX = self.filter(v =>
-      (! IntervalTree.overlap(pseudo, v.toRegion)) && (v.chr == "X" | v.chr == "chrX")).cache()
+      (! IntervalTree.overlap(pseudo, v.toRegion)) && (v.chr == "X" | v.chr == "chrX"))
+      chrX.cache()
     val chrY = self.filter(v =>
-      (! IntervalTree.overlap(pseudo, v.toRegion)) && (v.chr == "Y" | v.chr == "chrY")).cache()
+      (! IntervalTree.overlap(pseudo, v.toRegion)) && (v.chr == "Y" | v.chr == "chrY"))
+      chrY.cache()
     val xHet: Option[Counter[(Double, Double)]] = if (chrX.count() == 0) {
       None
     } else {

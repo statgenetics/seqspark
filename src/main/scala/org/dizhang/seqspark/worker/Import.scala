@@ -28,7 +28,7 @@ object Import {
     val raw = sc.textFile(imConf.path)
     val default = "0/0"
     val s1 = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default, noSample = noSample))
-    s1.cache()
+    //s1.cache()
     //logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
     val s2 = imConf.variants match {
       case Left(UC.Variants.all) => s1
@@ -39,8 +39,8 @@ object Import {
       case Left(_) => s1
       case Right(tree) => s1 filter (v => tree.overlap(v.toRegion))
     }
-    s2.cache()
-    s1.unpersist()
+    //s2.cache()
+    //s1.unpersist()
     //logger.info(s"imported variants: ${s2.count()}")
     val s3 = if (noSample) {
       s2
@@ -52,7 +52,7 @@ object Import {
           s2.samples(samples)(sc)
       }
     }
-    s2.unpersist()
+    //s2.unpersist()
     s3
   }
 
@@ -80,9 +80,9 @@ object Import {
         v
       case (r, (v, None)) =>
         v
-    }.cache()
+    }
     //logger.info(s"imported variants: ${res.count()}")
-    res.unpersist()
+    //res.unpersist()
     res
   }
 }

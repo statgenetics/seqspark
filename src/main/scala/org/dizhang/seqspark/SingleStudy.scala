@@ -7,6 +7,7 @@ import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.ConfigFactory
 import java.io.File
 
+import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.pheno.Phenotype
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
@@ -110,6 +111,7 @@ object SingleStudy {
   def runVCF(implicit ssc: SingleStudyContext): Unit = {
     val input = worker.Import.fromVCF(ssc)
     val clean = QualityControl.cleanVCF(input)
+    clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
       AssocMaster.SimpleMaster(clean, ssc).run()
     }
@@ -118,6 +120,7 @@ object SingleStudy {
   def runImputed(implicit ssc: SingleStudyContext): Unit = {
     val input = worker.Import.fromImpute2(ssc)
     val clean = QualityControl.cleanImputed(input)
+    clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
       AssocMaster.ImputedMaster(clean, ssc).run()
     }

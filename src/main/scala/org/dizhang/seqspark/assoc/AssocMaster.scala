@@ -28,6 +28,7 @@ object AssocMaster {
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
   val IK = Constant.Variant.InfoKey
   type Imputed = (Double, Double, Double)
+  val logger = LoggerFactory.getLogger(getClass)
 
   def makeEncode[A: Genotype](currentGenotype: Data[A],
                     y: Broadcast[DenseVector[Double]],
@@ -37,7 +38,10 @@ object AssocMaster {
 
     /** this is quite tricky
       * some encoding methods require phenotype information
-      * e.g. to learning weight from data */
+      * e.g. to learning weight from data
+      * */
+
+    logger.info("start encoding genotype ")
     val sampleSize = y.value.length
     val codingScheme = config.`type`
     val groupBy = config.misc.getStringList("groupBy").asScala.toList
@@ -91,6 +95,7 @@ object AssocMaster {
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
                       config: MethodConfig)(implicit sc: SparkContext): Map[String, TestResult] = {
+    logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     val nm = ScoreTest.NullModel(reg)
     val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, config).collect().toMap
@@ -129,7 +134,9 @@ object AssocMaster {
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
-                     config: MethodConfig)(implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+                     config: MethodConfig)
+                    (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+    logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     lazy val nm = sc.broadcast(ScoreTest.NullModel(reg))
     lazy val snm = sc.broadcast(SKATO.NullModel(reg))
@@ -250,7 +257,7 @@ abstract class AssocMaster[A: Genotype]{
     val permutation = methodConfig.resampling
     val test = methodConfig.test
     val binary = config.`trait`(currentTrait._1).binary
-
+    logger.info(s"run trait ${currentTrait._1} with method $method")
     if (methodConfig.`type` == MethodType.meta) {
       rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
     } else if (permutation) {

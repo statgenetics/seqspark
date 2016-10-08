@@ -194,7 +194,7 @@ object RawVCF {
     }
   }
 
-  val gdTicks = (1 to 10).toArray ++ Array(12, 15, 20, 25, 30, 35, 40, 60, 80, 100)
+  val gdTicks = (0 to 10).toArray ++ Array(15, 20, 25, 30, 35, 40, 60, 80, 100)
   val gqTicks = Range(0, 100, 5).toArray
 
   def makeGdGq(g: String, format: String): Int2IntOpenHashMap = {
@@ -202,8 +202,8 @@ object RawVCF {
     if (g.startsWith(".")) {
       new Int2IntOpenHashMap(Array(0), Array(1))
     } else {
-      val gd = General.insert(gdTicks, math.max(f.getOrElse("DP", "1").toInt, 1))
-      val gq = math.min(f.getOrElse("GQ", "0").toInt, 19) / 5
+      val gd = General.insert(gdTicks, f.getOrElse("DP", "0").toInt)
+      val gq = math.min(f.getOrElse("GQ", "0").toInt, 99) / 5
       val key = 20 * gd + gq
       new Int2IntOpenHashMap(Array(key), Array(1))
     }
@@ -211,14 +211,14 @@ object RawVCF {
 
   def writeBcnt(b: Map[Int, Int2IntOpenHashMap], batchKeys: Array[String], outFile: String) {
     val pw = new PrintWriter(new File(outFile))
-    pw.write("batch\tdp\tgq\tcont\n")
+    pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {
       val iter = cnt.keySet.iterator
       while (iter.hasNext) {
         val key = iter.next
         val gd: Int = gdTicks(key / 20)
         val gq: Int = gqTicks(key % 20)
-        val c = cnt.get(key)
+        val c = cnt.get(key).toInt
         pw.write("%s\t%d\t%d\t%d\n" format (batchKeys(i), gd, gq, c))
       }
     }

@@ -77,8 +77,9 @@ object General {
   }
 
   def insert(array: Array[Int], x: Int): Int = {
-    @tailrec
+    //@tailrec
     def rec(low: Int, up: Int): Int = {
+      println(s"low: $low up: $up")
       if (low == up) {
         low
       } else if (x >= array(up)) {
@@ -88,7 +89,7 @@ object General {
       } else if (x < array((low + up)/2)) {
         rec(low, (low + up)/2 - 1)
       } else {
-        rec((low + up)/2, up)
+        rec((low + up)/2 + 1, up)
       }
     }
     rec(0, array.length - 1)

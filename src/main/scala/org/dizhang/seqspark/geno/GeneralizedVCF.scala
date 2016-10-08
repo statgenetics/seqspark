@@ -33,7 +33,6 @@ trait GeneralizedVCF[A] {
   def toDummy: RDD[Variant[A]] = {
     self.map(v => v.toDummy)
   }
-
 }
 
 object GeneralizedVCF {

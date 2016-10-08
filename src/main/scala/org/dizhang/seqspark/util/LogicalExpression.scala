@@ -1,5 +1,7 @@
 package org.dizhang.seqspark.util
 
+import org.slf4j.LoggerFactory
+
 import scala.util.parsing.combinator.JavaTokenParsers
 
 /**
@@ -36,11 +38,14 @@ case class LogicalExpression(varMap: Map[String, String]) extends JavaTokenParse
 }
 
 object LogicalExpression {
+  val logger = LoggerFactory.getLogger(getClass)
+
   def judge(varMap: Map[String, String])(input: String): Boolean = {
     LogicalExpression(varMap).judge(input)
   }
 
   def analyze(input: String): Set[String] = {
+    logger.info(s"start analyzing $input")
     Analyzer.names(input)
   }
 

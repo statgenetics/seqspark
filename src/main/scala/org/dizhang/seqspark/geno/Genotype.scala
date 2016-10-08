@@ -9,7 +9,7 @@ import ImputedVCF._
   */
 /** here we go */
 
-trait Genotype[A] {
+trait Genotype[A] extends Serializable {
   def maf(g: A): (Double, Double)
   def toCMC(g: A, maf: Double): Double
   def toBRV(g: A, maf: Double): Double

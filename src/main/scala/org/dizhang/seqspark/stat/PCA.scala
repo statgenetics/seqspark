@@ -11,7 +11,8 @@ import org.dizhang.seqspark.util.General._
 /**
   * perform PCA for
   */
-class PCA[A: Genotype](vcf: Data[A]) {
+@SerialVersionUID(103L)
+class PCA[A: Genotype](vcf: Data[A]) extends Serializable {
 
   def geno = implicitly[Genotype[A]]
 

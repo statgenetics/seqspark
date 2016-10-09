@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.ds
 
-import breeze.linalg.{DenseMatrix => DM, DenseVector => DV, _}
+import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import breeze.stats._
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -70,19 +70,19 @@ object Phenotype {
     if (toDouble.count(_.isDefined) == 0) {
       None
     } else {
-      val defined = DV(toDouble.filter(_.isDefined).map(_.get))
-      val Mean = mean(defined)
-      val imputed = toDouble.map{
+      val defined: Array[Double] = toDouble.filter(_.isDefined).map(_.get)
+      val Mean: Double = mean(defined)
+      val imputed: Array[Double] = toDouble.map{
         case None => Mean
         case Some(d) => d
       }
-      val len = (data.length * limit).toInt
+      val len: Int = (data.length * limit).toInt
       if (len < 1) {
         Some(imputed)
       } else {
-        val sorted = imputed.sorted
-        val (low, up) = (sorted(len - 1), sorted(sorted.length - len))
-        val res = imputed.map{x =>
+        val sorted: Array[Double] = imputed.sorted
+        val (low, up): (Double, Double) = (sorted(len - 1), sorted(sorted.length - len))
+        val res: Array[Double] = imputed.map{x =>
           if (x <= low) {
             low
           } else if (x >= up) {

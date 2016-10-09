@@ -8,7 +8,8 @@ import scala.util.parsing.combinator.JavaTokenParsers
   * A logical expression parser
   */
 
-case class LogicalExpression(varMap: Map[String, String]) extends JavaTokenParsers {
+case class LogicalExpression(varMap: Map[String, String])
+  extends JavaTokenParsers with Serializable {
   def expr: Parser[Boolean] = term~rep("or"~term) ^^ {
     case f1 ~ f2 => (f1 /: f2)(_ || _._2)
   }
@@ -52,7 +53,7 @@ object LogicalExpression {
     res
   }
 
-  case object Analyzer extends JavaTokenParsers {
+  case object Analyzer extends JavaTokenParsers with Serializable {
     def expr: Parser[Set[String]] = term~rep("or"~term) ^^ {
       case f1 ~ f2 => (f1 /: f2)(_ ++ _._2)
     }

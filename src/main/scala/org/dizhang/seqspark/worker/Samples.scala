@@ -7,17 +7,20 @@ import org.dizhang.seqspark.ds.{Counter, Genotype}
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 9/20/16.
   */
 object Samples {
+  val logger = LoggerFactory.getLogger(getClass)
 
   def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
     
   }
 
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
+    logger.info("compute ti/tv for samples")
     val geno = implicitly[Genotype[A]]
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       if (v.isTi) {
@@ -40,6 +43,7 @@ object Samples {
   }
 
   def checkSex[A: Genotype](self:Data[A])(ssc: SingleStudyContext): Unit = {
+    logger.info("check sex")
     val geno = implicitly[Genotype[A]]
     def toHet(g: A): (Double, Double) = {
       if (geno.isMis(g)) {

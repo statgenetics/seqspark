@@ -9,7 +9,6 @@ import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
 import Encode._
 import org.dizhang.seqspark.util.Constant.Variant.InfoKey
-import org.dizhang.seqspark.geno.Genotype
 
 
 /**
@@ -173,7 +172,7 @@ object Encode {
   }
 
   sealed trait PooledOrAnnotationMaf[A] extends Encode[A] {
-    lazy val mafCount = vars.map(v => v.toCounter(genotype.maf, (0.0, 2.0)).reduce)
+    lazy val mafCount = vars.map(v => v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce)
 
     lazy val maf = {
       config.maf.getString("source") match {
@@ -186,7 +185,7 @@ object Encode {
 
   sealed trait ControlsMaf[A] extends Encode[A] {
     def controls: Array[Boolean]
-    lazy val mafCount = vars.map(v => v.select(controls).toCounter(genotype.maf, (0.0, 2.0)).reduce)
+    lazy val mafCount = vars.map(v => v.select(controls).toCounter(genotype.toAAF, (0.0, 2.0)).reduce)
     lazy val maf = mafCount.map(_.ratio)
   }
 

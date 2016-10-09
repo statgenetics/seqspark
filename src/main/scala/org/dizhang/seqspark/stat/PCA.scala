@@ -1,23 +1,25 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseMatrix => BDM}
-import org.apache.spark.mllib.linalg.{Vectors, Vector}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.feature.{PCA => SPCA}
 import org.apache.spark.rdd.RDD
+import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.worker.Data
-import org.dizhang.seqspark.geno.Genotype
 import org.dizhang.seqspark.util.General._
 
 /**
   * perform PCA for
   */
-class PCA[A](vcf: Data[A])(implicit geno: Genotype[A]) {
+class PCA[A: Genotype](vcf: Data[A]) {
+
+  def geno = implicitly[Genotype[A]]
 
   def transpose: RDD[Vector] = {
     val input = vcf
     val byColAndRow = input.zipWithIndex().flatMap{
       case (v, ri) =>
-        val maf = v.toCounter(geno.maf, (0.0, 2.0)).reduce.ratio
+        val maf = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce.ratio
         v.toIndexedSeq.zipWithIndex.map{
         case (g, ci) => ci -> (ri, geno.toBRV(g, maf))
       }

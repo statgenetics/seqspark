@@ -1,7 +1,7 @@
 package org.dizhang.seqspark
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.dizhang.seqspark.ds.{Bed, Counter}
+import org.dizhang.seqspark.ds.{Bed, Counter, Phenotype}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.ConfigFactory
@@ -9,7 +9,6 @@ import java.io.File
 
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.assoc.AssocMaster
-import org.dizhang.seqspark.pheno.Phenotype
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
 import org.dizhang.seqspark.worker.QualityControl
 import org.slf4j.LoggerFactory
@@ -113,7 +112,7 @@ object SingleStudy {
     val clean = QualityControl.cleanVCF(input)
     clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
-      AssocMaster.SimpleMaster(clean, ssc).run()
+      new AssocMaster(clean)(ssc).run()
     }
   }
 
@@ -122,7 +121,7 @@ object SingleStudy {
     val clean = QualityControl.cleanImputed(input)
     clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
-      AssocMaster.ImputedMaster(clean, ssc).run()
+      new AssocMaster(clean)(ssc).run()
     }
   }
 

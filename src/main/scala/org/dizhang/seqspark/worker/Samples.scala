@@ -3,8 +3,7 @@ package org.dizhang.seqspark.worker
 import java.io.{File, PrintWriter}
 
 import org.dizhang.seqspark.annot.IntervalTree
-import org.dizhang.seqspark.ds.Counter
-import org.dizhang.seqspark.geno.Genotype
+import org.dizhang.seqspark.ds.{Counter, Genotype}
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
@@ -22,9 +21,9 @@ object Samples {
     val geno = implicitly[Genotype[A]]
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       if (v.isTi) {
-        v.toCounter(g => (geno.maf(g)._1, 0.0), (0.0, 0.0))
+        v.toCounter(g => (geno.toAAF(g)._1, 0.0), (0.0, 0.0))
       } else {
-        v.toCounter(g => (0.0, geno.maf(g)._1), (0.0, 0.0))
+        v.toCounter(g => (0.0, geno.toAAF(g)._1), (0.0, 0.0))
       }
     }.reduce((a, b) => a ++ b)
     val pheno = ssc.phenotype
@@ -40,8 +39,17 @@ object Samples {
     pw.close()
   }
 
-  def checkSex[A](self:Data[A], isHet: A => (Double, Double), callRate: A => (Double, Double))
-                 (ssc: SingleStudyContext): Unit = {
+  def checkSex[A: Genotype](self:Data[A])(ssc: SingleStudyContext): Unit = {
+    val geno = implicitly[Genotype[A]]
+    def toHet(g: A): (Double, Double) = {
+      if (geno.isMis(g)) {
+        (0, 0)
+      } else if (geno.isHet(g)) {
+        (1, 1)
+      } else {
+        (0, 1)
+      }
+    }
     val gb = ssc.userConfig.input.genotype.genomeBuild
     val pseudo = if (gb == GenomeBuild.hg19) {
       Hg19.pseudo
@@ -58,14 +66,14 @@ object Samples {
       None
     } else {
       val res = chrX.map(v =>
-        v.toCounter(isHet, (0.0, 1.0))).reduce((a, b) => a ++ b)
+        v.toCounter(toHet, (0.0, 1.0))).reduce((a, b) => a ++ b)
       Some(res)
     }
     val yCall: Option[Counter[(Double, Double)]] = if (chrY.count() == 0) {
       None
     } else {
       val res = chrY.map(v =>
-        v.toCounter(callRate, (0.0, 1.0))).reduce((a, b) => a ++ b)
+        v.toCounter(geno.callRate, (0.0, 1.0))).reduce((a, b) => a ++ b)
       Some(res)
     }
     val outdir = new File(ssc.userConfig.localDir + "/output")

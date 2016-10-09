@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.util
 
 import org.apache.spark.SparkContext
-import org.dizhang.seqspark.pheno.Phenotype
+import org.dizhang.seqspark.ds.Phenotype
 import org.dizhang.seqspark.util.UserConfig.{MetaConfig, RootConfig}
 
 /**

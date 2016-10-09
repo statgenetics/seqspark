@@ -1,89 +1,87 @@
 package org.dizhang.seqspark.worker
 
-import org.dizhang.seqspark.ds.Variant
+import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.util.{LogicalExpression, SingleStudyContext}
 import breeze.stats.distributions.ChiSquared
-import org.apache.spark.rdd.RDD
+
+import scala.language.implicitConversions
 /**
   * Created by zhangdi on 9/20/16.
   */
 object Variants {
 
-  def maf[A](v: Variant[A], controls: Array[Boolean], makeMaf: A => (Double, Double)): Double = {
-    val res = v.select(controls).toCounter(makeMaf, (0.0, 2.0)).reduce
-    res.ratio
-  }
-  def batchMaf[A](v: Variant[A],
-                  controls: Array[Boolean],
-                  batch: Array[String],
-                  makeMaf: A => (Double, Double)): Map[String, Double] = {
-    val keyFunc = (i: Int) => batch(i)
-    val res = v.select(controls).toCounter(makeMaf, (0.0, 2.0)).reduceByKey(keyFunc)
-    res.map{case (k, v) => k -> v.ratio}
-  }
-  def callRate[A](v: Variant[A], makeCall: A => (Double, Double)): Double = {
-    val res = v.toCounter(makeCall, (1.0, 1.0)).reduce
-    res.ratio
-  }
-  def batchCallRate[A](v: Variant[A],
-                       batch: Array[String],
-                       makeCall: A => (Double, Double)): Map[String, Double] = {
-    val keyFunc = (i: Int) => batch(i)
-    val res = v.toCounter(makeCall, (1.0, 1.0)).reduceByKey(keyFunc)
-    res.map{case (k, v) => k -> v.ratio}
-  }
-  def hwePvalue[A](v: Variant[A],
-                   controls: Array[Boolean],
-                   makeHWE: A => (Double, Double, Double)): Double = {
-    val cnt = v.select(controls).toCounter(makeHWE, (1.0, 0.0, 0.0)).reduce
-    val n = cnt._1 + cnt._2 + cnt._3
-    val p = (cnt._1 + cnt._2/2)/n
-    val q = 1 - p
-    val eAA = p.square * n
-    val eAa = 2 * p * q * n
-    val eaa = q.square * n
-    val chisq = (cnt._1 - eAA).square/eAA + (cnt._2 - eAa).square/eAa + (cnt._3 - eaa).square/eaa
-    val dis = ChiSquared(1)
-    1.0 - dis.cdf(chisq)
+  implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
+
+  def decompose(self: Data[String]): Data[String] = {
+    self.flatMap(v => decomposeVariant(v))
   }
 
-  def batchSpecific[A](v: Variant[A],
-                       batch: Array[String],
-                       makeMaf: A => (Double, Double)): Map[String, Double] = {
-    val keyFunc = (i: Int) => batch(i)
-    val res = v.toCounter(makeMaf, (0.0, 2.0)).reduceByKey(keyFunc)
-    res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+  def decomposeVariant(v: Variant[String]): Array[Variant[String]] = {
+    /** decompose multi-allelic variants to bi-allelic variants */
+    if (v.alleleNum == 2) {
+      Array(v)
+    } else {
+      val alleles = v.alleles
+      (1 until v.alleleNum).toArray.map{i =>
+        val newV = v.map{g =>
+          val s = g.split(":")
+          val gt = s(0).split("[|/]")
+          if (gt.length == 1) {
+            if (gt(0) == "0") "0" else "1"
+          } else {
+            gt.map(j => if (j.toInt == i) "1" else "0").mkString(s(0).substring(1,2))
+          }
+        }
+        newV.meta(4) = alleles(i)
+        newV
+      }
+    }
   }
 
-  def isFunctional[A](v: Variant[A]): Int = {
-    val genes = parseAnnotation(v.parseInfo(IK.anno))
-    if (genes.exists(p => FM(p._2) <= 4)) 1 else 0
-  }
+  class VariantQC[A: Genotype](v: Variant[A]) extends Serializable {
+    def geno = implicitly[Genotype[A]]
+    def maf(controls: Array[Boolean]): Double = {
+      val res = v.select(controls).toCounter(geno.toAAF, (0.0, 2.0)).reduce
+      res.ratio
+    }
+    def batchMaf(controls: Array[Boolean],
+                 batch: Array[String]): Map[String, Double] = {
+      val keyFunc = (i: Int) => batch(i)
+      val res = v.select(controls).toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+      res.map{case (k, v) => k -> v.ratio}
+    }
+    def callRate: Double = {
+      val res = v.toCounter(geno.callRate, (1.0, 1.0)).reduce
+      res.ratio
+    }
+    def batchCallRate(batch: Array[String]): Map[String, Double] = {
+      val keyFunc = (i: Int) => batch(i)
+      val res = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
+      res.map{case (k, v) => k -> v.ratio}
+    }
+    def hwePvalue(controls: Array[Boolean]): Double = {
+      val cnt = v.select(controls).toCounter(geno.toHWE, (1.0, 0.0, 0.0)).reduce
+      val n = cnt._1 + cnt._2 + cnt._3
+      val p = (cnt._1 + cnt._2/2)/n
+      val q = 1 - p
+      val eAA = p.square * n
+      val eAa = 2 * p * q * n
+      val eaa = q.square * n
+      val chisq = (cnt._1 - eAA).square/eAA + (cnt._2 - eAa).square/eAa + (cnt._3 - eaa).square/eaa
+      val dis = ChiSquared(1)
+      1.0 - dis.cdf(chisq)
+    }
 
-  def filter[A](self: Data[A],
-                variants: String,
-                batch: Array[String],
-                controls: Array[Boolean],
-                makeMaf: A => (Double, Double),
-                makeCall: A => (Double, Double),
-                makeHWE: A => (Double, Double, Double)): Data[A] = {
+    def batchSpecific(batch: Array[String]): Map[String, Double] = {
+      val keyFunc = (i: Int) => batch(i)
+      val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+      res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+    }
 
-    val names: Set[String] = LogicalExpression.analyze(variants)
-    self.filter{v =>
-      val varMap = names.toArray.map{
-        case "chr" => "chr" -> v.chr
-        case "maf" => "maf" -> maf(v, controls, makeMaf).toString
-        case "missingRate" => "missingRate" -> (1 - callRate(v, makeCall)).toString
-        case "batchMissingRate" => "batchMissingRate" -> (1 - batchCallRate(v, batch, makeCall).values.max).toString
-        case "alleleNum" => "alleleNum" -> v.alleleNum.toString
-        case "batchSpecific" => "batchSpecific" -> batchSpecific(v, batch, makeMaf).values.max.toString
-        case "hwePvalue" => "hwePvalue" -> hwePvalue(v, controls, makeHWE).toString
-        case "isFunctional" => "isFunctional" -> isFunctional(v).toString
-        case x => x -> v.parseInfo.getOrElse(x, "0")
-      }.toMap
-      LogicalExpression.judge(varMap)(variants)
+    def isFunctional: Int = {
+      val genes = parseAnnotation(v.parseInfo(IK.anno))
+      if (genes.exists(p => FM(p._2) <= 4)) 1 else 0
     }
   }
 

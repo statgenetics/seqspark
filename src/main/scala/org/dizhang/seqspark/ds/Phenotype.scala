@@ -1,14 +1,12 @@
-package org.dizhang.seqspark.pheno
+package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import breeze.stats._
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
-import org.dizhang.seqspark.pheno.Phenotype._
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.dizhang.seqspark.util.Constant.Pheno
 import scala.util.{Failure, Success, Try}
-
+import Phenotype._
 
  /**
   * Created by zhangdi on 9/13/16.
@@ -22,8 +20,6 @@ object Phenotype {
       .builder()
       .appName("SeqSpark Phenotype")
       .getOrCreate()
-
-    import spark.implicits._
 
     val options = Map(
       "nullValue" -> Pheno.mis,

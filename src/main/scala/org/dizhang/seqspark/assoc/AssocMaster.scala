@@ -9,12 +9,14 @@ import org.dizhang.seqspark.util.{Constant, SingleStudyContext}
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.geno.Genotype
 import AssocMaster._
+import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
-import org.dizhang.seqspark.geno.GeneralizedVCF._
+import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.ds.Genotype
+
 import scala.collection.JavaConverters._
 
 /**
@@ -42,7 +44,7 @@ object AssocMaster {
       * */
 
     logger.info("start encoding genotype ")
-    val sampleSize = y.value.length
+    //val sampleSize = y.value.length
     val codingScheme = config.`type`
     val groupBy = config.misc.getStringList("groupBy").asScala.toList
     val annotated = codingScheme match {
@@ -52,7 +54,7 @@ object AssocMaster {
         currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ =>
         (groupBy match {
-          case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s(0).toInt, s(1).toInt))
+          case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s.head.toInt, s(1).toInt))
           case _ => currentGenotype.flatMap(v => v.groupByGene(onlyFunctional = true))
         }).groupByKey()
     }
@@ -163,35 +165,9 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
-  case class SimpleMaster(genotype: Data[Byte], ssc: SingleStudyContext) extends AssocMaster[Byte] {
-
-    def samples(input: Data[Byte], indicator: Array[Boolean]) = {
-      input.samples(indicator)(ssc.sparkContext)
-    }
-    def variantsFilter(input: Data[Byte], cond: List[String]) = {
-      input.variantsFilter(cond)(ssc)
-    }
-  }
-
-  case class ImputedMaster(genotype: Data[Imputed], ssc: SingleStudyContext) extends AssocMaster[Imputed] {
-
-    def samples(input: Data[Imputed], indicator: Array[Boolean]) = {
-      input.samples(indicator)(ssc.sparkContext)
-    }
-    def variantsFilter(input: Data[Imputed], cond: List[String]) = {
-      input.variantsFilter(cond)(ssc)
-    }
-  }
-
-
 }
 
-abstract class AssocMaster[A: Genotype]{
-  def geno: Genotype[A] = implicitly[Genotype[A]]
-  def genotype: Data[A]
-  def ssc: SingleStudyContext
-  def samples(input: Data[A], indicator: Array[Boolean]): Data[A]
-  def variantsFilter(input: Data[A], cond: List[String]): Data[A]
+class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = ssc.phenotype
@@ -218,13 +194,15 @@ abstract class AssocMaster[A: Genotype]{
           val indicator = sc.broadcast(phenotype.indicate(traitName))
           val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
             .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-          val currentGenotype = samples(genotype, indicator.value).cache()
+          val currentGenotype = genotype.samples(indicator.value)(sc)
+          currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
           val traitConfig = assocConf.`trait`(traitName)
-          val forPCA = variantsFilter(currentGenotype, List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))
+          val forPCA = currentGenotype
+            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
           val pc = if (traitConfig.pc == 0) {
             None
           } else {
-            Some(new PCA(forPCA)(geno).pc(traitConfig.pc))
+            Some(new PCA(forPCA).pc(traitConfig.pc))
           }
           val cov =
             if (traitConfig.covariates.nonEmpty) {
@@ -252,7 +230,7 @@ abstract class AssocMaster[A: Genotype]{
     val config = cnf.association
     val methodConfig = config.method(method)
     val cond = methodConfig.misc.getStringList("variants").asScala.toList
-    val chosenVars = variantsFilter(currentGenotype, cond)
+    val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
     val permutation = methodConfig.resampling
     val test = methodConfig.test

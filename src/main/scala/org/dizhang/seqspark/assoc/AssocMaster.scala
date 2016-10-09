@@ -216,7 +216,9 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
           val pc = if (traitConfig.pc == 0) {
             None
           } else {
-            Some(new PCA(forPCA).pc(traitConfig.pc))
+            val res =  new PCA(forPCA).pc(traitConfig.pc)
+            logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
+            Some(res)
           }
           val cov =
             if (traitConfig.covariates.nonEmpty) {
@@ -224,7 +226,9 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
                 case Left(msg) =>
                   logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
                   None
-                case Right(dm) => Some(dm)
+                case Right(dm) =>
+                  logger.info(s"COV dimension: ${dm.rows} x ${dm.cols}")
+                  Some(dm)
               }
             } else
               None

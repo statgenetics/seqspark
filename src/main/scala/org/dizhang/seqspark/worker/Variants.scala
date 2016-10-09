@@ -39,6 +39,7 @@ object Variants {
     }
   }
 
+  @SerialVersionUID(100L)
   class VariantQC[A: Genotype](v: Variant[A]) extends Serializable {
     def geno = implicitly[Genotype[A]]
     def maf(controls: Array[Boolean]): Double = {

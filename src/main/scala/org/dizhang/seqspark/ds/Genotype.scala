@@ -7,7 +7,7 @@ import org.dizhang.seqspark.util.LogicalExpression
   * Created by zhangdi on 9/26/16.
   */
 /** here we go */
-
+@SerialVersionUID(101L)
 sealed trait Genotype[A] extends Serializable {
   def toAAF(g: A): (Double, Double) //This is the alt allele frequency
   def toCMC(g: A, af: Double): Double

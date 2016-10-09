@@ -24,7 +24,9 @@ object QualityControl {
 
     statGdGq(annotated)(ssc)
 
-    val simpleVCF: Data[Byte] = toSimpleVCF(genotypeQC(annotated, conf.qualityControl.genotypes))
+    val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
+
+    val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
 
     simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */

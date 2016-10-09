@@ -62,9 +62,9 @@ package object annot {
   def linkGeneDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
     logger.info("link gene database ...")
     val dbConf = conf.annotation.RefSeq
-    val build = dbConf.getString("build")
-    val coordFile = dbConf.getString("coordFile")
-    val seqFile = dbConf.getString("seqFile")
+    val build = "hg19"
+    val coordFile = dbConf.getString("coord")
+    val seqFile = dbConf.getString("seq")
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
     input.map(v => v.annotateByVariant(refSeq))
   }

@@ -1,5 +1,7 @@
 package org.dizhang.seqspark.assoc
 
+import java.io.PrintWriter
+
 import breeze.linalg.{DenseMatrix, DenseVector, sum}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
@@ -165,6 +167,19 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
+  def writeResults(res: RDD[(String, AssocMethod.AnalyticResult)], outFile: String): Unit = {
+    val pw = new PrintWriter(new java.io.File(outFile))
+    pw.write("name\tvars\tstatistic\tp-value\n")
+    res.collect().sortBy(p => p._2.pValue).foreach{p =>
+      val gene = p._1
+      val pVal = p._2.pValue
+      val stat = p._2.statistic
+      val vars = p._2.vars.map(_.toString).mkString(",")
+      pw.write("%s\t%s\t%f\t%f\n".format(gene, vars, stat, pVal))
+    }
+    pw.close()
+  }
+
 }
 
 class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
@@ -178,13 +193,12 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
 
   def run(): Unit = {
     val traits = assocConf.traitList
-    traits.foreach{
-      t => runTrait(t)
-    }
+    logger.info("we have traits: %s" format traits.mkString(","))
+    traits.foreach{t => runTrait(t)}
   }
 
-  def runTrait(traitName: String) = {
-    try {
+  def runTrait(traitName: String): Unit = {
+   // try {
       logger.info(s"load trait $traitName from phenotype database")
       phenotype.getTrait(traitName) match {
         case Left(msg) => logger.warn(s"getting trait $traitName failed, skip")
@@ -217,9 +231,6 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
           val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
           methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
       }
-    } catch {
-      case e: Exception => logger.warn(e.getStackTrace.toString)
-    }
   }
 
   def runTraitWithMethod(currentGenotype: Data[A],
@@ -241,7 +252,8 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     } else if (permutation) {
       permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
     } else {
-      asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
+      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
+      writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }
 }

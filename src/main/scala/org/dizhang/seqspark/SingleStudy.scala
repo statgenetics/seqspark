@@ -112,7 +112,8 @@ object SingleStudy {
     val clean = QualityControl.cleanVCF(input)
     clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
-      new AssocMaster(clean)(ssc).run()
+      val assoc = new AssocMaster(clean)(ssc)
+      assoc.run()
     }
   }
 
@@ -121,7 +122,8 @@ object SingleStudy {
     val clean = QualityControl.cleanImputed(input)
     clean.persist(StorageLevel.MEMORY_AND_DISK)
     if (ssc.userConfig.pipeline.length > 1) {
-      new AssocMaster(clean)(ssc).run()
+      val assoc = new AssocMaster(clean)(ssc)
+      assoc.run()
     }
   }
 

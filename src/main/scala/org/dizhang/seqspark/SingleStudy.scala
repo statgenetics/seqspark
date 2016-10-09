@@ -116,7 +116,7 @@ object SingleStudy {
       val assocConf = ssc.userConfig.association
       val methods = assocConf.methodList
       val annotated = if (methods.exists(m =>
-        assocConf.method(m).misc.getStringList("groupBy").asScala.contains(m))) {
+        assocConf.method(m).misc.getStringList("groupBy").asScala.contains("gene"))) {
         annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
       } else {
         input

@@ -13,7 +13,8 @@ import scala.language.implicitConversions
   * generalize VCF format
   */
 
-class VCF[A: Genotype](self: RDD[Variant[A]]) {
+@SerialVersionUID(102L)
+class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
 
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -39,8 +40,8 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) {
       case _ => false
     }
     val myCond = cond.map(c => s"($c)").reduce((a,b) => s"$a and $b")
-
     val names: Set[String] = LogicalExpression.analyze(myCond)
+
     self.filter{v =>
       val varMap = names.toArray.map{
         case "chr" => "chr" -> v.chr

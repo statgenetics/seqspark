@@ -142,14 +142,15 @@ object AssocMaster {
                     (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
-    lazy val nm = sc.broadcast(ScoreTest.NullModel(reg))
-    lazy val snm = sc.broadcast(SKATO.NullModel(reg))
     config.`type` match {
       case MethodType.skat =>
+        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         encode.map(p => (p._1, SKAT(nm.value, p._2, 0.0).result))
       case MethodType.skato =>
+        val snm = sc.broadcast(SKATO.NullModel(reg))
         encode.map(p => (p._1, SKATO(snm.value, p._2).result))
       case _ =>
+        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         if (config.maf.getBoolean("fixed"))
           encode.map(p => (p._1, Burden.AnalyticTest(nm.value, p._2).result))
         else
@@ -199,42 +200,42 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
 
   def runTrait(traitName: String): Unit = {
    // try {
-      logger.info(s"load trait $traitName from phenotype database")
-      phenotype.getTrait(traitName) match {
-        case Left(msg) => logger.warn(s"getting trait $traitName failed, skip")
-        case Right(tr) =>
-          val currentTrait = (traitName, sc.broadcast(tr))
-          val methods = assocConf.methodList
-          val indicator = sc.broadcast(phenotype.indicate(traitName))
-          val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
-            .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-          val currentGenotype = genotype.samples(indicator.value)(sc)
-          currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
-          val traitConfig = assocConf.`trait`(traitName)
-          val forPCA = currentGenotype
-            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
-          val pc = if (traitConfig.pc == 0) {
+    logger.info(s"load trait $traitName from phenotype database")
+    phenotype.getTrait(traitName) match {
+      case Left(msg) => logger.warn(s"getting trait $traitName failed, skip")
+      case Right(tr) =>
+        val currentTrait = (traitName, sc.broadcast(tr))
+        val methods = assocConf.methodList
+        val indicator = sc.broadcast(phenotype.indicate(traitName))
+        val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
+          .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
+        val currentGenotype = genotype.samples(indicator.value)(sc)
+        currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
+        val traitConfig = assocConf.`trait`(traitName)
+        val forPCA = currentGenotype
+          .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
+        val pc = if (traitConfig.pc == 0) {
+          None
+        } else {
+          val res =  new PCA(forPCA).pc(traitConfig.pc)
+          logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
+          Some(res)
+        }
+        val cov =
+          if (traitConfig.covariates.nonEmpty) {
+            phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
+              case Left(msg) =>
+                logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
+                None
+              case Right(dm) =>
+                logger.info(s"COV dimension: ${dm.rows} x ${dm.cols}")
+                Some(dm)
+            }
+          } else
             None
-          } else {
-            val res =  new PCA(forPCA).pc(traitConfig.pc)
-            logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
-            Some(res)
-          }
-          val cov =
-            if (traitConfig.covariates.nonEmpty) {
-              phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
-                case Left(msg) =>
-                  logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
-                  None
-                case Right(dm) =>
-                  logger.info(s"COV dimension: ${dm.rows} x ${dm.cols}")
-                  Some(dm)
-              }
-            } else
-              None
-          val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
-          methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
-      }
+        val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
+        methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
+    }
   }
 
   def runTraitWithMethod(currentGenotype: Data[A],

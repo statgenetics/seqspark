@@ -70,7 +70,7 @@ object Phenotype {
     if (toDouble.count(_.isDefined) == 0) {
       None
     } else {
-      val defined = toDouble.filter(_.isDefined).map(_.get)
+      val defined = DV(toDouble.filter(_.isDefined).map(_.get))
       val Mean = mean(defined)
       val imputed = toDouble.map{
         case None => Mean

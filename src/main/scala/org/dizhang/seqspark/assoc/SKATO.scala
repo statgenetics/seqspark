@@ -269,12 +269,12 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     *
     *  */
   lazy val P0SqrtZ: DM[Double] = {
-    val z = rowMultiply(geno, weight)
+    val z: CM[Double] = rowMultiply(geno, weight)
     nullModel match {
       case lm: LinearModel =>
         (- lm.xsInfoInv * (lm.xs.t * z) + z)/lm.sigma
       case lm: LogisticModel =>
-        colMultiply(z, lm.sigma) - lm.xsInfoInv * (lm.xs.t * colMultiply(z, lm.variance))
+        colMultiply(z, lm.sigma).toDense - lm.xsInfoInv * (lm.xs.t * colMultiply(z, lm.variance))
     }
   }
 

@@ -252,11 +252,11 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (methodConfig.`type` == MethodType.meta) {
-      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
+      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)(sc)
     } else if (permutation) {
-      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
+      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)(sc)
     } else {
-      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
+      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)(sc)
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }

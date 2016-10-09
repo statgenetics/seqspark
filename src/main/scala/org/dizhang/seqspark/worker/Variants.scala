@@ -81,8 +81,13 @@ object Variants {
     }
 
     def isFunctional: Int = {
-      val genes = parseAnnotation(v.parseInfo(IK.anno))
-      if (genes.exists(p => FM(p._2) <= 4)) 1 else 0
+      val info = v.parseInfo
+      if (info.contains(IK.anno)) {
+        val genes = parseAnnotation(v.parseInfo(IK.anno))
+        if (genes.exists(p => FM(p._2) <= 4)) 1 else 0
+      } else {
+        0
+      }
     }
   }
 

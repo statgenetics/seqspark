@@ -16,15 +16,14 @@ libraryDependencies ++= Seq(
 	"org.apache.spark" % "spark-mllib_2.11" % "2.0.0" % "provided",
 	"com.typesafe" % "config" % "1.2.1",
 	"it.unimi.dsi" % "fastutil" % "7.0.4",
-	"org.scalanlp" %% "breeze" % "0.12",
-	//"com.github.fommil.netlib" % "all" % "1.1.2" pomOnly(),
-	"org.scalanlp" %% "breeze-natives" % "0.12",
+	"org.scalanlp" % "breeze_2.11" % "0.11.2" % "provided",
+	"org.scalanlp" % "breeze-natives_2.11" % "0.11.2",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
 	"net.java.dev.jna" % "jna" % "4.2.2",
 	"org.scalaz" %% "scalaz-core" % "7.2.4"
 )
 
-resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
+//resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)

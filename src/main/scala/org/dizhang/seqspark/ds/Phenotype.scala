@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.ds
 
-import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
+import breeze.linalg.{DenseMatrix => DM, DenseVector => DV, _}
 import breeze.stats._
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}

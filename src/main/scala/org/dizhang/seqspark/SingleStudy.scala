@@ -1,16 +1,17 @@
 package org.dizhang.seqspark
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.dizhang.seqspark.ds.{Bed, Counter, Phenotype}
+import org.dizhang.seqspark.ds.{Bed, Counter, Genotype, Phenotype}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.ConfigFactory
 import java.io.File
 
+import scala.collection.JavaConverters._
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
-import org.dizhang.seqspark.worker.QualityControl
+import org.dizhang.seqspark.worker.{Import, QualityControl}
 import org.slf4j.LoggerFactory
 import util.General._
 
@@ -86,9 +87,11 @@ object SingleStudy {
     implicit val ssc = SingleStudyContext(cnf, sc, phenotype)
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
-      runVCF
+      val clean = QualityControl.cleanVCF(Import.fromVCF(ssc))
+      runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
-      runImputed
+      val clean = QualityControl.cleanImputed(Import.fromImpute2(ssc))
+      runAssoc(clean)
     } else {
       logger.error(s"unrecognized genotype format ${cnf.input.genotype.format.toString}")
     }
@@ -107,24 +110,23 @@ object SingleStudy {
     //PropertyConfigurator.configure("log4j.properties")
   }
 
-  def runVCF(implicit ssc: SingleStudyContext): Unit = {
-    val input = worker.Import.fromVCF(ssc)
-    val clean = QualityControl.cleanVCF(input)
-    clean.persist(StorageLevel.MEMORY_AND_DISK)
+  def runAssoc[A: Genotype](input: worker.Data[A])
+                           (implicit ssc: SingleStudyContext): Unit = {
     if (ssc.userConfig.pipeline.length > 1) {
-      val assoc = new AssocMaster(clean)(ssc)
+      val assocConf = ssc.userConfig.association
+      val methods = assocConf.methodList
+      val annotated = if (methods.exists(m =>
+        assocConf.method(m).misc.getStringList("groupBy").asScala.contains(m))) {
+        annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+      } else {
+        input
+      }
+      annotated.persist(StorageLevel.MEMORY_AND_DISK)
+      val assoc = new AssocMaster(annotated)(ssc)
       assoc.run()
     }
   }
 
-  def runImputed(implicit ssc: SingleStudyContext): Unit = {
-    val input = worker.Import.fromImpute2(ssc)
-    val clean = QualityControl.cleanImputed(input)
-    clean.persist(StorageLevel.MEMORY_AND_DISK)
-    if (ssc.userConfig.pipeline.length > 1) {
-      val assoc = new AssocMaster(clean)(ssc)
-      assoc.run()
-    }
-  }
+
 
 }

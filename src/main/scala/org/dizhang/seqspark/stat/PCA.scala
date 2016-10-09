@@ -7,12 +7,15 @@ import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.worker.Data
 import org.dizhang.seqspark.util.General._
+import org.slf4j.LoggerFactory
 
 /**
   * perform PCA for
   */
 @SerialVersionUID(103L)
 class PCA[A: Genotype](vcf: Data[A]) extends Serializable {
+
+  val logger = LoggerFactory.getLogger(getClass)
 
   def geno = implicitly[Genotype[A]]
 
@@ -29,6 +32,8 @@ class PCA[A: Genotype](vcf: Data[A]) extends Serializable {
     val res = byCol.map {
       row => Vectors.dense(row.toArray.sortBy(_._1).map(_._2))
     }
+    res.cache()
+    logger.info(s"PCA transposed data dimension: ${res.count()} x ${res.first().size}")
     res
   }
   def pc(n: Int): BDM[Double] = {

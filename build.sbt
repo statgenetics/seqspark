@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
 	"com.typesafe" % "config" % "1.2.1",
 	"it.unimi.dsi" % "fastutil" % "7.0.4",
 	"org.scalanlp" %% "breeze" % "0.12",
-	"org.scalanlp" %% "breeze-natives" % "0.12",
+	"com.github.fommil.netlib" % "all" % "1.1.2" pomOnly(),
+	//"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
 	"net.java.dev.jna" % "jna" % "4.2.2",
 	"org.scalaz" %% "scalaz-core" % "7.2.4"

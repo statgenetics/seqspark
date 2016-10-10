@@ -129,7 +129,7 @@ object Encode {
   sealed trait Single[A] extends Encode[A] {
     override def getRare(cutoff: Double) = None
     def weight(cutoff: Double) = DenseVector(1.0)
-    def isDefined = maf.exists(_ >= fixedCutoff)
+    def isDefined = maf.exists(m => m >= fixedCutoff && m <= (1 - fixedCutoff))
     def getFixed(cutoff: Double = fixedCutoff) = None
   }
 
@@ -137,7 +137,7 @@ object Encode {
     def weight(cutoff: Double) = DenseVector[Double]()
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
 
-      definedIndices(_ < cutoff).map{idx =>
+      definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
         val sv = idx.map{i =>
           vars(i).toCounter(genotype.toCMC(_, maf(i)), 0.0)
         }.reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toSparseVector(x => x)
@@ -156,9 +156,9 @@ object Encode {
     def isDefined = maf.exists(_ < fixedCutoff)
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      val w = weight(cutoff)
-      definedIndices(_ < cutoff).map{idx =>
-        val sv = idx.filter(maf(_) < cutoff).map { i =>
+      val w = weight(1.0)
+      definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
+        val sv = idx.map {i =>
           vars(i).toCounter(genotype.toBRV(_, maf(i)) * w(i), 0.0)
         }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toSparseVector(x => x)
         val variations = idx.map{ i =>
@@ -191,11 +191,11 @@ object Encode {
 
   sealed trait SimpleWeight[A] extends BRV[A] {
     def weight(cutoff: Double): DenseVector[Double] = {
-      val mafDV = DenseVector(this.maf.filter(m => m < cutoff))
+      val mafDV: DenseVector[Double] = DenseVector(maf.filter(m => m < cutoff || m > (1 - cutoff)))
       config.weight match {
         case WeightMethod.annotation =>
           DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
-            .filter(v => v._2 < cutoff).map(_._1))
+            .filter(v => v._2 < cutoff || v._2 > (1.0 - cutoff)).map(_._1))
         case WeightMethod.wss =>
           pow(mafDV :* mafDV.map(1.0 - _), -0.5)
         case WeightMethod.skat =>
@@ -304,7 +304,8 @@ abstract class Encode[A: Genotype] extends Serializable {
       * (with 1 - 4 minor alleles. anyway 5 is indistinguishable.
       * Because 5.0/0.9n - 5.0/n == 5.0/n - 4.0/0.9n */
     val tol = 4.0/(9 * n)
-    val sortedMaf = maf.filter(m => m < fixedCutoff).sorted
+    val sortedMaf = maf.filter(m => m < fixedCutoff || m > (1 - fixedCutoff))
+      .map(m => if (m < 0.5) m else 1 - m).sorted
     if (sortedMaf.isEmpty)
       None
     else
@@ -336,13 +337,15 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
   def isDefined: Boolean
   def getCommon(cutoff: Double = fixedCutoff): Option[Common] = {
-    if (maf.forall(_ < cutoff)) {
+    if (maf.forall(m => m < cutoff || m > (1 - cutoff))) {
       None
     } else {
-      val res = DenseVector.horzcat(vars.zip(maf).filter(v => v._2 >= cutoff).map {
+      val res = DenseVector.horzcat(vars.zip(maf).filter(v =>
+        v._2 >= cutoff && v._2 <= (1 - cutoff)).map {
         case (v, m) => DenseVector(v.toIndexedSeq.map(genotype.toBRV(_, m)): _*)
       }: _*)
-      val info = vars.zip(mafCount).filter(v => v._2.ratio >= cutoff).map{
+      val info = vars.zip(mafCount)
+        .filter(v => v._2.ratio >= cutoff && v._2.ratio <= (1 - cutoff)).map{
         case (v, m) =>
           v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
       }
@@ -359,13 +362,13 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
 
   def getRare(cutoff: Double = fixedCutoff): Option[Encode.Rare] = {
-    if (maf.forall(_ >= cutoff)) {
-      val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(_ < cutoff))
-      val cnt = vars.zip(maf).filter(v => v._2 < cutoff).map{ v =>
+    if (maf.exists(m => m < cutoff || m > (1 - cutoff))) {
+      val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(m => m < cutoff || m > (1 - cutoff)))
+      val cnt = vars.zip(maf).filter(v => v._2 < cutoff || v._2 > (1 - cutoff)).map{ v =>
         v._1.toCounter(genotype.toBRV(_, v._2), 0.0).toMap}
       cnt.zipWithIndex.foreach{ case (elems, col) =>
           elems.foreach{case (row, v) => builder.add(row, col, v)}}
-      val info = vars.zip(mafCount).filter(v => v._2.ratio >= cutoff).map{
+      val info = vars.zip(mafCount).filter(v => v._2.ratio < cutoff || v._2.ratio > (1 -cutoff)).map{
         case (v, m) =>
           v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
       }

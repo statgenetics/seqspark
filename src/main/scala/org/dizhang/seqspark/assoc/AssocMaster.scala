@@ -175,7 +175,7 @@ object AssocMaster {
       val gene = p._1
       val pVal = p._2.pValue
       val stat = p._2.statistic
-      val vars = p._2.vars.map(_.toString).mkString(",")
+      val vars = p._2.vars.map(_.toString).mkString("/")
       pw.write("%s\t%s\t%f\t%f\n".format(gene, vars, stat, pVal))
     }
     pw.close()

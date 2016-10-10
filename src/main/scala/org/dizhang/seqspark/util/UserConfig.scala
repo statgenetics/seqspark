@@ -49,7 +49,7 @@ object UserConfig {
     val skato = Value("skato")
     val meta = Value("meta")
     val cmc = Value("cmc")
-    val brv = Value("burden")
+    val brv = Value("brv")
     val snv = Value("snv")
   }
 

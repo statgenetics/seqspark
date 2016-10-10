@@ -61,9 +61,10 @@ object AssocMaster {
         }).groupByKey()
     }
 
-    annotated.map(p =>
+    val res: RDD[(String, Encode[_])] = annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, config))
-    )
+    ).filter{case (g, e) => (! e.monoallelic) && e.isDefined}.map(x => x)
+    res
   }
 
   def adjustForCov(binaryTrait: Boolean,

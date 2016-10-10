@@ -31,7 +31,6 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
   }
 
   def variants(cond: List[String])(ssc: SingleStudyContext): RDD[Variant[A]] = {
-    logger.info("filter variants ...")
     val conf = ssc.userConfig
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
@@ -40,6 +39,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
       case _ => false
     }
     val myCond = cond.map(c => s"($c)").reduce((a,b) => s"$a and $b")
+    logger.info(s"filter variants with '$myCond' ...")
     val names: Set[String] = LogicalExpression.analyze(myCond)
 
     self.filter{v =>

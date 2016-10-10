@@ -120,7 +120,7 @@ object Encode {
   case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
 
   sealed trait Raw[A] extends Encode[A] {
-    def isDefined = maf.exists(_ > 0.0)
+    def isDefined = maf.exists(m => m > 0.0 && m < 1.0)
     def getFixed(cutoff: Double = fixedCutoff) = None
     override def getCoding = None
     def weight = DenseVector.fill(1)(0.0)
@@ -149,11 +149,11 @@ object Encode {
         Fixed(sv, variations)
       }
     }
-    def isDefined = maf.exists(_ < fixedCutoff)
+    def isDefined = maf.exists(m => m < fixedCutoff || m > (1 - fixedCutoff))
   }
 
   sealed trait BRV[A] extends Encode[A] {
-    def isDefined = maf.exists(_ < fixedCutoff)
+    def isDefined = maf.exists(m => m < fixedCutoff || m > (1 - fixedCutoff))
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
       val w = weight
@@ -293,6 +293,11 @@ abstract class Encode[A: Genotype] extends Serializable {
     case x => x
   }
   def vars: Array[Variant[A]]
+  def monoallelic: Boolean = {
+    vars.map(v => v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce).forall(mc =>
+      mc._1 == 0.0 || mc._1 == mc._2
+    )
+  }
   def mafCount: Array[(Double, Double)]
   def maf: Array[Double]
   def sampleSize: Int = if (vars.isEmpty) 0 else vars.head.length

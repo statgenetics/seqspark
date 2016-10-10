@@ -39,10 +39,10 @@ object RefGene {
 
   def apply(build: String, coordFile: String, seqFile: String)(implicit sc: SparkContext): RefGene = {
 
-    logger.info(s"load RefSeq: build: $build coord: $coordFile seq: $seqFile")
+    logger.info(s"load RefSeq: coord: $coordFile seq: $seqFile")
 
     val locRaw = sc.textFile(coordFile)
-    locRaw.cache()
+    //locRaw.cache()
     val header = locRaw.first().split("\t")
 
     val locRdd = locRaw.zipWithUniqueId().filter(_._2 > 0).map(_._1)
@@ -65,17 +65,19 @@ object RefGene {
 
 
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
-    logger.info(s"${seq.size} mRNA sequences")
+    logger.info(s"${seq.size} transcript sequences")
 
     val res = new RefGene(build, loci, seq)
     logger.info(s"${IntervalTree.count(res.loci)} locations generated")
 
+    /**
     val test = IntervalTree.lookup(res.loci, Single(1, 1296690))
 
     test match {
       case Nil => logger.info("cannot find anything for chr1:1296691")
       case _ => logger.info(s"here we go: ${test.last.toString}")
     }
+      */
     res
   }
 }

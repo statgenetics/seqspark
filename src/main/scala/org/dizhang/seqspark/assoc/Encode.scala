@@ -156,7 +156,7 @@ object Encode {
     def isDefined = maf.exists(_ < fixedCutoff)
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      val w = weight(1.0)
+      val w = weight(1.1)
       definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
         val sv = idx.map {i =>
           println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")

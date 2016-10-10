@@ -123,18 +123,18 @@ object Encode {
     def isDefined = maf.exists(_ > 0.0)
     def getFixed(cutoff: Double = fixedCutoff) = None
     override def getCoding = None
-    def weight(cutoff: Double = fixedCutoff) = DenseVector.fill(1)(0.0)
+    def weight = DenseVector.fill(1)(0.0)
   }
 
   sealed trait Single[A] extends Encode[A] {
     override def getRare(cutoff: Double) = None
-    def weight(cutoff: Double) = DenseVector(1.0)
+    def weight = DenseVector(1.0)
     def isDefined = maf.exists(m => m >= fixedCutoff && m <= (1 - fixedCutoff))
     def getFixed(cutoff: Double = fixedCutoff) = None
   }
 
   sealed trait CMC[A] extends Encode[A] {
-    def weight(cutoff: Double) = DenseVector[Double]()
+    def weight = DenseVector[Double]()
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
 
       definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
@@ -156,7 +156,7 @@ object Encode {
     def isDefined = maf.exists(_ < fixedCutoff)
 
     def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-      val w = weight(1.1)
+      val w = weight
       definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
         val sv = idx.map {i =>
           println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")
@@ -191,12 +191,11 @@ object Encode {
   }
 
   sealed trait SimpleWeight[A] extends BRV[A] {
-    def weight(cutoff: Double): DenseVector[Double] = {
-      val mafDV: DenseVector[Double] = DenseVector(maf.filter(m => m < cutoff || m > (1 - cutoff)))
+    def weight: DenseVector[Double] = {
+      val mafDV: DenseVector[Double] = DenseVector(maf)
       config.weight match {
         case WeightMethod.annotation =>
-          DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble).zip(maf)
-            .filter(v => v._2 < cutoff || v._2 > (1.0 - cutoff)).map(_._1))
+          DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble))
         case WeightMethod.wss =>
           pow(mafDV :* mafDV.map(1.0 - _), -0.5)
         case WeightMethod.skat =>
@@ -210,8 +209,8 @@ object Encode {
   sealed trait LearnedWeight[A] extends BRV[A] {
     def y: DenseVector[Double]
     def cov: Option[DenseMatrix[Double]]
-    def weight(cutoff: Double = fixedCutoff) = {
-      val geno = getRare(cutoff).get.coding.toDense
+    def weight = {
+      val geno = getRare(1.1).get.coding.toDense
       val n = geno.cols
       val combined = cov match {
         case None => geno
@@ -316,7 +315,7 @@ abstract class Encode[A: Genotype] extends Serializable {
         else
           a ++ b))
   }
-  def weight(cutoff: Double = fixedCutoff): DenseVector[Double]
+  def weight: DenseVector[Double]
   def getFixed(cutoff: Double = fixedCutoff): Option[Encode.Fixed]
 
   def getVT: Option[Encode.VT] = {

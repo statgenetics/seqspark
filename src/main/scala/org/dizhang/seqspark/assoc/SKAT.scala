@@ -108,7 +108,9 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   def x: Encode[_]
   def isDefined: Boolean = x.isDefined
   def rho: Double
-  lazy val weight = x.weight()
+  lazy val weight = DV(x.weight.toArray.zip(x.maf)
+    .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
+    .map(_._1))
   /**
     * we trust the size is not very large here
     * otherwise, we could not store the matrix in memory

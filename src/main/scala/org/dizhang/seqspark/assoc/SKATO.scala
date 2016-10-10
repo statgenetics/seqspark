@@ -252,7 +252,9 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
   def x: Encode[_]
   lazy val geno: CM[Double] = x.getRare().get.coding
-  lazy val weight = x.weight()
+  lazy val weight = DV(x.weight.toArray.zip(x.maf)
+    .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
+    .map(_._1))
   def numVars = weight.length
   lazy val misc = x.config.misc
   lazy val method = misc.getString("method")

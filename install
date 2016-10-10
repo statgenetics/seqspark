@@ -54,7 +54,7 @@ sub download_dbs {
 	
 	!system("hdfs", "dfs", "-mkdir", "-p", "$db_dir") 
 		or die "Cannot create dir $db_dir on HDFS, you need to mannually download databases later\n";
-	my @db = qw/refFlat_table.bz2 refGene_mRNA.bz2 dbSNP-138.vcf.bz2/;
+	my @db = qw/refFlat_table refGene_seq dbSNP-138.vcf.bz2/;
 	if ($db_dir) {
 		print STDERR "going to download refseq and dbsnp to $db_dir\n";
 		for my $db (@db) {

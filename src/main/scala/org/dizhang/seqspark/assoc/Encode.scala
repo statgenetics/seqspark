@@ -159,7 +159,7 @@ object Encode {
       val w = weight
       definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
         val sv = idx.map {i =>
-          println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")
+          //println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")
           vars(i).toCounter(genotype.toBRV(_, maf(i)) * w(i), 0.0)
         }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toSparseVector(x => x)
         val variations = idx.map{ i =>

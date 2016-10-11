@@ -87,10 +87,30 @@ object SingleStudy {
     implicit val ssc = SingleStudyContext(cnf, sc, phenotype)
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
-      val clean = QualityControl.cleanVCF(Import.fromVCF(ssc))
+      val clean = try {
+        logger.info("read from cache")
+        sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+      } catch {
+        case e: Exception =>
+          logger.info("no cache, compute from start")
+          val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
+          res.persist(StorageLevel.MEMORY_AND_DISK)
+          res.saveAsObjectFile(cnf.project)
+          res
+      }
       runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
-      val clean = QualityControl.cleanImputed(Import.fromImpute2(ssc))
+      val clean = try {
+        logger.info("read from cache")
+        sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+      } catch {
+        case e: Exception =>
+          logger.info("no cache, compute from start")
+          val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
+          res.persist(StorageLevel.MEMORY_AND_DISK)
+          res.saveAsObjectFile(cnf.project)
+          res
+      }
       runAssoc(clean)
     } else {
       logger.error(s"unrecognized genotype format ${cnf.input.genotype.format.toString}")

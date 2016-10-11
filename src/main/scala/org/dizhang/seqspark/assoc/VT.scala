@@ -30,7 +30,7 @@ object VT {
                                 x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
     val geno = x.getVT.get
     val scoreTest = {
-      val cnt = (for (((i,j), v) <- geno.coding.activeIterator) yield 1).length
+      val cnt = geno.coding.activeSize
       println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, active: $cnt")
       ScoreTest(nullModel, geno.coding)
     }

@@ -35,10 +35,11 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
     val controls = pheno.select("control")
-    val ctrlInd = if (controls.exists(_.isDefined)) {
-      Some(controls.map{case Some("1") => true; case _ => false})
-    } else {
+    val ctrlInd = if (controls.forall(c => c.isEmpty || c.get == "1")) {
+      /** if everybody is either control or unknown, assume they are all controls */
       None
+    } else {
+      Some(controls.map{case Some("1") => true; case _ => false})
     }
 
     val myCond = cond.map(c => s"($c)").reduce((a,b) => s"$a and $b")

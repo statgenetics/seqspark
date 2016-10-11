@@ -96,7 +96,7 @@ object SingleStudy {
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
           res.persist(StorageLevel.MEMORY_AND_DISK)
-          res.saveAsObjectFile(cnf.project)
+          //res.saveAsObjectFile(cnf.project)
           res
       }
       runAssoc(clean)
@@ -110,7 +110,7 @@ object SingleStudy {
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
           res.persist(StorageLevel.MEMORY_AND_DISK)
-          res.saveAsObjectFile(cnf.project)
+          //res.saveAsObjectFile(cnf.project)
           res
       }
       runAssoc(clean)

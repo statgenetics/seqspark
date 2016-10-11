@@ -88,8 +88,9 @@ object SingleStudy {
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {
-        logger.info("read from cache")
-        sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+        val res = sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+        logger.info(s"read from cache, rec: ${res.count()}")
+        res
       } catch {
         case e: Exception =>
           logger.info("no cache, compute from start")

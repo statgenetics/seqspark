@@ -31,7 +31,8 @@ object VT {
     val geno = x.getVT.get
     val scoreTest = {
       val cnt = geno.coding.activeSize
-      println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, active: $cnt")
+      println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
+        s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
       ScoreTest(nullModel, geno.coding)
     }
     val statistic = getStatistic(scoreTest)

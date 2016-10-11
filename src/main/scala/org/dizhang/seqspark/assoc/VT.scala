@@ -19,6 +19,8 @@ trait VT extends AssocMethod {
 object VT {
 
   def getStatistic(st: ScoreTest): Double = {
+    println(s"scores: ${st.score.toArray.mkString(",")}")
+    println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
     val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
     max(ts)
   }

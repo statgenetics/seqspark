@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import breeze.stats.distributions.{Binomial, Gaussian}
+import breeze.stats.distributions.Binomial
 import org.scalatest.FlatSpec
 
 /**

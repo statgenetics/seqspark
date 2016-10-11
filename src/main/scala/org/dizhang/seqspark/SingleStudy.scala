@@ -101,8 +101,9 @@ object SingleStudy {
       runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
       val clean = try {
-        logger.info("read from cache")
-        sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        val res =sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        logger.info(s"read from cache, rec: ${res.count()}")
+        res
       } catch {
         case e: Exception =>
           logger.info("no cache, compute from start")

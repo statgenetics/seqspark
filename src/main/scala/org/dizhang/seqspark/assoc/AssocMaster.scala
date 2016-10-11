@@ -2,7 +2,7 @@ package org.dizhang.seqspark.assoc
 
 import java.io.PrintWriter
 
-import breeze.linalg.{DenseMatrix, DenseVector, sum}
+import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
@@ -143,6 +143,7 @@ object AssocMaster {
                     (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
+    logger.info(s"reg.xs cols: ${reg.xs.cols} rank: ${rank(reg.xs)}")
     config.`type` match {
       case MethodType.skat =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))

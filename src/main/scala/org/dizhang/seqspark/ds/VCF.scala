@@ -34,10 +34,13 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     val conf = ssc.userConfig
     val pheno = ssc.phenotype
     val batch = pheno.batch(conf.input.phenotype.batch)
-    val controls = pheno.select("control").map{
-      case Some("1") => true
-      case _ => false
+    val controls = pheno.select("control")
+    val ctrlInd = if (controls.exists(_.isDefined)) {
+      Some(controls.map{case Some("1") => true; case _ => false})
+    } else {
+      None
     }
+
     val myCond = cond.map(c => s"($c)").reduce((a,b) => s"$a and $b")
     logger.info(s"filter variants with '$myCond' ...")
     val names: Set[String] = LogicalExpression.analyze(myCond)
@@ -45,12 +48,13 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     self.filter{v =>
       val varMap = names.toArray.map{
         case "chr" => "chr" -> v.chr
-        case "maf" => "maf" -> v.maf(controls).toString
+        case "maf" => "maf" -> v.maf(ctrlInd).toString
+        //case "batchMaf" => "batchMaf" -> v.batchMaf(ctrlInd, batch).values.min.toString
         case "missingRate" => "missingRate" -> (1 - v.callRate).toString
-        case "batchMissingRate" => "batchMissingRate" -> (1 - v.batchCallRate(batch).values.max).toString
+        case "batchMissingRate" => "batchMissingRate" -> (1 - v.batchCallRate(batch).values.min).toString
         case "alleleNum" => "alleleNum" -> v.alleleNum.toString
         case "batchSpecific" => "batchSpecific" -> v.batchSpecific(batch).values.max.toString
-        case "hwePvalue" => "hwePvalue" -> v.hwePvalue(controls).toString
+        case "hwePvalue" => "hwePvalue" -> v.hwePvalue(ctrlInd).toString
         case "isFunctional" => "isFunctional" -> v.isFunctional.toString
         case x => x -> v.parseInfo.getOrElse(x, "0")
       }.toMap

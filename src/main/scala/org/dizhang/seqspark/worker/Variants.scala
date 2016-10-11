@@ -4,6 +4,7 @@ import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
 import breeze.stats.distributions.ChiSquared
+import org.dizhang.seqspark.util.Constant.Variant._
 
 import scala.language.implicitConversions
 /**
@@ -42,14 +43,29 @@ object Variants {
   @SerialVersionUID(100L)
   class VariantQC[A: Genotype](v: Variant[A]) extends Serializable {
     def geno = implicitly[Genotype[A]]
-    def maf(controls: Array[Boolean]): Double = {
-      val res = v.select(controls).toCounter(geno.toAAF, (0.0, 2.0)).reduce
-      res.ratio
+    def maf(controls: Option[Array[Boolean]]): Double = {
+      val cache = v.parseInfo
+      if (cache.contains(InfoKey.maf)) {
+        val res = cache(InfoKey.maf).split(",").map(_.toDouble)
+        res(0)/res(1)
+      } else {
+        controls match {
+          case None =>
+            val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
+            v.addInfo(InfoKey.maf,s"${res._1},${res._2}")
+            res.ratio
+          case Some(indi) =>
+            val res = v.select(indi).toCounter(geno.toAAF, (0.0, 2.0)).reduce
+            v.addInfo(InfoKey.maf, s"${res._1},${res._2}")
+            res.ratio
+        }
+      }
     }
-    def batchMaf(controls: Array[Boolean],
+    def batchMaf(controls: Option[Array[Boolean]],
                  batch: Array[String]): Map[String, Double] = {
       val keyFunc = (i: Int) => batch(i)
-      val res = v.select(controls).toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+      val rest = controls match {case None => v; case Some(c) => v.select(c)}
+      val res = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
       res.map{case (k, v) => k -> v.ratio}
     }
     def callRate: Double = {
@@ -61,8 +77,12 @@ object Variants {
       val res = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
       res.map{case (k, v) => k -> v.ratio}
     }
-    def hwePvalue(controls: Array[Boolean]): Double = {
-      val cnt = v.select(controls).toCounter(geno.toHWE, (1.0, 0.0, 0.0)).reduce
+    def hwePvalue(controls: Option[Array[Boolean]]): Double = {
+      val rest = controls match {
+        case Some(c) => v.select(c)
+        case None => v
+      }
+      val cnt =  rest.toCounter(geno.toHWE, (1.0, 0.0, 0.0)).reduce
       val n = cnt._1 + cnt._2 + cnt._3
       val p = (cnt._1 + cnt._2/2)/n
       val q = 1 - p

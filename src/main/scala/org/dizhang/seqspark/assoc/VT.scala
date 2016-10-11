@@ -29,7 +29,11 @@ object VT {
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
     val geno = x.getVT.get
-    val scoreTest = ScoreTest(nullModel, geno.coding)
+    val scoreTest = {
+      val cnt = (for (() <- geno.coding.activeIterator) yield 1).length
+      println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, active: $cnt")
+      ScoreTest(nullModel, geno.coding)
+    }
     val statistic = getStatistic(scoreTest)
     val pValue = {
       val ss = diag(scoreTest.variance).map(_.sqrt)

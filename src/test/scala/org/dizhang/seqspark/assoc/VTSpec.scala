@@ -33,6 +33,7 @@ class VTSpec extends FlatSpec {
     ScoreTest.NullModel(reg)
   }
   "A VT" should "be fine" in {
+
     val vt = VT.AnalyticTest(nullModel, encode)
     println(s"S: ${vt.statistic} P: ${vt.pValue}")
   }

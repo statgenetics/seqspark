@@ -317,7 +317,7 @@ abstract class Encode[A: Genotype] extends Serializable {
     } else {
       println(s"sortedMaf length should be 0 < ${sortedMaf.length}")
       Some(sortedMaf.map(c => Array(c)).reduce{(a, b) =>
-        println(s"a: $a b: $b")
+        println(s"a: ${a.mkString(",")} b: ${b.mkString(",")}")
         if (a(-1) + tol >= b(0))
           a.slice(0, a.length - 1) ++ b
         else

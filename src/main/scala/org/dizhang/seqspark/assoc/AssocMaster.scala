@@ -143,7 +143,8 @@ object AssocMaster {
                     (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
-    logger.info(s"reg.xs cols: ${reg.xs.cols} rank: ${rank(reg.xs)}")
+    logger.info(s"reg.xs cols: ${reg.xs.cols}")
+    logger.info(s"reg.xs rank: ${rank(reg.xs)}")
     config.`type` match {
       case MethodType.skat =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))

@@ -19,8 +19,8 @@ trait VT extends AssocMethod {
 object VT {
 
   def getStatistic(st: ScoreTest): Double = {
-    println(s"scores: ${st.score.toArray.mkString(",")}")
-    println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
+    //println(s"scores: ${st.score.toArray.mkString(",")}")
+    //println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
     val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
     max(ts)
   }
@@ -31,8 +31,8 @@ object VT {
     val geno = x.getVT.get
     val scoreTest = {
       val cnt = geno.coding.activeSize
-      println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
-        s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
+      //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
+      //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
       ScoreTest(nullModel, geno.coding)
     }
     val statistic = getStatistic(scoreTest)

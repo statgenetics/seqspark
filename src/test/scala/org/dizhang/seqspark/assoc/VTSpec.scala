@@ -1,10 +1,10 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import breeze.stats.distributions.{Binomial, Gaussian}
+import breeze.stats.distributions.{Binomial, Gaussian, RandBasis}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FlatSpec
-import org.dizhang.seqspark.ds.{Variant, Genotype}
+import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.Constant

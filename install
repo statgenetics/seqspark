@@ -24,7 +24,7 @@ sub build {
 	} else {
 		$arch = $^O;
 	}
-	!system("mkdir -p src/main/$arch") or die "Cannot mkdir -p src/main/$arch";
+	mkdir("src/main/$arch") or die "cannot mkdir src/main/$arch";
 	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/$arch/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
 	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }

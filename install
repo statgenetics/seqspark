@@ -18,7 +18,13 @@ GetOptions(
 );
 
 sub build {
-	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
+	my $arch;
+	if ($^O eq "linux") {
+		$arch = "linux-x86-64";
+	} else {
+		$arch = $^O;
+	}
+	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/$arch/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
 	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 

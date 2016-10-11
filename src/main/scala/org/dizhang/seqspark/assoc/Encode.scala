@@ -328,8 +328,9 @@ abstract class Encode[A: Genotype] extends Serializable {
   def getFixed(cutoff: Double = fixedCutoff): Option[Encode.Fixed]
 
   def getVT: Option[Encode.VT] = {
+    val tol = 4.0/(9 * sampleSize)
     thresholds.map{th =>
-      val cm = SparseVector.horzcat(th.map(c => this.getFixed(c).get.coding): _*)
+      val cm = SparseVector.horzcat(th.map(c => this.getFixed(c + tol).get.coding): _*)
       val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => p._2.ratio <= th.max).map{
         case (v, mc) =>
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")

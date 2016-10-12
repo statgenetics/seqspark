@@ -50,6 +50,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
       val varMap = names.toArray.map{
         case "chr" => "chr" -> v.chr
         case "maf" => "maf" -> v.maf(ctrlInd).toString
+        case "informative" => "informative" -> (if (v.informative) "1" else "0")
         //case "batchMaf" => "batchMaf" -> v.batchMaf(ctrlInd, batch).values.min.toString
         case "missingRate" => "missingRate" -> (1 - v.callRate).toString
         case "batchMissingRate" => "batchMissingRate" -> (1 - v.batchCallRate(batch).values.min).toString

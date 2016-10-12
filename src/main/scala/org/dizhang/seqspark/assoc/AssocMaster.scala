@@ -187,8 +187,7 @@ object AssocMaster {
 }
 
 @SerialVersionUID(105L)
-class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext)
-  extends Serializable {
+class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = ssc.phenotype
@@ -215,7 +214,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext)
         val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
           .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
         val chooseSample = genotype.samples(indicator.value)(sc)
-        val currentGenotype = chooseSample.filter(v => v.informative)
+        val currentGenotype = chooseSample.variants(List("informative"))
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
 

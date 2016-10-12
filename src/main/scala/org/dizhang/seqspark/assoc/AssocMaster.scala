@@ -212,7 +212,8 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val indicator = sc.broadcast(phenotype.indicate(traitName))
         val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
           .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-        val currentGenotype = genotype.samples(indicator.value)(sc).filter(v => v.informative)
+        val chooseSample = genotype.samples(indicator.value)(sc)
+        val currentGenotype = chooseSample.filter(v => v.informative)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
 

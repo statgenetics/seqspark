@@ -186,7 +186,9 @@ object AssocMaster {
 
 }
 
-class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
+@SerialVersionUID(105L)
+class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext)
+  extends Serializable {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = ssc.phenotype

@@ -28,7 +28,7 @@ object VT {
   @SerialVersionUID(7727880101L)
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
-    val geno = x.getVT.get
+    val geno = x.getVT
     val scoreTest = {
       val cnt = geno.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
@@ -56,7 +56,7 @@ object VT {
     def pCount = {
       Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     }
-    def result = AssocMethod.ResamplingResult(x.getVT.get.vars, refStatistic, pCount)
+    def result = AssocMethod.ResamplingResult(x.getVT.vars, refStatistic, pCount)
   }
 
 }

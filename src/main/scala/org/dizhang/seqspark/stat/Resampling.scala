@@ -41,14 +41,13 @@ object Resampling {
 
     /** re-compute the statistic for the new null model and newX */
     def makeNewStatistic(newNullModel: NullModel, newX: Encode[_]): Double = {
-      newX.getCoding.get match {
-        case Encode.Fixed(c, _) =>
-          val st = ScoreTest(newNullModel, c)
-          transformer(st)
-        case Encode.VT(c, _) =>
-          val st = ScoreTest(newNullModel, c)
-          transformer(st)
-        case _ => refStatistic
+
+      if (newX.config.maf.getBoolean("fixed")) {
+        val st = ScoreTest(newNullModel, newX.getFixed().coding)
+        transformer(st)
+      } else {
+        val st = ScoreTest(newNullModel, newX.getVT.coding)
+        transformer(st)
       }
     }
 

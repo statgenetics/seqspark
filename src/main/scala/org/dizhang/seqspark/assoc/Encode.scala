@@ -22,6 +22,18 @@ object Encode {
 
   type Imputed = (Double, Double, Double)
 
+  val DummySV = SparseVector.fill[Double](1)(0.0)
+  val DummySM = CSCMatrix.fill(1,1)(0.0)
+  val DummyDV = DenseVector.fill(1)(0.0)
+  val DummyVars = Array.empty[Variation]
+  val DummyFixed = Fixed(DummySV, DummyVars)
+  val DummyVT = VT(DummySM, DummyVars)
+
+  implicit class AF(val f: Double) extends AnyVal {
+    def isRare(cutoff: Double): Boolean = f < cutoff || f > (1 - cutoff)
+    def isCommon(cutoff: Double): Boolean = ! isRare(cutoff)
+  }
+
   object CmcAddNaAdjust extends Counter.CounterElementSemiGroup[Double] {
     def zero = 0.0
 
@@ -120,24 +132,23 @@ object Encode {
   case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
 
   sealed trait Raw[A] extends Encode[A] {
-    def isDefined = maf.exists(m => m > 0.0 && m < 1.0)
-    def getFixed(cutoff: Double = fixedCutoff) = None
-    override def getCoding = None
-    def weight = DenseVector.fill(1)(0.0)
+    lazy val isDefined = maf.exists(m => m > 0.0 && m < 1.0)
+    def getFixed(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
+    def weight = DummyDV
   }
 
   sealed trait Single[A] extends Encode[A] {
     override def getRare(cutoff: Double) = None
-    def weight = DenseVector(1.0)
-    def isDefined = maf.exists(m => m >= fixedCutoff && m <= (1 - fixedCutoff))
-    def getFixed(cutoff: Double = fixedCutoff) = None
+    def weight = DummyDV
+    lazy val isDefined = maf.exists(m => m.isCommon(fixedCutoff))
+    def getFixed(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
   }
 
   sealed trait CMC[A] extends Encode[A] {
-    def weight = DenseVector[Double]()
-    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
-
-      definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
+    lazy val isDefined = maf.exists(_.isRare(fixedCutoff))
+    def weight = DummyDV
+    def getFixed(cutoff: Double = fixedCutoff): Fixed = {
+      definedIndices(_.isRare(cutoff)).map{idx =>
         val sv = idx.map{i =>
           vars(i).toCounter(genotype.toCMC(_, maf(i)), 0.0)
         }.reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toSparseVector(x => x)
@@ -148,17 +159,16 @@ object Encode {
         }
         Fixed(sv, variations)
       }
-    }
-    def isDefined = maf.exists(m => m < fixedCutoff || m > (1 - fixedCutoff))
+    }.getOrElse(DummyFixed)
   }
 
   sealed trait BRV[A] extends Encode[A] {
-    def isDefined = maf.exists(m => m < fixedCutoff || m > (1 - fixedCutoff))
+    lazy val isDefined = maf.exists(_.isRare(fixedCutoff))
 
-    def getFixed(cutoff: Double = fixedCutoff): Option[Fixed] = {
+    def getFixed(cutoff: Double = fixedCutoff): Fixed = {
       val w = weight
-      definedIndices(m => m < cutoff || m > (1 - cutoff)).map{idx =>
-        val sv = idx.map {i =>
+      definedIndices(_.isRare(cutoff)).map{idx =>
+        val sv = idx.map{i =>
           //println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")
           vars(i).toCounter(genotype.toBRV(_, maf(i)) * w(i), 0.0)
         }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toSparseVector(x => x)
@@ -168,7 +178,7 @@ object Encode {
           res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
         }
         Fixed(sv, variations)
-      }
+      }.getOrElse(DummyFixed)
     }
   }
 
@@ -325,14 +335,15 @@ abstract class Encode[A: Genotype] extends Serializable {
     }
   }
   def weight: DenseVector[Double]
-  def getFixed(cutoff: Double = fixedCutoff): Option[Encode.Fixed]
+  def getFixed(cutoff: Double = fixedCutoff): Encode.Fixed
 
-  def getVT: Option[Encode.VT] = {
+  lazy val getVT: Encode.VT = {
     val tol = 4.0/(9 * sampleSize)
     thresholds.map{th =>
       val cm = SparseVector.horzcat(th.map{c =>
-        val sv = this.getFixed(c + tol).get.coding
-        println(s"sv size: ${sv.length} activeSize: ${sv.activeSize} values: ${sv.activeValuesIterator.mkString(",")}")
+        val sv = this.getFixed(c + tol).coding
+        println(s"threashold: $c sv size: ${sv.length} activeSize: ${sv.activeSize} " +
+          s"values: ${sv.activeValuesIterator.take(5).mkString(",")}")
         sv
       }: _*)
       println(s"cscmat(1, ::): ${cm.toDense(1, ::)}")
@@ -341,15 +352,9 @@ abstract class Encode[A: Genotype] extends Serializable {
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
       }
       Encode.VT(cm, variations)
-    }
+    }.getOrElse(Encode.VT(DummySM, DummyVars))
   }
 
-  def getCoding: Option[Encode.Coding] = {
-    if (config.maf.getBoolean("fixed"))
-      this.getFixed()
-    else
-      this.getVT
-  }
   def isDefined: Boolean
   def getCommon(cutoff: Double = fixedCutoff): Option[Common] = {
     if (maf.forall(m => m < cutoff || m > (1 - cutoff))) {

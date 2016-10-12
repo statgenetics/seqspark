@@ -18,7 +18,7 @@ import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.Genotype
-
+import org.dizhang.seqspark.worker.Variants._
 import scala.collection.JavaConverters._
 
 /**
@@ -51,7 +51,7 @@ object AssocMaster {
     val groupBy = config.misc.getStringList("groupBy").asScala.toList
     val annotated = codingScheme match {
       case MethodType.snv =>
-        currentGenotype.map(v => (s"${v.chr}:${v.pos}", v)).groupByKey()
+        currentGenotype.map(v => (v.toVariation(withInfo = false).toString(), v)).groupByKey()
       case MethodType.meta =>
         currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ =>
@@ -212,14 +212,16 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val indicator = sc.broadcast(phenotype.indicate(traitName))
         val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
           .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-        val currentGenotype = genotype.samples(indicator.value)(sc)
+        val currentGenotype = genotype.samples(indicator.value)(sc).filter(v => v.informative)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
-        val forPCA = currentGenotype
-          .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
+
         val pc = if (traitConfig.pc == 0) {
           None
         } else {
+          logger.info("perform PCA for genotype data")
+          val forPCA = currentGenotype
+            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
           val res =  new PCA(forPCA).pc(traitConfig.pc)
           logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
           Some(res)

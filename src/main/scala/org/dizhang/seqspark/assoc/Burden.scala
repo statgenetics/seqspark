@@ -30,7 +30,7 @@ object Burden {
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode[_]) extends Burden with AssocMethod.AnalyticTest {
-    val geno = x.getFixed().get
+    val geno = x.getFixed()
     val scoreTest = ScoreTest(nullModel, geno.coding)
     val statistic = getStatistic(scoreTest)
     val pValue = {
@@ -51,7 +51,7 @@ object Burden {
                                   x: Encode[_]) extends Burden with AssocMethod.ResamplingTest {
     def pCount = Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(x.getFixed().get.vars, refStatistic, pCount)
+      AssocMethod.ResamplingResult(x.getFixed().vars, refStatistic, pCount)
     }
   }
 }

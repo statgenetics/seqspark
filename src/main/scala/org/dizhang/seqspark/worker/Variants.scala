@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.worker
 
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.{DenseVariant, Genotype, Variant}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
 import breeze.stats.distributions.ChiSquared
@@ -60,6 +60,10 @@ object Variants {
             res.ratio
         }
       }
+    }
+    def informative: Boolean = {
+      val af = v.toCounter(geno.toAAF, (0.0, 2.2)).reduce
+      af._1 != 0.0 && af._1 != af._2
     }
     def batchMaf(controls: Option[Array[Boolean]],
                  batch: Array[String]): Map[String, Double] = {

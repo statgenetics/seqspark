@@ -342,11 +342,11 @@ abstract class Encode[A: Genotype] extends Serializable {
     thresholds.map{th =>
       val cm = SparseVector.horzcat(th.map{c =>
         val sv = this.getFixed(c + tol).coding
-        println(s"threashold: $c sv size: ${sv.length} activeSize: ${sv.activeSize} " +
-          s"values: ${sv.activeValuesIterator.take(5).mkString(",")}")
+        //println(s"threashold: $c sv size: ${sv.length} activeSize: ${sv.activeSize} " +
+        //  s"values: ${sv.activeValuesIterator.take(5).mkString(",")}")
         sv
       }: _*)
-      println(s"cscmat(1, ::): ${cm.toDense(1, ::)}")
+      //println(s"cscmat(1, ::): ${cm.toDense(1, ::)}")
       val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => p._2.ratio <= th.max).map{
         case (v, mc) =>
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")

@@ -102,6 +102,7 @@ object AssocMaster {
     logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     val nm = ScoreTest.NullModel(reg)
+    logger.info("get the reference statistics first")
     val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, config).collect().toMap
     val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
     val sites = encode.count().toInt
@@ -113,6 +114,7 @@ object AssocMaster {
     var curEncode = encode
     var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
     for (i <- 0 to loops) {
+      logger.info(s"round $i of permutation test, ${curEncode.count()} genes")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
       curEncode = expand(curEncode, lastMax, curMax)
@@ -130,6 +132,7 @@ object AssocMaster {
       pCount = sc.broadcast(for ((k, v) <- pCount.value)
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
+      curEncode.persist(StorageLevel.MEMORY_AND_DISK)
     }
     pCount.value.map{x =>
       val asymp = asymptoticRes(x._1)

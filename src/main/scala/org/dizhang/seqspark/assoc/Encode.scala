@@ -133,7 +133,7 @@ object Encode {
 
   sealed trait Raw[A] extends Encode[A] {
     lazy val isDefined = maf.exists(m => m > 0.0 && m < 1.0)
-    def getFixed(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
+    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
     def weight = DummyDV
   }
 
@@ -141,13 +141,13 @@ object Encode {
     override def getRare(cutoff: Double) = None
     def weight = DummyDV
     lazy val isDefined = maf.exists(m => m.isCommon(fixedCutoff))
-    def getFixed(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
+    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
   }
 
   sealed trait CMC[A] extends Encode[A] {
     lazy val isDefined = maf.exists(_.isRare(fixedCutoff))
     def weight = DummyDV
-    def getFixed(cutoff: Double = fixedCutoff): Fixed = {
+    def getFixedBy(cutoff: Double = fixedCutoff): Fixed = {
       definedIndices(_.isRare(cutoff)).map{idx =>
         val sv = idx.map{i =>
           vars(i).toCounter(genotype.toCMC(_, maf(i)), 0.0)
@@ -165,7 +165,7 @@ object Encode {
   sealed trait BRV[A] extends Encode[A] {
     lazy val isDefined = maf.exists(_.isRare(fixedCutoff))
 
-    def getFixed(cutoff: Double = fixedCutoff): Fixed = {
+    def getFixedBy(cutoff: Double = fixedCutoff): Fixed = {
       val w = weight
       definedIndices(_.isRare(cutoff)).map{idx =>
         val sv = idx.map{i =>
@@ -335,13 +335,15 @@ abstract class Encode[A: Genotype] extends Serializable {
     }
   }
   def weight: DenseVector[Double]
-  def getFixed(cutoff: Double = fixedCutoff): Encode.Fixed
+  def getFixedBy(cutoff: Double = fixedCutoff): Encode.Fixed
+
+  lazy val getFixed: Encode.Fixed = getFixedBy()
 
   lazy val getVT: Encode.VT = {
     val tol = 4.0/(9 * sampleSize)
     thresholds.map{th =>
       val cm = SparseVector.horzcat(th.map{c =>
-        val sv = this.getFixed(c + tol).coding
+        val sv = this.getFixedBy(c + tol).coding
         //println(s"threashold: $c sv size: ${sv.length} activeSize: ${sv.activeSize} " +
         //  s"values: ${sv.activeValuesIterator.take(5).mkString(",")}")
         sv

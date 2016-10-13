@@ -18,7 +18,6 @@ import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.Genotype
-import org.dizhang.seqspark.worker.Variants._
 import scala.collection.JavaConverters._
 
 /**

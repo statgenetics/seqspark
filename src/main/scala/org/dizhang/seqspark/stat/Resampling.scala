@@ -43,7 +43,7 @@ object Resampling {
     def makeNewStatistic(newNullModel: NullModel, newX: Encode[_]): Double = {
 
       if (newX.config.maf.getBoolean("fixed")) {
-        val st = ScoreTest(newNullModel, newX.getFixed().coding)
+        val st = ScoreTest(newNullModel, newX.getFixed.coding)
         transformer(st)
       } else {
         val st = ScoreTest(newNullModel, newX.getVT.coding)

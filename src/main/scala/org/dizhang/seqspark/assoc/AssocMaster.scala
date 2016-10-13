@@ -98,7 +98,7 @@ object AssocMaster {
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
-                      config: MethodConfig)(implicit sc: SparkContext): Map[String, TestResult] = {
+                      config: MethodConfig)(implicit sc: SparkContext): Map[String, AssocMethod.ResamplingResult] = {
     logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     val nm = ScoreTest.NullModel(reg)
@@ -116,7 +116,7 @@ object AssocMaster {
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
       curEncode = expand(curEncode, lastMax, curMax)
-      val curPCount = curEncode.map{x =>
+      val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
         val model =
           if (config.maf.getBoolean("fixed")) {
@@ -131,7 +131,12 @@ object AssocMaster {
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
     }
-    pCount.value.map(x => (x._1, TestResult(None, None, x._2._2.toDouble, x._2._1.toDouble/x._2._2)))
+    pCount.value.map{x =>
+      val asymp = asymptoticRes(x._1)
+      val vars = asymp.vars
+      val ref = asymp.statistic
+      (x._1, AssocMethod.ResamplingResult(vars, ref, x._2))
+    }
   }
 
   def asymptoticTest(encode: RDD[(String, Encode[_])],
@@ -142,8 +147,8 @@ object AssocMaster {
                     (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
-    logger.info(s"reg.xs cols: ${reg.xs.cols}")
-    logger.info(s"reg.xs rank: ${rank(reg.xs)}")
+    logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
+    logger.info(s"covariates design matrix rank: ${rank(reg.xs)}")
     config.`type` match {
       case MethodType.skat =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))
@@ -170,15 +175,14 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
-  def writeResults(res: RDD[(String, AssocMethod.AnalyticResult)], outFile: String): Unit = {
+  def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: String): Unit = {
     val pw = new PrintWriter(new java.io.File(outFile))
-    pw.write("name\tvars\tstatistic\tp-value\n")
-    res.collect().sortBy(p => p._2.pValue).foreach{p =>
-      val gene = p._1
-      val pVal = p._2.pValue
-      val stat = p._2.statistic
-      val vars = p._2.vars.map(_.toString).mkString("/")
-      pw.write("%s\t%s\t%f\t%f\n".format(gene, vars, stat, pVal))
+    res match {
+      case _: AssocMethod.AnalyticResult => pw.write("name\tvars\tstatistic\tp-value\n")
+      case _: AssocMethod.ResamplingResult => pw.write("name\tvars\tstatistic\tp-count\tp-value\n")
+    }
+    res.sortBy(p => p._2.pValue).foreach{p =>
+      pw.write("%s\t%s\n".format(p._1, p._2.toString))
     }
     pw.close()
   }
@@ -261,9 +265,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     if (methodConfig.`type` == MethodType.meta) {
       rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)(sc)
     } else if (permutation) {
-      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)(sc)
+      val res = permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)(sc).toArray
+      writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
-      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)(sc)
+      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)(sc).collect()
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }

@@ -42,7 +42,7 @@ object VT {
       val maxT = max(ts)
       val cutoff = maxT * ss
       val dis = MultivariateNormal.Centered(scoreTest.variance)
-      dis.cdf(cutoff).pvalue
+      1.0 - dis.cdf(cutoff).pvalue
     }
     def result = AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
   }

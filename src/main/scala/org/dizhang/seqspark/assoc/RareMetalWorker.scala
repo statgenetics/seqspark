@@ -130,7 +130,9 @@ object RareMetalWorker {
                            sampleSizes: Array[Int],
                            vars: Array[Variation],
                            score: DV[Double],
-                           variance: DM[Double]) extends Result
+                           variance: DM[Double]) extends Result {
+    def pValue: Double = 1.0
+  }
 
 
   def getMaf(v: Variation): (Int, Int) = {

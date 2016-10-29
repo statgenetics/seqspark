@@ -2,7 +2,7 @@
 use strict;
 
 my $dbmap = {
-	RefSeq => "refFlat_table.bz2,refGene_mRNA.bz2",
+	RefSeq => "refFlat_table,refGene_seq",
 	ExAC => "ExAC-0.3.1.vcf.bz2",
 	dbSNP => "dbSNP-138.vcf.bz2",
 	dbNSFP => "dbNSFP-3.2.tsv.bz2",
@@ -70,5 +70,7 @@ sub usage {
   example:    seqspark-db ref dbNSFP,ExAC
 ";
 }
+my $dir = shift;
+my $list = shift;
 
-&main;
+&main($dir, $list);

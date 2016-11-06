@@ -1,12 +1,15 @@
 package org.dizhang.seqspark.util
 
 import java.io._
+
 import com.typesafe.config.Config
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
 import Constant._
+import breeze.linalg.DenseMatrix
 import org.dizhang.seqspark.ds.Variant
 import org.dizhang.seqspark.util.UserConfig.RootConfig
+
 import scala.io.Source
 /**
  * defines some input/output functions here
@@ -83,6 +86,14 @@ object InputOutput {
   def writeAny(file: String, data: String): Unit = {
     val pw = new PrintWriter(new File(file))
     pw.write(data + "\n")
+    pw.close()
+  }
+
+  def writeDenseMatrix(file: String, dm: DenseMatrix[Double]): Unit = {
+    val pw = new PrintWriter(new File(file))
+    (0 until dm.rows).foreach{i =>
+      pw.write(dm(i, ::).t.toArray.mkString("\t") + "\n")
+    }
     pw.close()
   }
 

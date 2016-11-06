@@ -4,10 +4,14 @@ import java.io.{File, PrintWriter}
 
 import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.{Counter, Genotype}
+import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.stat.PCA
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
+import org.dizhang.seqspark.util.InputOutput._
 import org.slf4j.LoggerFactory
+
 
 /**
   * Created by zhangdi on 9/20/16.
@@ -16,7 +20,10 @@ object Samples {
   val logger = LoggerFactory.getLogger(getClass)
 
   def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
-    
+    val common = self.variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"Y\""))(ssc)
+    val res =  new PCA(common).pc(10)
+    logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
+    writeDenseMatrix(ssc.userConfig.localDir + "/output/pca.txt", res)
   }
 
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {

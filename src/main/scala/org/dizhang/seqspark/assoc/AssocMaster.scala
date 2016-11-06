@@ -230,7 +230,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         } else {
           logger.info("perform PCA for genotype data")
           val forPCA = currentGenotype
-            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))(ssc)
+            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"Y\""))(ssc)
           val res =  new PCA(forPCA).pc(traitConfig.pc)
           logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
           Some(res)

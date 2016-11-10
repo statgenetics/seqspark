@@ -2,7 +2,6 @@ package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import breeze.stats._
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.dizhang.seqspark.util.Constant.Pheno
 import scala.util.{Failure, Success, Try}
@@ -13,13 +12,20 @@ import Phenotype._
   */
 object Phenotype {
 
-  def apply(path: String, sc: SparkContext): Phenotype = {
-    //val sqlContext = new SQLContext(sc)
+   def update(path: String, table: String)(spark: SparkSession): Phenotype = {
+     val options = Map(
+       "nullValue" -> Pheno.mis,
+       "sep" -> Pheno.delim,
+       "header" -> "true"
+     )
+     val dataFrame = spark.read.options(options).csv(path)
+     val old = spark.table(table)
+     val newdf = old.join(dataFrame, usingColumn = "iid")
+     newdf.createOrReplaceTempView(table)
+     Distributed(newdf)
+   }
 
-    val spark = SparkSession
-      .builder()
-      .appName("SeqSpark Phenotype")
-      .getOrCreate()
+  def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
 
     val options = Map(
       "nullValue" -> Pheno.mis,
@@ -28,33 +34,27 @@ object Phenotype {
     )
 
     val dataFrame = spark.read.options(options).csv(path)
-    /**
-    val raw = sc.textFile(path).cache()
-    val head = raw.first()
-    val ped = raw.zipWithUniqueId().filter(_._2 != 0).map(_._1)
 
-    val scheme =
-      StructType(
-        head.split(Pheno.delim)
-        .map(fieldName => StructField(fieldName, StringType, nullable = true)))
-    val rowRDD = ped.map{l =>
-      val p = l.split(Pheno.delim)
-      Row.fromSeq(p.map{
-        case Pheno.mis => null
-        case x => x
-      })
-    }
-    val dataFrame = sqlContext.createDataFrame(rowRDD, scheme)
-    */
+    dataFrame.createOrReplaceTempView(table)
+
     Distributed(dataFrame)
   }
 
-  case class Distributed(private val df: DataFrame) extends Phenotype {
+   def apply(table: String)(spark: SparkSession): Phenotype = {
+     Distributed(spark.table(table))
+   }
+
+
+  case class Distributed(df: DataFrame) extends Phenotype {
+
+    private lazy val cols = df.columns
+
     def select(field: String): Array[Option[String]] = {
-      if (df.columns.contains(field)) {
+      if (cols.contains(field)) {
         val spark = df.sparkSession
         import spark.implicits._
         df.select(field).map(r => Option(r(0)).map(_.toString)).collect()
+
       } else {
         Array.fill(df.count().toInt)(None)
       }
@@ -100,6 +100,7 @@ object Phenotype {
 trait Phenotype {
 
   def select(field: String): Array[Option[String]]
+  def sampleNames = this.select("iid").map(_.getOrElse("NA"))
   def batch(field: String): Array[String] = {
     this.select(field).map{
       case None => s"$field:None"

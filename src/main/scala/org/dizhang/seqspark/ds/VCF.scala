@@ -32,7 +32,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
 
   def variants(cond: List[String])(ssc: SingleStudyContext): RDD[Variant[A]] = {
     val conf = ssc.userConfig
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val batch = pheno.batch(conf.input.phenotype.batch)
     val controls = pheno.select("control")
     val ctrlInd = if (controls.forall(c => c.isEmpty || c.get == "1")) {

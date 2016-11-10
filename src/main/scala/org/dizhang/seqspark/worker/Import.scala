@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.ds.{Region, Variant}
+import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.util.{UserConfig => UC}
@@ -19,7 +19,7 @@ object Import {
     logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
       case Left(UC.Samples.none) => true
@@ -60,7 +60,7 @@ object Import {
     logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val imConf = conf.input
     val imputedFile = imConf.genotype.path
     val imputedInfoFile = imConf.genotype.path + "_info"

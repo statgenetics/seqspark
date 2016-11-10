@@ -3,7 +3,7 @@ package org.dizhang.seqspark.worker
 import java.io.{File, PrintWriter}
 
 import org.dizhang.seqspark.annot.IntervalTree
-import org.dizhang.seqspark.ds.{Counter, Genotype}
+import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype}
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.stat.PCA
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
@@ -23,7 +23,12 @@ object Samples {
     val common = self.variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"Y\""))(ssc)
     val res =  new PCA(common).pc(10)
     logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
-    writeDenseMatrix(ssc.userConfig.localDir + "/output/pca.txt", res)
+    val phenotype = Phenotype("phenotype")(ssc.sparkSession)
+    val sn = phenotype.sampleNames
+    val header = (1 to 10).map(i => s"_pc$i").mkString(",")
+    val path = ssc.userConfig.localDir + "/output/pca.csv"
+    writeDenseMatrix(path, res, Some(header))
+    Phenotype.update(path, "phenotype")(ssc.sparkSession)
   }
 
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
@@ -36,7 +41,7 @@ object Samples {
         v.toCounter(g => (0.0, geno.toAAF(g)._1), (0.0, 0.0))
       }
     }.reduce((a, b) => a ++ b)
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val fid = pheno.select("fid").map(_.get)
     val iid = pheno.select("iid").map(_.get)
     val outFile = "output/titv.txt"
@@ -95,7 +100,7 @@ object Samples {
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: String)
                    (ssc: SingleStudyContext): Unit = {
 
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val fid = pheno.select("fid").map(_.get)
     val iid = pheno.select("iid").map(_.get)
     val sex = pheno.select("sex").map{

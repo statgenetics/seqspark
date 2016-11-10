@@ -7,6 +7,8 @@ import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.typesafe.config.ConfigFactory
 import java.io.File
 
+import org.apache.spark.sql.SparkSession
+
 import scala.collection.JavaConverters._
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.assoc.AssocMaster
@@ -80,11 +82,14 @@ object SingleStudy {
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
 
-    val pipeline = cnf.pipeline
+    val ss: SparkSession = SparkSession
+      .builder()
+      .appName("SeqSpark Phenotype")
+      .getOrCreate()
 
-    val phenotype = Phenotype(cnf.input.phenotype.path, sc)
+    Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
 
-    implicit val ssc = SingleStudyContext(cnf, sc, phenotype)
+    implicit val ssc = SingleStudyContext(cnf, sc, ss)
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {

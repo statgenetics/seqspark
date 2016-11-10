@@ -17,7 +17,8 @@ import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.Genotype
+import org.dizhang.seqspark.ds.{Genotype, Phenotype}
+
 import scala.collection.JavaConverters._
 
 /**
@@ -197,7 +198,7 @@ object AssocMaster {
 class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
-  val phenotype = ssc.phenotype
+  val phenotype = Phenotype("phenotype")(ssc.sparkSession)
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -224,7 +225,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val currentGenotype = chooseSample.variants(List("informative"))(ssc)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
-
+        /**
         val pc = if (traitConfig.pc == 0) {
           None
         } else {
@@ -235,8 +236,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
           logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
           Some(res)
         }
+          */
         val cov =
           if (traitConfig.covariates.nonEmpty) {
+            val all = traitConfig.covariates ++ (1 to traitConfig.pc).map(i => s"_pc$i")
             phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
               case Left(msg) =>
                 logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
@@ -247,7 +250,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
             }
           } else
             None
-        val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
+        val currentCov = sc.broadcast(cov)
         methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
     }
   }

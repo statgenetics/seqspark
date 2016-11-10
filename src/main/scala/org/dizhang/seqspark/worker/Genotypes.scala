@@ -4,7 +4,7 @@ import java.io.{File, PrintWriter}
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.{Counter, Genotype, Variant}
+import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
 import org.dizhang.seqspark.util.Constant.Genotype.Raw
 import org.dizhang.seqspark.util.{General, SingleStudyContext}
 import org.slf4j.LoggerFactory
@@ -19,7 +19,7 @@ object Genotypes {
 
     val sc = ssc.sparkContext
     val conf = ssc.userConfig
-    val phenotype = ssc.phenotype
+    val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val batch = conf.input.phenotype.batch
     val (batchKeys, keyFunc) = if (batch == "none") {
       (Array("all"), (i: Int) => 0)

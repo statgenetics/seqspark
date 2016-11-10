@@ -89,10 +89,18 @@ object InputOutput {
     pw.close()
   }
 
-  def writeDenseMatrix(file: String, dm: DenseMatrix[Double]): Unit = {
+  def writeDenseMatrix(file: String,
+                       dm: DenseMatrix[Double],
+                       header: Option[String] = None,
+                       rowNames: Option[Array[String]] = None): Unit = {
     val pw = new PrintWriter(new File(file))
+
+    header.foreach(h => pw.write(h + "\n"))
+
     (0 until dm.rows).foreach{i =>
-      pw.write(dm(i, ::).t.toArray.mkString("\t") + "\n")
+      val rn = rowNames.map(a => a(i)).getOrElse("")
+      val res = rn +: dm(i, ::).t.toArray.map(_.toString)
+      pw.write(res.mkString(",") + "\n")
     }
     pw.close()
   }

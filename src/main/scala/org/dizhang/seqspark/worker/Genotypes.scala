@@ -76,7 +76,7 @@ object Genotypes {
       new Int2IntOpenHashMap(Array(0), Array(1))
     } else {
       val gd = General.insert(gdTicks, f.getOrElse("DP", "0").toInt)
-      val gq = math.min(f.getOrElse("GQ", "0").toInt, 99) / 5
+      val gq = math.min(f.getOrElse("GQ", "0").toDouble.toInt, 99) / 5
       val key = 20 * gd + gq
       new Int2IntOpenHashMap(Array(key), Array(1))
     }

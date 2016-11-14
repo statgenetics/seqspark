@@ -84,7 +84,7 @@ object VariantAnnotOp {
     new VariantAnnotOp[A](v)
   }
   def parseAnnotation(value: String) = {
-    val geneRegex = """([\w][\w-]*)::(\S+)""".r
+    val geneRegex = """([\w][\w-\.]*)::(\S+)""".r
     val trsRegex = """(\w+):(\S+)""".r
     val genes = value.split(",,").map{
       case geneRegex(gene, rest) => gene -> rest.split(",").map{

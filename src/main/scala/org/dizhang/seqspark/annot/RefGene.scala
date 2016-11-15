@@ -56,8 +56,12 @@ object RefGene {
     val seq = seqLines.map{
       case seqName(n) => Array((n, ""))
       case l => Array(("", l))
-    }.fold(Array(("", ""))){(a, b) =>
-      if (b.head._1 != "") {
+    }.fold(Array()){(a, b) =>
+      if (a.isEmpty) {
+        b
+      } else if (b.isEmpty) {
+        a
+      } else if (b.head._1 != "") {
         a ++ b
       } else {
         (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)

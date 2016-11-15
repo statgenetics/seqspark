@@ -58,46 +58,34 @@ object RefGene {
       case l => Array(("", l))
     }
 
+    def mergeFa(a: Array[(String, String)], b: Array[(String, String)]): Array[(String, String)] = {
+      if (a.isEmpty) {
+        b
+      } else if (b.isEmpty) {
+        a
+      } else if (b.head._1 != "") {
+        a ++ b
+      } else {
+        (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
+      }
+    }
+
     val seq3 = seq2.mapPartitions{p =>
       p.fold(Array()){(a, b) =>
-        if (a.isEmpty) {
-          b
-        } else if (b.isEmpty) {
-          a
-        } else if (b.head._1 != "") {
-          a ++ b
-        } else {
-          (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
-        }
+        mergeFa(a, b)
       }.toIterator
     }.collect().map(x => Array(x)).fold(Array()){(a, b) =>
-      if (a.isEmpty) {
-        b
-      } else if (b.isEmpty) {
-        a
-      } else if (b.head._1 != "") {
-        a ++ b
-      } else {
-        (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
-      }
-    }.toMap
+      mergeFa(a,b)
+    }.map(s => s._1 -> makeRNA(s._1, s._2)).toMap
 
     val seq = seq2.fold(Array()){(a, b) =>
-      if (a.isEmpty) {
-        b
-      } else if (b.isEmpty) {
-        a
-      } else if (b.head._1 != "") {
-        a ++ b
-      } else {
-        (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
-      }
+      mergeFa(a, b)
     }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
-
 
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
     logger.info(s"${seq.size} ${seq3.size} transcript sequences")
 
+    ///**
     val names = seq3.keys
 
     val pw = new PrintWriter(new File("output/test.seq"))
@@ -107,8 +95,8 @@ object RefGene {
       pw.write(s"$k: ${s.length}\n")
     }
     pw.close()
-
-    val res = new RefGene(build, loci, seq)
+    //*/
+    val res = new RefGene(build, loci, seq3)
     logger.info(s"${IntervalTree.count(res.loci)} locations generated")
 
     /**

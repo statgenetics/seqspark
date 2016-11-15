@@ -56,7 +56,7 @@ object RefGene {
     val seq2 = seqLines.map{
       case seqName(n) => Array((n, ""))
       case l => Array(("", l))
-    }.reduce{(a, b) =>
+    }.fold(Array(("", ""))){(a, b) =>
       if (b(0)._1.startsWith("NM_")) {
         a ++ b
       } else {

@@ -26,7 +26,7 @@ sub download_file {
 		print STDERR "$file already exists, skip\n";
 		return;
 	}
-	my $res = system("curl http://seqspark.dizhang.org/$file | hdfs dfs -appendToFile $dir/$file");
+	my $res = system("curl http://seqspark.dizhang.org/$file | hdfs dfs -appendToFile - $dir/$file");
 	if (!$res) {
 		print STDERR "Something wrong when downloading $file, exit code: $res\n";
 	}

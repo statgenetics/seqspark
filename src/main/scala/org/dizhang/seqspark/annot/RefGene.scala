@@ -74,7 +74,8 @@ object RefGene {
 
     val pw = new PrintWriter(new File("output/test.seq"))
     for (k <- names) {
-      pw.write(s"$k\n")
+      val s = seq(k)
+      pw.write(s"$k: ${s.slice(0, math.min(10, s.length)).toString}\n")
     }
     pw.close()
 

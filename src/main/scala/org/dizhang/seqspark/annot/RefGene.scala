@@ -60,7 +60,7 @@ object RefGene {
       if (b(0)._1.startsWith("NM_")) {
         a ++ b
       } else {
-        a(a.length - 1) = (a.last._1, a.last._2 + b(0)._2)
+        //a(a.length - 1) = (a.last._1, a.last._2 + b(0)._2)
         (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
       }
     }.map(s => (s._1, makeRNA(s._1, s._2))).toMap

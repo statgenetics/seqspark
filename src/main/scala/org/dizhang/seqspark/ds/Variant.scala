@@ -191,7 +191,7 @@ abstract class Variant[A: Genotype] extends Serializable {
       false
   }
 
-  def parseInfo: Map[String, String] = {
+  lazy val parseInfo: Map[String, String] = {
     if (this.info == ".")
       Map[String, String]()
     else
@@ -201,7 +201,12 @@ abstract class Variant[A: Genotype] extends Serializable {
   }
 
   def addInfo(key: String, value: String): Unit = {
-    require(! this.parseInfo.contains(key))
+    //require(! this.parseInfo.contains(key))
+
+    if (this.parseInfo.contains(key)) {
+      println(s"WARN: info key exists -- key: $key value: ${parseInfo(key)} new value: $value")
+    }
+
     this.meta(7) = s"$info;$key=$value"
   }
 

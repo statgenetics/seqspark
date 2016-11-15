@@ -53,10 +53,36 @@ object RefGene {
     val seqName = """>(\w+_\d+)\.\d+""".r
     val seqLines = sc.textFile(seqFile)
 
-    val seq = seqLines.map{
+    val seq2 = seqLines.map{
       case seqName(n) => Array((n, ""))
       case l => Array(("", l))
-    }.fold(Array()){(a, b) =>
+    }
+
+    val seq3 = seq2.mapPartitions{p =>
+      p.fold(Array()){(a, b) =>
+        if (a.isEmpty) {
+          b
+        } else if (b.isEmpty) {
+          a
+        } else if (b.head._1 != "") {
+          a ++ b
+        } else {
+          (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
+        }
+      }.toIterator
+    }.collect().map(x => Array(x)).fold(Array()){(a, b) =>
+      if (a.isEmpty) {
+        b
+      } else if (b.isEmpty) {
+        a
+      } else if (b.head._1 != "") {
+        a ++ b
+      } else {
+        (a.take(a.length - 1) :+ (a.last._1, a.last._2 + b.head._2)) ++ b.drop(1)
+      }
+    }.toMap
+
+    val seq = seq2.fold(Array()){(a, b) =>
       if (a.isEmpty) {
         b
       } else if (b.isEmpty) {
@@ -70,14 +96,14 @@ object RefGene {
 
 
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
-    logger.info(s"${seq.size} transcript sequences")
+    logger.info(s"${seq.size} ${seq3.size} transcript sequences")
 
     val names = seq.keys
 
     val pw = new PrintWriter(new File("output/test.seq"))
     //pw.write(s"${seq("").toString}\n")
     for (k <- names) {
-      val s = seq(k)
+      val s = seq3(k)
       pw.write(s"$k: ${s.length}\n")
     }
     pw.close()

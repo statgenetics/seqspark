@@ -126,6 +126,7 @@ object UserConfig {
   case class QualityControlConfig(config: Config) extends UserConfig {
     def genotypes = config.getStringList("genotypes").asScala.toList
     def variants = config.getStringList("variants").asScala.toList
+    def summaries = config.getStringList("summaries").asScala.toList
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {

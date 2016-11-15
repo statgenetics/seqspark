@@ -22,7 +22,11 @@ object QualityControl {
 
     annotated.persist(StorageLevel.MEMORY_AND_DISK)
 
-    statGdGq(annotated)(ssc)
+    val sums = ssc.userConfig.qualityControl.summaries
+
+    if (sums.contains("gdgq")) {
+      statGdGq(annotated)(ssc)
+    }
 
     val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
 
@@ -30,9 +34,18 @@ object QualityControl {
 
     simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
-    checkSex(simpleVCF)(ssc)
 
-    titv(simpleVCF)(ssc)
+    if (sums.contains("sexCheck")) {
+      checkSex(simpleVCF)(ssc)
+    }
+
+    if (sums.contains("titv")) {
+      titv(simpleVCF)(ssc)
+    }
+
+    if (sums.contains("pca")) {
+      pca(simpleVCF)(ssc)
+    }
 
     /** Variant QC */
     simpleVCF.variants(conf.qualityControl.variants)(ssc)
@@ -46,8 +59,15 @@ object QualityControl {
     val annotated = linkVariantDB(input)(conf, sc)
     annotated.persist(StorageLevel.MEMORY_AND_DISK)
 
+    val sums = ssc.userConfig.qualityControl.summaries
     /** sample QC */
-    checkSex(annotated)(ssc)
+    if (sums.contains("sexCheck")) {
+      checkSex(annotated)(ssc)
+    }
+
+    if (sums.contains("pca")) {
+      pca(annotated)(ssc)
+    }
 
     /** Variant QC */
     annotated.variants(conf.qualityControl.variants)(ssc)

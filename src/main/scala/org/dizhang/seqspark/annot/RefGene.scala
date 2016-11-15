@@ -53,7 +53,7 @@ object RefGene {
     val seqName = """>(\w+_\d+)\.\d+""".r
     val seqLines = sc.textFile(seqFile)
 
-    val seq = seqLines.map{
+    val seq2 = seqLines.map{
       case seqName(n) => Array((n, ""))
       case l => Array(("", l))
     }.reduce{(a, b) =>
@@ -63,23 +63,22 @@ object RefGene {
         a(a.length - 1) = (a.last._1, a.last._2 + b(0)._2)
         a ++ b.slice(1, b.length)
       }
-    }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
+    }
+
+    val seq = seq2.map(s => (s._1, makeRNA(s._1, s._2))).toMap
 
 
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
-    logger.info(s"${seq.size} transcript sequences")
+    logger.info(s"${seq2.length} ${seq.size} transcript sequences")
 
     val names = seq.keys
 
-    val pw = new PrintWriter(new File("output/test2.seq"))
-    pw.write(s"${seq("").toString}\n")
-    pw.write(s">NM_001198672\n${seq("NM_001198672").toString}\n")
-    pw.write(s">NM_001198673\n${seq("NM_001198673").toString}\n")
-    pw.write(s">NM_001198674\n${seq("NM_001198674").toString}\n")
-    //for (k <- names) {
-    //  val s = seq(k)
-    //  pw.write(s"$k: ${s.slice(0, math.min(10, s.length)).toString}\n")
-    //}
+    val pw = new PrintWriter(new File("output/test.seq"))
+    //pw.write(s"${seq("").toString}\n")
+    for (k <- names) {
+      val s = seq(k)
+      pw.write(s"$k: ${s.length}\n")
+    }
     pw.close()
 
     val res = new RefGene(build, loci, seq)

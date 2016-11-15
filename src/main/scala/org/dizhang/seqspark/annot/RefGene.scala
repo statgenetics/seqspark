@@ -98,7 +98,7 @@ object RefGene {
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
     logger.info(s"${seq.size} ${seq3.size} transcript sequences")
 
-    val names = seq.keys
+    val names = seq3.keys
 
     val pw = new PrintWriter(new File("output/test.seq"))
     //pw.write(s"${seq("").toString}\n")

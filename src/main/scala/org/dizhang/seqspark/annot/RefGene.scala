@@ -66,7 +66,6 @@ object RefGene {
     }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
 
 
-
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
     logger.info(s"${seq.size} transcript sequences")
 
@@ -74,6 +73,9 @@ object RefGene {
 
     val pw = new PrintWriter(new File("output/test2.seq"))
     pw.write(s"${seq("").toString}\n")
+    pw.write(s">NM_001198672\n${seq("NM_001198672").toString}\n")
+    pw.write(s">NM_001198673\n${seq("NM_001198673").toString}\n")
+    pw.write(s">NM_001198674\n${seq("NM_001198674").toString}\n")
     //for (k <- names) {
     //  val s = seq(k)
     //  pw.write(s"$k: ${s.slice(0, math.min(10, s.length)).toString}\n")

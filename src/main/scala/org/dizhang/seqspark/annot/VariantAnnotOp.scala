@@ -12,7 +12,8 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
   def annotateByVariant(dict: Broadcast[RefGene]): Variant[A] = {
     val variation = v.toVariation()
 
-    val annot = IntervalTree.lookup(dict.value.loci, variation).map{l =>
+    val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
+      dict.value.seq.contains(l.mRNAName)).map{l =>
       (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
     annot match {
       case Nil =>

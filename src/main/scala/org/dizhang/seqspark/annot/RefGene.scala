@@ -1,9 +1,12 @@
 package org.dizhang.seqspark.annot
 
 
+import java.io.{File, PrintWriter}
+
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.ds.{Region, Single}
 import org.dizhang.seqspark.annot.NucleicAcid._
+
 import scala.io.Source
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -66,6 +69,14 @@ object RefGene {
 
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
     logger.info(s"${seq.size} transcript sequences")
+
+    val names = seq.keys
+
+    val pw = new PrintWriter(new File("output/test.seq"))
+    for (k <- names) {
+      pw.write(s"$k\n")
+    }
+    pw.close()
 
     val res = new RefGene(build, loci, seq)
     logger.info(s"${IntervalTree.count(res.loci)} locations generated")

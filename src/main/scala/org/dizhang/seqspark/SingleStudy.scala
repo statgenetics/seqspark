@@ -77,7 +77,7 @@ object SingleStudy {
     val project = cnf.project
 
     /** Spark configuration */
-    val scConf = new SparkConf().setAppName("SeqA-%s" format project)
+    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)

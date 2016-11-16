@@ -46,7 +46,7 @@ object InputOutput {
   }
 
   def saveDir(implicit cnf: RootConfig, name: WorkerName): String = {
-    "%s/%s" format (cnf.hdfsDir, name)
+    "%s/%s" format (cnf.dbDir, name)
   }
 
   def sitesFile(implicit cnf: RootConfig, name: WorkerName): String = {

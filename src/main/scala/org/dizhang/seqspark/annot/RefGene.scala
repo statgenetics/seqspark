@@ -70,7 +70,7 @@ object RefGene {
       }
     }
 
-    val seq3 = seq2.mapPartitions{p =>
+    val seq = seq2.mapPartitions{p =>
       p.fold(Array()){(a, b) =>
         mergeFa(a, b)
       }.toIterator
@@ -78,25 +78,26 @@ object RefGene {
       mergeFa(a,b)
     }.map(s => s._1 -> makeRNA(s._1, s._2)).toMap
 
+    /**
     val seq = seq2.fold(Array()){(a, b) =>
       mergeFa(a, b)
     }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
-
+    */
     logger.debug(s"${seq.take(100).keys.mkString(":")}")
-    logger.info(s"${seq.size} ${seq3.size} transcript sequences")
+    logger.info(s"${seq.size} transcript sequences")
 
-    ///**
-    val names = seq3.keys
+    /**
+    val names = seq.keys
 
     val pw = new PrintWriter(new File("output/test.seq"))
     //pw.write(s"${seq("").toString}\n")
     for (k <- names) {
-      val s = seq3(k)
+      val s = seq(k)
       pw.write(s"$k: ${s.length}\n")
     }
     pw.close()
-    //*/
-    val res = new RefGene(build, loci, seq3)
+    */
+    val res = new RefGene(build, loci, seq)
     logger.info(s"${IntervalTree.count(res.loci)} locations generated")
 
     /**

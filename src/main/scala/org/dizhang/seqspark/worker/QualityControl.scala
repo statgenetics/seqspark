@@ -32,7 +32,8 @@ object QualityControl {
 
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
 
-    simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
+    simpleVCF.checkpoint()
+    //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
 
     if (sums.contains("sexCheck")) {
@@ -49,8 +50,8 @@ object QualityControl {
 
     /** Variant QC */
     simpleVCF.variants(conf.qualityControl.variants)(ssc)
-    annotated.unpersist()
-    simpleVCF.unpersist()
+    //annotated.unpersist()
+    //simpleVCF.unpersist()
   }
 
   def cleanImputed(input: Data[(Double, Double, Double)])(implicit ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
@@ -58,6 +59,8 @@ object QualityControl {
     val sc = ssc.sparkContext
     val annotated = linkVariantDB(input)(conf, sc)
     annotated.persist(StorageLevel.MEMORY_AND_DISK)
+
+    annotated.checkpoint()
 
     val sums = ssc.userConfig.qualityControl.summaries
     /** sample QC */

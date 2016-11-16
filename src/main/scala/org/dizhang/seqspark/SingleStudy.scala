@@ -150,7 +150,8 @@ object SingleStudy {
       } else {
         input
       }
-      annotated.persist(StorageLevel.MEMORY_AND_DISK)
+      annotated.cache()
+      annotated.map(v => v.site).saveAsTextFile("test")
       val assoc = new AssocMaster(annotated)(ssc)
       assoc.run()
     }

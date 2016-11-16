@@ -18,7 +18,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     annot match {
       case Nil =>
         //logger.warn(s"no annotation for variant ${variation.toString}")
-        v.addInfo(IK.anno, Anno.Feature.InterGenic.toString)
+        v.addInfo(IK.anno, F.InterGenic.toString)
         v
       case _ =>
         //val consensus = annot.map(p => (p._1, p._3))
@@ -80,15 +80,14 @@ object VariantAnnotOp {
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
   val Nucleotide = Constant.Annotation.Base
-  val Anno = Constant.Annotation
   val IK = Constant.Variant.InfoKey
   type Genes = Map[String, List[Location]]
   implicit def addAnnotOp[A](v: Variant[A]): VariantAnnotOp[A] = {
     new VariantAnnotOp[A](v)
   }
   def worstAnnotation(value: String): F.Value = {
-    if (value == Anno.Feature.InterGenic.toString) {
-      Anno.Feature.InterGenic
+    if (value == F.InterGenic.toString) {
+      F.InterGenic
     } else {
       val genes = parseAnnotation(value)
       genes.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b)

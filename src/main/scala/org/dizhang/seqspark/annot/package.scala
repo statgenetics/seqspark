@@ -75,7 +75,7 @@ package object annot {
       if (v.parseInfo.contains(IK.anno)) {
         worstAnnotation(v.parseInfo(IK.anno)) -> 1
       } else {
-        Anno.Feature.Unknown -> 1
+        F.Unknown -> 1
       }).countByKey()
       .toArray.sortBy(p => FM(p._1))
 

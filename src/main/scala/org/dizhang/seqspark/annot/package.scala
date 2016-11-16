@@ -70,7 +70,11 @@ package object annot {
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
     input.foreach(v => v.annotateByVariant(refSeq))
     val cnt = input.map(v =>
-      worstAnnotation(v.parseInfo(IK.anno)) -> 1).countByKey()
+      if (v.parseInfo.contains(IK.anno)) {
+        worstAnnotation(v.parseInfo(IK.anno)) -> 1
+      } else {
+        Anno.Feature.Unknown -> 1
+      }).countByKey()
       .toArray.sortBy(p => FM(p._1))
 
     val pw = new PrintWriter(new File("output/annotation_summary.txt"))

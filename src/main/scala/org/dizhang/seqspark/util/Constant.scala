@@ -67,6 +67,7 @@ object Constant {
       val Downstream = Value("Downstream")
       val InterGenic = Value("InterGenic")
       val CNV = Value("CNV")
+      val Unknown = Value("Unknown")
     }
 
     object Base extends Enumeration {

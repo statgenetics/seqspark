@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.assoc
 
-import java.io.PrintWriter
+import java.io.{File, PrintWriter}
 
 import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
 import org.apache.spark.SparkContext
@@ -63,7 +63,7 @@ object AssocMaster {
 
     val res: RDD[(String, Encode[_])] = annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, config))
-    ).filter{case (g, e) => (! e.monoallelic) && e.isDefined}.map(x => x)
+    ).filter{case (g, e) => e.isDefined && e.informative()}.map(x => x)
     res
   }
 
@@ -265,6 +265,19 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val cond = methodConfig.misc.getStringList("variants").asScala.toList
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
+
+    encode.persist(StorageLevel.MEMORY_AND_DISK)
+
+    if (method == "vt") {
+      val summary = encode.map{case (g, e) =>
+        s"$g variants: ${e.vars.length} thresholds: ${e.thresholds.getOrElse(Array()).length}"}.collect()
+      val pw = new PrintWriter(new File(s"output/encode_${method}_summary.txt"))
+      for (s <- summary) {
+        pw.write(s"$s\n")
+      }
+      pw.close()
+    }
+
     val permutation = methodConfig.resampling
     val test = methodConfig.test
     val binary = config.`trait`(currentTrait._1).binary

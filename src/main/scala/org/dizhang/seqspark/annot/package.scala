@@ -1,5 +1,7 @@
 package org.dizhang.seqspark
 
+import java.io.{File, PrintWriter}
+
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
@@ -66,7 +68,18 @@ package object annot {
     val coordFile = dbConf.getString("coord")
     val seqFile = dbConf.getString("seq")
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
-    input.map(v => v.annotateByVariant(refSeq))
+    input.foreach(v => v.annotateByVariant(refSeq))
+    val cnt = input.map(v =>
+      worstAnnotation(v.parseInfo(IK.anno)) -> 1).countByKey()
+      .toArray.sortBy(p => FM(p._1))
+
+    val pw = new PrintWriter(new File("output/annotation_summary.txt"))
+    for ((k, v) <- cnt) {
+      pw.write(s"${k.toString}: $v\n")
+    }
+    pw.close()
+      //.aggregateByKey(0)(_ + _, _ + _).collect()
+    input
   }
 
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {

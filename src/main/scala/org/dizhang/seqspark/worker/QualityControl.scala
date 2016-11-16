@@ -22,6 +22,8 @@ object QualityControl {
 
     annotated.persist(StorageLevel.MEMORY_AND_DISK)
 
+
+
     val sums = ssc.userConfig.qualityControl.summaries
 
     if (sums.contains("gdgq")) {

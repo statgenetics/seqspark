@@ -9,7 +9,7 @@ import scala.language.implicitConversions
   */
 @SerialVersionUID(1L)
 class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
-  def annotateByVariant(dict: Broadcast[RefGene]): Variant[A] = {
+  def annotateByVariant(dict: Broadcast[RefGene]): Unit = {
     val variation = v.toVariation()
 
     val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
@@ -18,15 +18,14 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     annot match {
       case Nil =>
         //logger.warn(s"no annotation for variant ${variation.toString}")
-        v
+        v.addInfo(IK.anno, Anno.Feature.InterGenic.toString)
       case _ =>
-        val consensus = annot.map(p => (p._1, p._3))
-          .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
+        //val consensus = annot.map(p => (p._1, p._3))
+        //  .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
         val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
           .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
           .mkString(",,")
         v.addInfo(IK.anno, merge)
-        v
     }
   }
 
@@ -79,12 +78,21 @@ object VariantAnnotOp {
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
   val Nucleotide = Constant.Annotation.Base
+  val Anno = Constant.Annotation
   val IK = Constant.Variant.InfoKey
   type Genes = Map[String, List[Location]]
   implicit def addAnnotOp[A](v: Variant[A]): VariantAnnotOp[A] = {
     new VariantAnnotOp[A](v)
   }
-  def parseAnnotation(value: String) = {
+  def worstAnnotation(value: String): F.Value = {
+    if (value == Anno.Feature.InterGenic.toString) {
+      Anno.Feature.InterGenic
+    } else {
+      val genes = parseAnnotation(value)
+      genes.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b)
+    }
+  }
+  def parseAnnotation(value: String): Array[(String, F.Value)] = {
     val geneRegex = """([\w][\w-\.]*)::(\S+)""".r
     val trsRegex = """(\w+):(\S+)""".r
     val genes = value.split(",,").map{

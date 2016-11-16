@@ -303,9 +303,9 @@ abstract class Encode[A: Genotype] extends Serializable {
     case x => x
   }
   def vars: Array[Variant[A]]
-  def monoallelic: Boolean = {
+  def informative(cutoff: Double = 3.0): Boolean = {
     vars.map(v => v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce).forall(mc =>
-      mc._1 == 0.0 || mc._1 == mc._2
+      mc._1 >= cutoff && mc._1 <= mc._2 - cutoff
     )
   }
   def mafCount: Array[(Double, Double)]

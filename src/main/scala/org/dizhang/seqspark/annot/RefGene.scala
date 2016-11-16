@@ -44,14 +44,14 @@ object RefGene {
 
     logger.info(s"load RefSeq: coord: $coordFile seq: $seqFile")
 
-    val locRaw = sc.textFile(coordFile)
+    val locRaw = sc.textFile(coordFile, 10)
     //locRaw.cache()
     val header = locRaw.first().split("\t")
 
     val locRdd = locRaw.zipWithUniqueId().filter(_._2 > 0).map(_._1)
     val loci = IntervalTree(locRdd.map(l => makeLocation(l, header)).toLocalIterator)
     val seqName = """>(\w+_\d+)\.\d+""".r
-    val seqLines = sc.textFile(seqFile)
+    val seqLines = sc.textFile(seqFile, 20)
 
     val seq2 = seqLines.map{
       case seqName(n) => Array((n, ""))

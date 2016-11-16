@@ -62,7 +62,7 @@ object Variants {
       }
     }
     def informative: Boolean = {
-      val af = v.toCounter(geno.toAAF, (0.0, 2.2)).reduce
+      val af = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
       af._1 != 0.0 && af._1 != af._2
     }
     def batchMaf(controls: Option[Array[Boolean]],

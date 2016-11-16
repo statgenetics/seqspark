@@ -6,6 +6,7 @@ import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene, dbNSFP}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.{Constant, LogicalExpression, SingleStudyContext}
@@ -68,8 +69,9 @@ package object annot {
     val coordFile = dbConf.getString("coord")
     val seqFile = dbConf.getString("seq")
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
-    input.foreach(v => v.annotateByVariant(refSeq))
-    val cnt = input.map(v =>
+    val annotated = input.map(v => v.annotateByVariant(refSeq))
+    annotated.persist(StorageLevel.MEMORY_AND_DISK)
+    val cnt = annotated.map(v =>
       if (v.parseInfo.contains(IK.anno)) {
         worstAnnotation(v.parseInfo(IK.anno)) -> 1
       } else {
@@ -83,7 +85,7 @@ package object annot {
     }
     pw.close()
       //.aggregateByKey(0)(_ + _, _ + _).collect()
-    input
+    annotated
   }
 
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {

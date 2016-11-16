@@ -9,7 +9,7 @@ import scala.language.implicitConversions
   */
 @SerialVersionUID(1L)
 class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
-  def annotateByVariant(dict: Broadcast[RefGene]): Unit = {
+  def annotateByVariant(dict: Broadcast[RefGene]): Variant[A] = {
     val variation = v.toVariation()
 
     val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
@@ -19,6 +19,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
       case Nil =>
         //logger.warn(s"no annotation for variant ${variation.toString}")
         v.addInfo(IK.anno, Anno.Feature.InterGenic.toString)
+        v
       case _ =>
         //val consensus = annot.map(p => (p._1, p._3))
         //  .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
@@ -26,6 +27,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
           .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
           .mkString(",,")
         v.addInfo(IK.anno, merge)
+        v
     }
   }
 

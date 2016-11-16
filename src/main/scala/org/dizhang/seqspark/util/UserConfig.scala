@@ -72,6 +72,7 @@ object UserConfig {
 
     def project = config.getString("project")
     def localDir = config.getString("localDir")
+    def outDir = localDir + "/output"
     def dbDir = config.getString("dbDir")
     def pipeline = config.getStringList("pipeline").asScala.toList
 

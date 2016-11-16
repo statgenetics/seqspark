@@ -69,6 +69,7 @@ object SingleStudy {
       false
     } else {
       logger.info("Conf file fine")
+      new File(conf.outDir).mkdir()
       true
     }
   }

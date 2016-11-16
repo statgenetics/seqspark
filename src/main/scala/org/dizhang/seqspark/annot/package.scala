@@ -70,7 +70,7 @@ package object annot {
     val seqFile = dbConf.getString("seq")
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
     val annotated = input.map(v => v.annotateByVariant(refSeq))
-    annotated.persist(StorageLevel.MEMORY_AND_DISK)
+    annotated.cache()
     val cnt = annotated.map(v =>
       if (v.parseInfo.contains(IK.anno)) {
         worstAnnotation(v.parseInfo(IK.anno)) -> 1

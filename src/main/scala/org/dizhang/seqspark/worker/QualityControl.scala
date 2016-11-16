@@ -20,9 +20,7 @@ object QualityControl {
     val sc = ssc.sparkContext
     val annotated =  linkVariantDB(decompose(input))(conf, sc)
 
-    annotated.persist(StorageLevel.MEMORY_AND_DISK)
-
-
+    annotated.cache()
 
     val sums = ssc.userConfig.qualityControl.summaries
 
@@ -33,6 +31,8 @@ object QualityControl {
     val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
 
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
+
+    simpleVCF.cache()
 
     simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
@@ -60,7 +60,7 @@ object QualityControl {
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
     val annotated = linkVariantDB(input)(conf, sc)
-    annotated.persist(StorageLevel.MEMORY_AND_DISK)
+    annotated.cache()
 
     annotated.checkpoint()
 

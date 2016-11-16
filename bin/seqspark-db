@@ -27,7 +27,7 @@ sub download_file {
 		return;
 	}
 	my $res = system("curl http://seqspark.dizhang.org/$file | hdfs dfs -appendToFile - $dir/$file");
-	if (!$res) {
+	if ($res) {
 		print STDERR "Something wrong when downloading $file, exit code: $res\n";
 	}
 }

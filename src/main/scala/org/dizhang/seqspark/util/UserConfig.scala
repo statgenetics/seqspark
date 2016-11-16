@@ -72,7 +72,7 @@ object UserConfig {
 
     def project = config.getString("project")
     def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
+    def dbDir = config.getString("dbDir")
     def pipeline = config.getStringList("pipeline").asScala.toList
 
     def qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
@@ -182,7 +182,7 @@ object UserConfig {
   case class MetaConfig(config: Config) extends UserConfig {
     def project = config.getString("project")
     def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
+    def dbDir = config.getString("dbDir")
     def studies = config.getStringList("studies").asScala.toArray
     def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray

@@ -81,7 +81,7 @@ object SingleStudy {
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
-    sc.setCheckpointDir(cnf.hdfsDir + "/checkpoint")
+    sc.setCheckpointDir(cnf.dbDir + "/checkpoint")
 
     val ss: SparkSession = SparkSession
       .builder()

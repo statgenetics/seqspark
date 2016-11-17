@@ -34,7 +34,7 @@ object QualityControl {
 
     simpleVCF.cache()
 
-    simpleVCF.checkpoint()
+    //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
 
@@ -62,7 +62,7 @@ object QualityControl {
     val annotated = linkVariantDB(input)(conf, sc)
     annotated.cache()
 
-    annotated.checkpoint()
+    //annotated.checkpoint()
 
     val sums = ssc.userConfig.qualityControl.summaries
     /** sample QC */

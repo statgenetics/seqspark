@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, SparseVector}
+import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, SparseVector, sum}
 import breeze.numerics.{exp, lbeta, pow}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
@@ -304,9 +304,8 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
   def vars: Array[Variant[A]]
   def informative(cutoff: Double = 3.0): Boolean = {
-    vars.map(v => v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce).forall(mc =>
-      mc._1 >= cutoff && mc._1 <= mc._2 - cutoff
-    )
+    val mut = sum(getFixed.coding)
+    mut >= cutoff && mut <= (sampleSize - cutoff)
   }
   def mafCount: Array[(Double, Double)]
   def maf: Array[Double]

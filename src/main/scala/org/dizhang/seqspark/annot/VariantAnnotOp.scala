@@ -18,7 +18,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     annot match {
       case Nil =>
         //logger.warn(s"no annotation for variant ${variation.toString}")
-        //v.addInfo(IK.anno, F.InterGenic.toString)
+        v.addInfo(IK.anno, F.InterGenic.toString)
         v
       case _ =>
         //val consensus = annot.map(p => (p._1, p._3))

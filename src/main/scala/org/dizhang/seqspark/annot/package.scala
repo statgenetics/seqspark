@@ -69,8 +69,7 @@ package object annot {
     val coordFile = dbConf.getString("coord")
     val seqFile = dbConf.getString("seq")
     val refSeq = sc.broadcast(RefGene(build, coordFile, seqFile)(sc))
-    input.map(v => v.annotateByVariant(refSeq))
-    /**
+    //input.map(v => v.annotateByVariant(refSeq))
     val annotated = input.map(v => v.annotateByVariant(refSeq))
     annotated.cache()
     val cnt = annotated.map(v =>
@@ -88,8 +87,7 @@ package object annot {
     pw.close()
       //.aggregateByKey(0)(_ + _, _ + _).collect()
     annotated
-      */
-  }
+    }
 
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
     logger.info("link variant database ...")

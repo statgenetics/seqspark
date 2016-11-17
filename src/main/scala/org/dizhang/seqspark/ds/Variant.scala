@@ -191,13 +191,15 @@ abstract class Variant[A: Genotype] extends Serializable {
       false
   }
 
-  lazy val parseInfo: Map[String, String] = {
+  def parseInfo: Map[String, String] = {
     if (this.info == ".")
       Map[String, String]()
     else
-      (for {item <- this.info.split(";")
-            s = item.split("=")}
-        yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+      (for {
+        item <- this.info.split(";")
+        s = item.split("=")
+        if item != "."
+      } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
   }
 
   def addInfo(key: String, value: String): Unit = {

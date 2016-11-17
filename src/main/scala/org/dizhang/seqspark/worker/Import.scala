@@ -25,7 +25,7 @@ object Import {
       case Left(UC.Samples.none) => true
       case _ => false
     }
-    val raw = sc.textFile(imConf.path)
+    val raw = sc.textFile(imConf.path, conf.jobs)
     val default = "0/0"
     val s1 = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default, noSample = noSample))
     //s1.cache()
@@ -65,7 +65,7 @@ object Import {
     val imputedFile = imConf.genotype.path
     val imputedInfoFile = imConf.genotype.path + "_info"
     val default = (1.0, 0.0, 0.0)
-    val imputedGeno = sc.textFile(imputedFile).map{l =>
+    val imputedGeno = sc.textFile(imputedFile, conf.jobs).map{l =>
       val v = Variant.fromImpute2(l, default)
       (v.toRegion, v)
     }

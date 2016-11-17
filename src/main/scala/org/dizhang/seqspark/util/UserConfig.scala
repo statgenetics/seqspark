@@ -75,6 +75,7 @@ object UserConfig {
     def outDir = localDir + "/output"
     def dbDir = config.getString("dbDir")
     def pipeline = config.getStringList("pipeline").asScala.toList
+    def jobs = config.getInt("jobs")
 
     def qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 

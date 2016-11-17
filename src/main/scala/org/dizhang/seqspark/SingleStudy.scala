@@ -102,7 +102,7 @@ object SingleStudy {
         case e: Exception =>
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
-          res.persist(StorageLevel.MEMORY_AND_DISK)
+          res.cache()
           //res.saveAsObjectFile(cnf.project)
           res
       }
@@ -116,7 +116,7 @@ object SingleStudy {
         case e: Exception =>
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
-          res.persist(StorageLevel.MEMORY_AND_DISK)
+          res.cache()
           //res.saveAsObjectFile(cnf.project)
           res
       }

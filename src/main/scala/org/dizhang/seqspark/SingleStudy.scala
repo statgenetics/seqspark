@@ -151,7 +151,7 @@ object SingleStudy {
         input
       }
       annotated.cache()
-      annotated.map(v => v.site).saveAsTextFile("test")
+      //annotated.map(v => v.site).saveAsTextFile("test")
       val assoc = new AssocMaster(annotated)(ssc)
       assoc.run()
     }

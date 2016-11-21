@@ -99,7 +99,7 @@ package object annot {
     var paired = input.map(v => (v.toVariation(), v))
     dbTerms.foreach{
       case (k, v) =>
-        logger.info(s"join database ${k} with fields ${v.mkString(",")}")
+        logger.info(s"join database ${k} with fields ${if (v.isEmpty) "None" else v.mkString(",")}")
         val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
 
         paired = paired.leftOuterJoin(db.info).map{

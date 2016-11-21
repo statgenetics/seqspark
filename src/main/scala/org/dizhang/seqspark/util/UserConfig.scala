@@ -194,6 +194,6 @@ object UserConfig {
 
 }
 
-sealed trait UserConfig {
+sealed trait UserConfig extends Serializable {
   def config: Config
 }

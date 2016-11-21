@@ -29,7 +29,7 @@ sub build {
 		mkdir $dir or die "cannot create dir $dir $!\n";
 	}
 	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/$arch/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
-	!system("sbt", "'test in assembly := {}'", "assembly") or die "Failed to build jar: $!\n";
+	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 
 sub install {

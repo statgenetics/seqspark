@@ -28,7 +28,7 @@ package object annot {
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = conf.qualityControl.variants.map{s => getDBs(s)}
     val annDBs = getDBs(conf.annotation.variants)
-    logger.info(s"qcDBs: ${qcDBs.length}")
+    logger.info(s"qcDBs: ${qcDBs.map{q => q.map{case (k,v) => s"$k,$v"}.mkString("-")}.mkString("|")}")
     logger.info(s"annDBs: ${annDBs.size}")
 
     if (conf.pipeline.last == "association") {

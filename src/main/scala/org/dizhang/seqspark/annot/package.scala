@@ -96,20 +96,22 @@ package object annot {
     logger.info("link variant database ...")
     val dbTerms = getDBs(conf)
     logger.info(s"dbs: ${dbTerms.keys.mkString(",")}")
-    val paired = input.map(v => (v.toVariation(), v))
+    var paired = input.map(v => (v.toVariation(), v))
     dbTerms.foreach{
       case (k, v) =>
         logger.info(s"join database ${k} with fields ${v.mkString(",")}")
         val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
-        val cnt = paired.leftOuterJoin(db.info).map{
+
+        paired = paired.leftOuterJoin(db.info).map{
           case (va, (vt, Some(info))) =>
             vt.addInfo(k)
             db.header.zip(info).foreach{
-            case (ik, iv) =>  vt.addInfo(ik, iv)}
-            1
-          case (va, (vt, None)) => 0
-        }.reduce(_ + _)
-        logger.info(s"database $k annotated: $cnt")
+              case (ik, iv) => vt.addInfo(ik, iv)}
+            va -> vt
+          case (va, (vt, None)) => va -> vt
+        }
+        //val cnt = paired.map{_.2}.reduce(_ + _)
+        //logger.info(s"database $k annotated: $cnt")
     }
     paired.map(_._2)
   }

@@ -101,9 +101,10 @@ package object annot {
       case (k, v) =>
         val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
         paired.leftOuterJoin(db.info).map{
-          case (va, (vt, Some(info))) => db.header.zip(info).foreach{
-            case (ik, iv) =>  vt.addInfo(ik, iv)
-          }
+          case (va, (vt, Some(info))) =>
+            vt.addInfo(k)
+            db.header.zip(info).foreach{
+            case (ik, iv) =>  vt.addInfo(ik, iv)}
           case (va, (vt, None)) => {}
         }
     }

@@ -99,9 +99,13 @@ object Variants {
     }
 
     def batchSpecific(batch: Array[String]): Map[String, Double] = {
-      val keyFunc = (i: Int) => batch(i)
-      val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-      res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+      if (v.parseInfo.contains("dbSNP")) {
+        batch.map(b => b -> 0.0).toMap
+      } else {
+        val keyFunc = (i: Int) => batch(i)
+        val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+        res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+      }
     }
 
     def isFunctional: Int = {

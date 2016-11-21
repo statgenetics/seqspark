@@ -202,6 +202,12 @@ abstract class Variant[A: Genotype] extends Serializable {
       } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
   }
 
+  def addInfo(key: String): Unit = {
+    if (! this.parseInfo.contains(key)) {
+      this.meta(7) = s"$info;$key"
+    }
+  }
+
   def addInfo(key: String, value: String): Unit = {
     //require(! this.parseInfo.contains(key))
 

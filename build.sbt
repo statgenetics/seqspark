@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
 	"org.apache.spark" % "spark-mllib_2.11" % "2.0.0" % "provided",
 	"com.typesafe" % "config" % "1.2.1",
 	"it.unimi.dsi" % "fastutil" % "7.0.4",
-	"org.scalanlp" %% "breeze" % "0.12" % "provided",
+	"org.scalanlp" %% "breeze" % "0.12",
 	"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
 	"net.java.dev.jna" % "jna" % "4.2.2",

@@ -70,6 +70,11 @@ object RefGene {
       }
     }
 
+    /**
+      * Somehow the RDD fold method doesn't generate right result
+      * for non-commutable functions, we need to fold within partition first,
+      * then fold the partitions.
+      * */
     val seq = seq2.mapPartitions{p =>
       p.fold(Array()){(a, b) =>
         mergeFa(a, b)

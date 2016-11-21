@@ -53,8 +53,6 @@ object VariantDB {
       variation -> targetHeader.map(f => rec(f))
     }
 
-
-
   }
 
 }

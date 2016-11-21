@@ -57,11 +57,12 @@ package object annot {
   }
 
   def getDBs(conf: Config): Map[String, Set[String]] = {
-    conf.getObject("addInfo").flatMap{
-      case (k, v) => v.toString.split("/").map(_.replaceAll(" ", ""))
-    }.filter(n => n.contains(".")).map(_.split("\\.")).groupBy(_.apply(0)).map{
-      case (k, v) => k -> v.flatMap(r => r.slice(1, r.length)).toSet
-    }
+    conf.getObject("addInfo").map{
+      case (k, v) =>
+        val vs = v.toString.split("/").map(_.replaceAll(" ", ""))
+            .map(_.split("."))
+        k -> vs.filter(_.length > 1).map(_(1)).toSet
+    }.toMap
   }
 
   def linkGeneDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {

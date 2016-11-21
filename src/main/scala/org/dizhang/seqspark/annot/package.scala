@@ -101,13 +101,15 @@ package object annot {
       case (k, v) =>
         logger.info(s"join database ${k} with fields ${v.mkString(",")}")
         val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
-        paired.leftOuterJoin(db.info).foreach{
+        val cnt = paired.leftOuterJoin(db.info).map{
           case (va, (vt, Some(info))) =>
             vt.addInfo(k)
             db.header.zip(info).foreach{
             case (ik, iv) =>  vt.addInfo(ik, iv)}
-          case (va, (vt, None)) => {}
-        }
+            1
+          case (va, (vt, None)) => 0
+        }.reduce(_ + _)
+        logger.info(s"database $k annotated: $cnt")
     }
     paired.map(_._2)
   }

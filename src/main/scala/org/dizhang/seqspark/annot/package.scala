@@ -92,6 +92,7 @@ package object annot {
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
     logger.info("link variant database ...")
     val dbTerms = getDBs(conf)
+    logger.info(s"dbs: ${dbTerms.keys.mkString(",")}")
     val paired = input.map(v => (v.toVariation(), v))
     dbTerms.foreach{
       case (k, v) =>

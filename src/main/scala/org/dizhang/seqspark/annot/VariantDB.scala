@@ -21,6 +21,7 @@ object VariantDB {
     val data = sc.textFile(conf.getString("path")).cache()
     val header = fields.toArray
     if (conf.getString("format") == "vcf") {
+      logger.info(s"build Variant database from ${conf.getString("path")}")
       Default(header, fromVCF(conf.getString("path"), header)(sc))
     } else {
       val info = fromPlainFile(

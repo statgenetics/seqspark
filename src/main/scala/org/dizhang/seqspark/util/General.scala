@@ -70,17 +70,6 @@ object General {
     builder.result
   }
   def symMatrixSqrt(sm: DM[Double]): DM[Double] = {
-    /**
-      * this is a hack for spark-2.0.x using breeze 0.11.2
-      *
-      * the symmetric test is too stringent
-      *
-      * start from spark-2.1.0 using breeze 0.12, there is a tolerance parameter
-      *
-      * */
-    for (i <- 0 until sm.rows; j <- 0 until i) {
-      sm(j,i) = sm(i,j)
-    }
 
     val de = eigSym(sm)
     val values = de.eigenvalues

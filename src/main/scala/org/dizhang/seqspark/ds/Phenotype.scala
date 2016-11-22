@@ -71,7 +71,7 @@ object Phenotype {
       None
     } else {
       val defined: Array[Double] = toDouble.filter(_.isDefined).map(_.get)
-      val Mean: Double = mean(defined)
+      val Mean: Double = breeze.stats.mean(defined)
       val imputed: Array[Double] = toDouble.map{
         case None => Mean
         case Some(d) => d

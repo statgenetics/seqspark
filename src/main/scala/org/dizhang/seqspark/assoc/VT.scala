@@ -3,8 +3,10 @@ package org.dizhang.seqspark.assoc
 import breeze.linalg._
 import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
-import org.dizhang.seqspark.util.General.{RichDouble}
+import org.dizhang.seqspark.util.General.RichDouble
+
 import scala.language.existentials
+import scala.util.{Success, Try}
 
 /**
   * Variable threshold association method
@@ -41,8 +43,11 @@ object VT {
       val ts = scoreTest.score :/ ss
       val maxT = max(ts)
       val cutoff = maxT * ss
-      val dis = MultivariateNormal.Centered(scoreTest.variance)
-      1.0 - dis.cdf(cutoff).pvalue
+      val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff).pvalue)
+      pTry match {
+        case Success(p) => Some(1.0 - p)
+        case _ => None
+      }
     }
     def result = AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
   }

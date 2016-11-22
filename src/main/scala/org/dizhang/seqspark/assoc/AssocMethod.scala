@@ -28,7 +28,7 @@ object AssocMethod {
   }
   @SerialVersionUID(7727260101L)
   trait AnalyticTest extends AssocMethod {
-    def pValue: Double
+    def pValue: Option[Double]
   }
   @SerialVersionUID(7727260201L)
   trait ResamplingTest extends AssocMethod {
@@ -37,20 +37,20 @@ object AssocMethod {
   @SerialVersionUID(7727260301L)
   trait Result {
     def vars: Array[Variation]
-    def pValue: Double
+    def pValue: Option[Double]
   }
   @SerialVersionUID(7727260401L)
   case class AnalyticResult(vars: Array[Variation],
                             statistic: Double,
-                            pValue: Double) extends Result {
+                            pValue: Option[Double]) extends Result {
     override def toString: String = {
-      s"${vars.map(_.toString).mkString(",")}\t$statistic\t$pValue"
+      s"${vars.map(_.toString).mkString(",")}\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}"
     }
   }
   case class ResamplingResult(vars: Array[Variation],
                               refStatistic: Double,
                               pCount: (Int, Int)) extends Result {
-    def pValue: Double = pCount._1/pCount._2.toDouble
+    def pValue: Option[Double] = Some(pCount._1/pCount._2.toDouble)
     override def toString: String = {
       s"${vars.map(_.toString).mkString(",")}\t$refStatistic\t${pCount._1},${pCount._2}\t${pValue}"
     }

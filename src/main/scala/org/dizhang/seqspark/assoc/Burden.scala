@@ -35,7 +35,7 @@ object Burden {
     val statistic = getStatistic(scoreTest)
     val pValue = {
       val dis = new Gaussian(0.0, 1.0)
-      1.0 - dis.cdf(statistic)
+      Some(1.0 - dis.cdf(statistic))
     }
 
     def result: AssocMethod.AnalyticResult = {

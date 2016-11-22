@@ -6,7 +6,9 @@ import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
 import SKAT._
 import org.apache.spark.SparkContext
+
 import scala.language.existentials
+import scala.util.{Failure, Success, Try}
 /**
   * variance component test
   *
@@ -42,17 +44,25 @@ object SKAT {
     ).reduce((m1, m2) => DM.vertcat(m1, m2))
   }
 
-  def getLambdaU(sm: DM[Double]): (DV[Double], DM[Double]) = {
-    val eg = eigSym(sm)
-    val vals = eg.eigenvalues
-    val vecs = eg.eigenvectors
-    val lambda = DV(vals.toArray.filter(v => v > 1e-6): _*)
-    val u = DV.horzcat(
-      (for {
-        i <- 0 until vals.length
-        if vals(i) > 1e-6
-       } yield vecs(::, i)): _*)
-    (lambda, u)
+  def getLambdaU(sm: DM[Double]): (Option[DV[Double]], Option[DM[Double]]) = {
+    val egTry = Try(eigSym(sm))
+
+    egTry match {
+      case Success(eg) =>
+        val vals = eg.eigenvalues
+        val vecs = eg.eigenvectors
+        val lambda = DV(vals.toArray.filter(v => v > 1e-6): _*)
+        val u = DV.horzcat(
+          (for {
+            i <- 0 until vals.length
+            if vals(i) > 1e-6
+          } yield vecs(::, i)): _*)
+        (Some(lambda), Some(u))
+      case _ =>
+        (None, None)
+    }
+
+
   }
 
   @SerialVersionUID(7727750101L)
@@ -60,8 +70,8 @@ object SKAT {
                           x: Encode[_],
                           rho: Double = 0.0) extends SKAT {
 
-    def pValue: Double = {
-      1.0 - LCCSDavies.Simple(lambda).cdf(qScore).pvalue
+    def pValue: Option[Double] = {
+      lambda.map(l => 1.0 - LCCSDavies.Simple(l).cdf(qScore).pvalue)
     }
   }
   @SerialVersionUID(7727750201L)
@@ -69,8 +79,8 @@ object SKAT {
                        x: Encode[_],
                        rho: Double = 0.0) extends SKAT {
 
-    def pValue: Double = {
-      1.0 - LCCSLiu.Simple(lambda).cdf(qScore).pvalue
+    def pValue: Option[Double] = {
+      lambda.map(l => 1.0 - LCCSLiu.Simple(l).cdf(qScore).pvalue)
     }
   }
   @SerialVersionUID(7727750301L)
@@ -78,8 +88,8 @@ object SKAT {
                                x: Encode[_],
                                rho: Double = 0.0) extends SKAT {
 
-    def pValue: Double = {
-      1.0 - LCCSLiu.Modified(lambda).cdf(qScore).pvalue
+    def pValue: Option[Double] = {
+      lambda.map(l => 1.0 - LCCSLiu.Modified(l).cdf(qScore).pvalue)
     }
   }
   @SerialVersionUID(7727750401L)
@@ -91,9 +101,14 @@ object SKAT {
     val simScores = resampled * geno
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
 
-    def pValue: Double = {
-      val dis = new LCCSResampling(lambda, u, nullModel.residualsVariance, simQs)
-      1.0 - dis.cdf(qScore).pvalue
+    def pValue: Option[Double] = {
+      (lambda, u) match {
+        case (Some(l), Some(u1)) =>
+          val dis = new LCCSResampling(l, u1, nullModel.residualsVariance, simQs)
+          Some(1.0 - dis.cdf(qScore).pvalue)
+        case (_, _) =>
+          None
+      }
     }
   }
 }
@@ -129,6 +144,6 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val scoreSigma = symMatrixSqrt(scoreTest.variance)
   lazy val vc = scoreSigma * kernel * scoreSigma
   lazy val (lambda, u) = getLambdaU(vc)
-  def pValue: Double
-  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, 1.0 - pValue, pValue)
+  def pValue: Option[Double]
+  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, qScore, pValue)
 }

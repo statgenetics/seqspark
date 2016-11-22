@@ -36,7 +36,7 @@ object SKATO {
   def getParameters(p0sqrtZ: DM[Double],
                     rs: Array[Double],
                     pi: Option[DV[Double]] = None,
-                    resampled: Option[DM[Double]] = None) : Parameters = {
+                    resampled: Option[DM[Double]] = None) : Option[Parameters] = {
     val numSamples = p0sqrtZ.rows
     val numVars = p0sqrtZ.cols
     val meanZ: DV[Double] = sum(p0sqrtZ(*, ::))/numVars.toDouble
@@ -52,23 +52,30 @@ object SKATO {
     val varZeta = sum(iterm1.t * iterm1 * w3) * 4
 
     val (lambda, u) = SKAT.getLambdaU(w3)
-    val muQ = sum(lambda)
-    val (varQ, kurQ) = resampled match {
-      case None =>
-        val v = sum(pow(lambda, 2)) + varZeta
-        val k = sum(pow(lambda, 4))/sum(pow(lambda, 2)).square * 12
-        (v, k)
-      case Some(res) =>
-        val qTmp = pow(res * iterm2, 2)
-        val qs = sum(qTmp(*, ::))
-        val dis = new LCCSResampling(lambda, u, pi.get, qs)
-        (dis.varQ + varZeta, dis.kurQ)
+
+    (lambda, u) match {
+      case (Some(l), Some(u1)) =>
+        val muQ = sum(l)
+        val (varQ, kurQ) = resampled match {
+          case None =>
+            val v = sum(pow(l, 2)) + varZeta
+            val k = sum(pow(l, 4))/sum(pow(l, 2)).square * 12
+            (v, k)
+          case Some(res) =>
+            val qTmp = pow(res * iterm2, 2)
+            val qs = sum(qTmp(*, ::))
+            val dis = new LCCSResampling(l, u1, pi.get, qs)
+            (dis.varQ + varZeta, dis.kurQ)
+        }
+        val sumCof2 = sum(pow(cof1, 2))
+        val meanZ2 = sum(pow(meanZ, 2))
+        lazy val taus = rs.map{r =>
+          meanZ2 * (numVars.toDouble.square * r + (1 - r) * sumCof2)}
+        Some(Parameters(muQ, varQ, kurQ, l, varZeta, taus))
+      case (_, _) => None
     }
-    val sumCof2 = sum(pow(cof1, 2))
-    val meanZ2 = sum(pow(meanZ, 2))
-    lazy val taus = rs.map{r =>
-      meanZ2 * (numVars.toDouble.square * r + (1 - r) * sumCof2)}
-    Parameters(muQ, varQ, kurQ, lambda, varZeta, taus)
+
+
   }
 
   /**
@@ -145,7 +152,7 @@ object SKATO {
 
   trait AsymptoticKur extends SKATO {
 
-    val param = getParameters(P0SqrtZ, rhos)
+    val paramOpt = getParameters(P0SqrtZ, rhos)
 
     val pValues = {
       val cdf = lambdas.zip(qScores).map{case (l, q) =>
@@ -186,9 +193,16 @@ object SKATO {
         }
       term1 * term2.pdf(x)
     }
-    def pValue: Double = {
-      val re = simpson(integralFunc, 0.0, 40.0, 2000)
-      1.0 - re
+    def pValue: Option[Double] = {
+
+      (paramOpt, lambdaUsOpt) match {
+        case (None, _) => None
+        case (_, (None, _)) => None
+        case (_, _) =>
+          val re = simpson(integralFunc, 0.0, 40.0, 2000)
+          Some(1.0 - re)
+      }
+
     }
   }
 
@@ -205,37 +219,44 @@ object SKATO {
       val tmpQ = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       term1.cdf(tmpQ) * term2.pdf(x)
     }
-    def pValue: Double = {
-      val re = simpson(integralFunc, 0.0, 40.0, 2000)
-      1.0 - re
+
+
+    def pValue: Option[Double] = {
+      (paramOpt, lambdaUsOpt) match {
+        case (None, _) => None
+        case (_, (None, _)) => None
+        case (_, _) =>
+          val re = simpson(integralFunc, 0.0, 40.0, 2000)
+          Some(1.0 - re)
+      }
     }
   }
 
   @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
                          x: Encode[_]) extends LiuPValue with AsymptoticKur {
-    lazy val kurQ = {
-      12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
-    }
+    //lazy val kurQ = {
+    //  12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
+    //}
   }
 
   case class SmallSampleAdjust(nullModel: LogisticModel,
                                x: Encode[_],
                                resampled: DM[Double]) extends LiuPValue {
 
-    val param = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
+    lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
 
-    val simScores = resampled * geno
+    lazy val simScores = resampled * geno
 
 
-    val pValues = {
+    lazy val pValues = {
       rhos.indices.map{i =>
         val simQs = simScores(*, ::).map(s => s.t * kernels(i) * s)
         1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.variance, simQs).cdf(qScores(i)).pvalue
       }.toArray
     }
 
-    val pMinQuantiles = {
+    lazy val pMinQuantiles = {
       rhos.indices.map{i =>
         val varRho = (1 - rhos(i)).sqrt * param.varQ + param.taus(i).sqrt * 2
         val kurRho = getKurtosis(param.df, 1.0, param.varQ, 1 - rhos(i), param.taus(i))
@@ -280,7 +301,9 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     }
   }
 
-  def param: Parameters
+  def paramOpt: Option[Parameters]
+
+  def param: Parameters = paramOpt.get
 
   def df = param.df
 
@@ -300,18 +323,25 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   lazy val vcs = kernels.map(k => scoreSigma * k * scoreSigma)
 
-  lazy val (lambdas, us): (Array[DV[Double]], Array[DM[Double]]) = {
+  lazy val lambdaUsOpt: (Option[Array[DV[Double]]], Option[Array[DM[Double]]]) = {
     val res = vcs.map(v => SKAT.getLambdaU(v))
-    (res.map(_._1), res.map(_._2))
+    if (res.exists(_._1.isEmpty)) {
+      (None, None)
+    } else {
+      (Some(res.map(_._1.get)), Some(res.map(_._2.get)))
+    }
   }
+
+  lazy val (lambdas, us) = (lambdaUsOpt._1.get, lambdaUsOpt._2.get)
+
   def pValues: Array[Double]
 
   def pMin = min(pValues)
 
   def pMinQuantiles: Array[Double]
 
-  def pValue: Double
+  def pValue: Option[Double]
 
-  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, 1.0 - pValue, pValue)
+  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, pMin, pValue)
 
 }

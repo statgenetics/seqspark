@@ -1,5 +1,7 @@
 package org.dizhang.seqspark.assoc
 
+import java.io.{File, PrintWriter}
+
 import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
@@ -40,8 +42,22 @@ class SKATOSpec extends FlatSpec {
   "A SKATO" should "be fine" in {
     val so = SKATO(nullModel, encode)
 
+    val pw = new PrintWriter(new File("skat.data"))
+    val geno = so.geno.toDense
+    for (i <- 0 until so.geno.cols) {
+      pw.write(geno(::, i).toArray.mkString("\t") + "\n")
+    }
+    val y = so.nullModel.responses
+    val cov = so.nullModel.xs
+    pw.write(y.toArray.mkString("\t") + "\n")
+    for (i <- 0 until cov.cols) {
+      pw.write(cov(::, i).toArray.mkString("\t") + "\n")
+    }
+    pw.close()
     println(s"geno: ${so.geno.rows} x ${so.geno.cols} weight: ${so.weight.length}")
-    //val sores = so.result
-    //println(s"S: ${sores.statistic} P: ${sores.pValue.map(_.toString).getOrElse("NA")}")
+    println(so.paramOpt)
+    println(so.lambdaUsOpt)
+    val sores = so.result
+    println(s"S: ${sores.statistic} P: ${sores.pValue.map(_.toString).getOrElse("NA")}")
   }
 }

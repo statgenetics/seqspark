@@ -22,7 +22,10 @@ object QualityControl {
 
     annotated.cache()
     annotated.checkpoint()
-    annotated.foreach(_ => Unit)
+    if (conf.config.getBoolean("benchmark")) {
+      annotated.foreach(_ => Unit)
+      logger.info("annotated data ready")
+    }
 
     val sums = ssc.userConfig.qualityControl.summaries
 
@@ -40,7 +43,10 @@ object QualityControl {
 
     simpleVCF.cache()
     simpleVCF.checkpoint()
-    simpleVCF.foreach(_ => Unit)
+    if (conf.config.getBoolean("benchmark")) {
+      simpleVCF.foreach(_ => Unit)
+      logger.info("genotype QC completed")
+    }
 
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)

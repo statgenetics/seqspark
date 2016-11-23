@@ -51,13 +51,13 @@ object AssocMaster {
     val groupBy = config.misc.getStringList("groupBy").asScala.toList
     val annotated = codingScheme match {
       case MethodType.snv =>
-        currentGenotype.map(v => (v.toVariation(withInfo = false).toString(), v)).groupByKey()
+        currentGenotype.map(v => (v.toVariation().toString(), v)).groupByKey()
       case MethodType.meta =>
         currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ =>
         (groupBy match {
           case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s.head.toInt, s(1).toInt))
-          case _ => currentGenotype.flatMap(v => v.groupByGene(onlyFunctional = true))
+          case _ => currentGenotype.flatMap(v => v.groupByGene())
         }).groupByKey()
     }
 
@@ -266,7 +266,11 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
-    encode.persist(StorageLevel.MEMORY_AND_DISK)
+    encode.cache()
+    if (cnf.config.getBoolean("benchmark")) {
+      encode.foreach(_ => Unit)
+      logger.info("encoding completed")
+    }
 
     if (method == "vt") {
       val summary = encode.map{case (g, e) =>

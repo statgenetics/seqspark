@@ -127,6 +127,10 @@ object SingleStudy {
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
           res.cache()
+          if (cnf.config.getBoolean("benchmark")) {
+            res.foreach(_ => Unit)
+            logger.info("quality control completed")
+          }
           //res.saveAsObjectFile(cnf.project)
           res
       }
@@ -161,6 +165,10 @@ object SingleStudy {
         input
       }
       annotated.cache()
+      if (ssc.userConfig.config.getBoolean("benchmark")) {
+        annotated.foreach(_ => Unit)
+        logger.info("functional annotation completed")
+      }
       //annotated.map(v => v.site).saveAsTextFile("test")
       val assoc = new AssocMaster(annotated)(ssc)
       assoc.run()

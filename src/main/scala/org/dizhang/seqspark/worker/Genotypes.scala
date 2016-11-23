@@ -44,7 +44,7 @@ object Genotypes {
 
   def genotypeQC(self: Data[String], cond: List[String]): RDD[Variant[String]] = {
     logger.info("start genotype QC")
-    if (cond.isEmpty) {
+    if (cond.isEmpty || cond.forall(_ == "")) {
       self
     } else {
       val all = cond.map{x => s"($x)"}.reduce((a,b) => s"$a and $b")

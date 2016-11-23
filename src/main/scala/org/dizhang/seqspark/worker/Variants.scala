@@ -1,5 +1,7 @@
 package org.dizhang.seqspark.worker
 
+import java.io.{File, PrintWriter}
+
 import org.dizhang.seqspark.ds.{DenseVariant, Genotype, Variant}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.annot.VariantAnnotOp._
@@ -16,6 +18,22 @@ object Variants {
 
   def decompose(self: Data[String]): Data[String] = {
     self.flatMap(v => decomposeVariant(v))
+  }
+
+  def countByFunction[A](self: Data[A]): Unit = {
+    val cnt = self.map(v =>
+      if (v.parseInfo.contains(IK.anno)) {
+        worstAnnotation(v.parseInfo(IK.anno)) -> 1
+      } else {
+        F.Unknown -> 1
+      }).countByKey()
+      .toArray.sortBy(p => FM(p._1))
+
+    val pw = new PrintWriter(new File("output/annotation_summary.txt"))
+    for ((k, v) <- cnt) {
+      pw.write(s"${k.toString}: $v\n")
+    }
+    pw.close()
   }
 
   def decomposeVariant(v: Variant[String]): Array[Variant[String]] = {

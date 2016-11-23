@@ -33,21 +33,17 @@ object SingleStudy {
     }
 
     /** quick run */
-    val userConfFile = new File(args(0))
-    require(userConfFile.exists())
+
     try {
-      val userConf = ConfigFactory
-        .parseFile(userConfFile)
-        .withFallback(ConfigFactory.load().getConfig("seqspark"))
-        .resolve()
 
-      val show = userConf.root().render()
+      val rootConf = readConf(args(0))
 
-      logger.debug("Conf detail:\n" + show)
-
-      val rootConf = RootConfig(userConf)
-      if (checkConf(rootConf))
+      if (checkConf(rootConf)) {
         run(rootConf)
+      } else {
+        logger.error("Configuration error, exit")
+      }
+
     } catch {
       case e: Exception => {
         logger.error("Something went wrong, exit")
@@ -56,6 +52,20 @@ object SingleStudy {
     }
   }
 
+  def readConf(file: String): RootConfig = {
+    val userConfFile = new File(file)
+    require(userConfFile.exists())
+    val userConf = ConfigFactory
+      .parseFile(userConfFile)
+      .withFallback(ConfigFactory.load().getConfig("seqspark"))
+      .resolve()
+
+    val show = userConf.root().render()
+
+    logger.debug("Conf detail:\n" + show)
+    val rootConfig = RootConfig(userConf)
+    rootConfig
+  }
 
   def checkConf(conf: RootConfig): Boolean = {
     if (! annot.CheckDatabase.qcTermsInDB(conf)) {

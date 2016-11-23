@@ -24,6 +24,10 @@ object QualityControl {
 
     val sums = ssc.userConfig.qualityControl.summaries
 
+    if (sums.contains("annotation")) {
+
+    }
+
     if (sums.contains("gdgq")) {
       statGdGq(annotated)(ssc)
     }

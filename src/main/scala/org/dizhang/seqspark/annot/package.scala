@@ -1,23 +1,15 @@
 package org.dizhang.seqspark
 
-import java.io.{File, PrintWriter}
-
 import com.typesafe.config.Config
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene, dbNSFP}
-import org.dizhang.seqspark.ds._
-import org.dizhang.seqspark.util.{Constant, LogicalExpression, SingleStudyContext}
+import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.util.LogicalParser
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.worker.Data
-import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scalaz._
 
 /**
   * Created by zhangdi on 8/15/16.
@@ -26,20 +18,19 @@ package object annot {
   val logger = LoggerFactory.getLogger(getClass)
 
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
-    val qcDBs = conf.qualityControl.variants.map{s => getDBs(s)}
+    val qcDBs = getDBs(conf.qualityControl.variants)
     val annDBs = getDBs(conf.annotation.variants)
-    logger.info(s"qcDBs: ${qcDBs.map{q => q.map{case (k,v) => s"$k,$v"}.mkString("-")}.mkString("|")}")
-    logger.info(s"annDBs: ${annDBs.size}")
+    logger.info(s"qcDBs: ${qcDBs.keys.mkString(",")}")
+    logger.info(s"annDBs: ${annDBs.keys.mkString(",")}")
 
     if (conf.pipeline.last == "association") {
-      val assDBs = conf.association.methodList.flatMap(m =>
-        conf.association.method(m).misc.getStringList("variants").asScala.map{
-          s => getDBs(s)
-        }
-      ).toList
-      ((annDBs :: qcDBs) ::: assDBs).reduce((a, b) => addMap(a, b))
+      val assDBs = conf.association.methodList.map{ m =>
+        val cond = LogicalParser.parse(conf.association.method(m).misc.getStringList("variants").asScala.toList)
+        getDBs(cond)
+      }.toList
+      (annDBs :: qcDBs :: assDBs).reduce((a, b) => addMap(a, b))
     } else {
-      (annDBs :: qcDBs).reduce((a, b) => addMap(a, b))
+      addMap(annDBs, qcDBs)
     }
   }
 
@@ -47,8 +38,8 @@ package object annot {
     x1 ++ (for ((k, v) <- x2) yield if (x1.contains(k)) k -> (x1(k) ++ v) else k -> v)
   }
 
-  def getDBs(cond: String): Map[String, Set[String]] = {
-    LogicalExpression.analyze(cond).toArray.filter(n => n.contains(".")).map{n =>
+  def getDBs(cond: LogicalParser.LogExpr): Map[String, Set[String]] = {
+    LogicalParser.names(cond).filter(n => n.contains(".")).map{n =>
       val s = n.split("\\.")
       (s(0), s(1))
     }.groupBy(_._1).map{

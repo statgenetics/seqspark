@@ -2,7 +2,7 @@ package org.dizhang.seqspark.ds
 
 import org.dizhang.seqspark.util.Constant.Genotype.rawToSimple
 import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.util.LogicalExpression
+import org.dizhang.seqspark.util.LogicalParser
 /**
   * Created by zhangdi on 9/26/16.
   */
@@ -129,43 +129,47 @@ object Genotype {
   }
   implicit object Raw extends Genotype[String] {
     def gt(g: String): String = g.split(":")(0)
+
     def toSimpleGenotype(g: String): Byte = {
       rawToSimple(gt(g))
     }
+
     def isMis(g: String): Boolean = g.startsWith(".")
+
     def isPhased(g: String): Boolean = gt(g).contains("|")
+
     def isDiploid(g: String): Boolean = gt(g).split("[/|]").length == 2
+
     def isHet(g: String): Boolean = Simple.isHet(toSimpleGenotype(g))
+
     def isRef(g: String): Boolean = Simple.isRef(toSimpleGenotype(g))
+
     def isMut(g: String): Boolean = Simple.isMut(toSimpleGenotype(g))
+
     def toCMC(g: String, af: Double) = Simple.toCMC(toSimpleGenotype(g), af)
+
     def toBRV(g: String, af: Double) = Simple.toBRV(toSimpleGenotype(g), af)
 
-    def fields(g: String, format: String): Map[String, String] = {
+    def fields(g: String)(is: Int*): IndexedSeq[String] = {
       val s = g.split(":")
-      val f = format.split(":")
-      if (s.length == f.length) {
-        f.zip(s).flatMap{
-          case (k, v) =>
-            val vs = v.split(",")
-            if (vs == 2) {
-              Array((k + "_1", vs(0)), (k + "_2", vs(1)), (k + "_ratio", (vs(0).toDouble/vs(1).toDouble).toString))
-            } else {
-              Array((k, v))
-            }
-        }.toMap
-      } else {
-        Map(f(0) -> s(0))
-      }
+      for {i <- 0 until s.length; if is.contains(i)} yield s(i)
     }
 
-    def qc(g: String, format: String, cond: String, mis: String): String = {
+    def fields(g: String, format: List[String]): Map[String, String] = {
+      val s = g.split(":")
+      if (s.length == 1)
+        Map(format.head -> s(0))
+      else
+        format.zip(s).toMap
+    }
+
+    def qc(g: String, cond: LogicalParser.LogExpr, format: List[String], mis: String): String = {
       val varMap = fields(g, format).withDefaultValue("0")
-      if (LogicalExpression.judge(varMap)(cond)) {
-        g
-      } else {
+      if (LogicalParser.eval(cond)(varMap))
+        varMap("GT")
+      else
         mis
-      }
+
     }
 
     def callRate(g: String): (Double, Double) = {
@@ -174,6 +178,7 @@ object Genotype {
       else
         (1, 1)
     }
+
     def toAAF(g: String): (Double, Double) = {
       val gt = g.split(":")(0).split("[/|]").map(_.toInt)
       if (gt.length == 1) {
@@ -182,6 +187,7 @@ object Genotype {
         (gt.sum, 2)
       }
     }
+
     def toHWE(g: String): (Double, Double, Double) = {
       if (isMis(g)) {
         (0, 0, 0)
@@ -193,7 +199,6 @@ object Genotype {
         (0, 0, 1)
       }
     }
-
   }
   implicit object Imputed extends Genotype[Imp] {
     /**

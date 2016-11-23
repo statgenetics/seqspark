@@ -2,13 +2,13 @@ package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, SparseVector, sum}
 import breeze.numerics.{exp, lbeta, pow}
+import org.dizhang.seqspark.assoc.Encode._
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.stat.{LinearRegression, LogisticRegression}
 import org.dizhang.seqspark.util.Constant
+import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
-import Encode._
-import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 
 
 /**

@@ -1,12 +1,12 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseMatrix => BDM}
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.feature.{PCA => SPCA}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{DenseCounter, Genotype, SparseCounter}
-import org.dizhang.seqspark.worker.Data
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 
 /**

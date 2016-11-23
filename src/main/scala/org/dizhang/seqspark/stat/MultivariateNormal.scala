@@ -1,9 +1,9 @@
 package org.dizhang.seqspark.stat
 
-import org.dizhang.seqspark.util.General._
 import breeze.linalg.{*, diag, DenseMatrix => DM, DenseVector => DV}
-import com.sun.jna.{Library, Native}
 import com.sun.jna.ptr._
+import com.sun.jna.{Library, Native}
+import org.dizhang.seqspark.util.General._
 
 /**
   * multi-variate normal distribution cdf

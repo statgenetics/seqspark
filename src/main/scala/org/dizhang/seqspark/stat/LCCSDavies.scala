@@ -1,10 +1,10 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, max, min, sum}
-import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
-import LCCSDavies._
 import breeze.numerics._
-import constants.Pi
+import breeze.numerics.constants.Pi
+import org.dizhang.seqspark.stat.LCCSDavies._
+import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
 /**
   * Based on Davies' method (1980)
   * The code is quite old, containing a lot of

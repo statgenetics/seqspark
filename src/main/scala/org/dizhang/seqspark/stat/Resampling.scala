@@ -5,6 +5,7 @@ import breeze.stats.distributions.Bernoulli
 import org.dizhang.seqspark.assoc.Encode
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
+
 import scala.language.existentials
 
 /**

@@ -3,7 +3,7 @@ package org.dizhang.seqspark.ds
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.util.{LogicalExpression, SingleStudyContext}
+import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -30,8 +30,8 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     self.map(v => v.toDummy)
   }
 
-  def variants(cond: List[String])(ssc: SingleStudyContext): RDD[Variant[A]] = {
-    if (cond == Nil || cond.forall(_ == "")) {
+  def variants(cond: LogicalParser.LogExpr)(ssc: SingleStudyContext): RDD[Variant[A]] = {
+    if (cond == LogicalParser.T) {
       logger.info("condition empty, no need to filter variants")
       self
     } else {
@@ -46,9 +46,9 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
         Some(controls.map{case Some("1") => true; case _ => false})
       }
 
-      val myCond = cond.map(c => s"($c)").reduce((a,b) => s"$a and $b")
-      logger.info(s"filter variants with '$myCond' ...")
-      val names: Set[String] = LogicalExpression.analyze(myCond)
+      val myCond = LogicalParser.view(cond)
+      logger.info(s"filter variants with [$myCond] ...")
+      val names: Set[String] = LogicalParser.names(cond)
 
       self.filter{v =>
         val varMap = names.toArray.map{
@@ -64,7 +64,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
           case "isFunctional" => "isFunctional" -> v.isFunctional.toString
           case x => x -> v.parseInfo.getOrElse(x, "0")
         }.toMap
-        LogicalExpression.judge(varMap)(myCond)
+        LogicalParser.eval(cond)(varMap)
       }
     }
   }

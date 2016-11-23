@@ -1,11 +1,12 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{inv, DenseMatrix => DM, DenseVector => DV}
+import org.dizhang.seqspark.assoc.RareMetalWorker._
+import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.stat.ScoreTest
-import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.util.Constant
-import RareMetalWorker._
+
 import scala.language.existentials
 /**
   * raremetal worker

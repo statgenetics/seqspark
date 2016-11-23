@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, sum}
-import LinearCombinationChiSquare._
+import org.dizhang.seqspark.stat.LinearCombinationChiSquare._
 
 /**
   * Linear Combination of Chi-Square distributions

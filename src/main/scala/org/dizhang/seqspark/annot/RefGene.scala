@@ -1,14 +1,10 @@
 package org.dizhang.seqspark.annot
 
 
-import java.io.{File, PrintWriter}
-
 import org.apache.spark.SparkContext
-import org.dizhang.seqspark.ds.{Region, Single}
 import org.dizhang.seqspark.annot.NucleicAcid._
-
-import scala.io.Source
-import org.slf4j.{Logger, LoggerFactory}
+import org.dizhang.seqspark.ds.Region
+import org.slf4j.LoggerFactory
 
 /**
   * refgene

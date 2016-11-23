@@ -1,12 +1,11 @@
 package org.dizhang.seqspark.stat
 
 
-import breeze.linalg.{DenseVector => DV, sum}
+import breeze.linalg.{sum, DenseVector => DV}
 import breeze.numerics.pow
-import breeze.stats.distributions.ChiSquared
-import org.dizhang.seqspark.util.General.RichDouble
+import org.dizhang.seqspark.stat.LCCSLiu._
 import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
-import LCCSLiu._
+import org.dizhang.seqspark.util.General.RichDouble
 
 /**
   * Use Liu et al. to compute p value for

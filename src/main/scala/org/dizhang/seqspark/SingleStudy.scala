@@ -1,21 +1,20 @@
 package org.dizhang.seqspark
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.dizhang.seqspark.ds.{Bed, Counter, Genotype, Phenotype}
-import org.dizhang.seqspark.util.InputOutput._
-import org.dizhang.seqspark.util.UserConfig.RootConfig
-import com.typesafe.config.ConfigFactory
 import java.io.File
 
+import com.typesafe.config.ConfigFactory
 import org.apache.spark.sql.SparkSession
-
-import scala.collection.JavaConverters._
-import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{SparkConf, SparkContext}
 import org.dizhang.seqspark.assoc.AssocMaster
+import org.dizhang.seqspark.ds.{Bed, Counter, Genotype, Phenotype}
+import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
 import org.dizhang.seqspark.worker.{Import, QualityControl}
 import org.slf4j.LoggerFactory
-import util.General._
+
+import scala.collection.JavaConverters._
 
 /**
  * Main function

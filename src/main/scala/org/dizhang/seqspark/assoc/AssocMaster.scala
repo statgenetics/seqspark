@@ -6,18 +6,18 @@ import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.stat._
-import org.dizhang.seqspark.util.{Constant, SingleStudyContext}
-import org.dizhang.seqspark.util.Constant.Pheno
-import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.annot.VariantAnnotOp._
-import AssocMaster._
 import org.apache.spark.storage.StorageLevel
+import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.assoc.AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
-import org.dizhang.seqspark.worker.Data
-import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Genotype, Phenotype}
+import org.dizhang.seqspark.stat._
+import org.dizhang.seqspark.util.Constant.Pheno
+import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.{Constant, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.worker.Data
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
@@ -222,7 +222,8 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
           .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
         val chooseSample = genotype.samples(indicator.value)(sc)
-        val currentGenotype = chooseSample.variants(List("informative"))(ssc)
+        val cond = LogicalParser.parse("informative")
+        val currentGenotype = chooseSample.variants(cond)(ssc)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
         /**
@@ -262,7 +263,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
                          method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
     val config = cnf.association
     val methodConfig = config.method(method)
-    val cond = methodConfig.misc.getStringList("variants").asScala.toList
+    val cond = LogicalParser.parse(methodConfig.misc.getStringList("variants").asScala.toList)
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 

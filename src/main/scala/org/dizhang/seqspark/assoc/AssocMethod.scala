@@ -1,16 +1,7 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{DenseMatrix, DenseVector}
-import breeze.stats._
-import com.typesafe.config.Config
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 import org.dizhang.seqspark.ds.Variation
-import org.dizhang.seqspark.stat.ScoreTest
-import org.dizhang.seqspark.util.Constant.Pheno
-import org.dizhang.seqspark.util.InputOutput._
-import org.slf4j.{Logger, LoggerFactory}
-
-import scala.annotation.tailrec
 
 
 /**

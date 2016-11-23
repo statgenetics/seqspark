@@ -1,17 +1,15 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg._
-import breeze.numerics.{abs, pow}
-import breeze.stats._
-import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV}
-import SKATO._
+import breeze.integrate._
+import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
+import breeze.numerics.pow
 import breeze.stats.distributions.ChiSquared
+import org.dizhang.seqspark.assoc.SKATO._
+import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 
-import collection.JavaConverters._
-import breeze.integrate._
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
+import scala.collection.JavaConverters._
 import scala.language.existentials
 /**
   * optimal SKAT test

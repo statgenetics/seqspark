@@ -2,6 +2,7 @@ package org.dizhang.seqspark.util
 
 import breeze.linalg.{*, CSCMatrix, DenseVector, eigSym, DenseMatrix => DM}
 import breeze.numerics._
+
 import scala.annotation.tailrec
 
 /**

@@ -1,10 +1,11 @@
 package org.dizhang.seqspark.util
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.annot._
+import org.dizhang.seqspark.ds.Region
+import org.dizhang.seqspark.util.LogicalParser.LogExpr
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 /**
@@ -126,8 +127,8 @@ object UserConfig {
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
-    def genotypes = config.getStringList("genotypes").asScala.toList
-    def variants = config.getStringList("variants").asScala.toList
+    def genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
+    def variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
     def summaries = config.getStringList("summaries").asScala.toList
   }
 

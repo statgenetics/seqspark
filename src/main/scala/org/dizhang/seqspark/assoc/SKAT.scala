@@ -1,14 +1,14 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{*, diag, eig, eigSym, sum, svd, DenseMatrix => DM, DenseVector => DV}
+import breeze.linalg.{*, diag, eigSym, DenseMatrix => DM, DenseVector => DV}
+import org.apache.spark.SparkContext
+import org.dizhang.seqspark.assoc.SKAT._
+import org.dizhang.seqspark.stat.ScoreTest.{LogisticModel, NullModel}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
-import SKAT._
-import org.apache.spark.SparkContext
 
 import scala.language.existentials
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 /**
   * variance component test
   *

@@ -1,13 +1,13 @@
 package org.dizhang.seqspark.annot
 
 import breeze.linalg.sum
+import org.dizhang.seqspark.annot.Location.Strand.Strand
+import org.dizhang.seqspark.annot.Location._
+import org.dizhang.seqspark.annot.NucleicAcid._
 import org.dizhang.seqspark.ds.{Region, Single, Variation}
 import org.dizhang.seqspark.util.Constant.Annotation
 import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
 import org.dizhang.seqspark.util.Constant.Annotation._
-import Location._
-import org.dizhang.seqspark.annot.Location.Strand.Strand
-import org.dizhang.seqspark.annot.NucleicAcid._
 import org.dizhang.seqspark.util.UserConfig.MutType
 
 /**

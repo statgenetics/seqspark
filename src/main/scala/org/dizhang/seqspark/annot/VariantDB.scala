@@ -3,6 +3,7 @@ import com.typesafe.config.Config
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Region, Variant, Variation}
+
 import scala.collection.JavaConverters._
 /**
   * Created by zhangdi on 8/17/16.

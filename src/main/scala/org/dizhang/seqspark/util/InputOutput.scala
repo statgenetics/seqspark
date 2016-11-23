@@ -2,12 +2,11 @@ package org.dizhang.seqspark.util
 
 import java.io._
 
-import com.typesafe.config.Config
+import breeze.linalg.DenseMatrix
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
-import Constant._
-import breeze.linalg.DenseMatrix
 import org.dizhang.seqspark.ds.Variant
+import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 
 import scala.io.Source

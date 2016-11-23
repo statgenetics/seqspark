@@ -2,11 +2,11 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
 
-import org.dizhang.seqspark.ds.{DenseVariant, Genotype, Variant}
-import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.annot.VariantAnnotOp._
 import breeze.stats.distributions.ChiSquared
+import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
+import org.dizhang.seqspark.util.General._
 
 import scala.language.implicitConversions
 /**

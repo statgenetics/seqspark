@@ -1,13 +1,12 @@
 package org.dizhang.seqspark.worker
 
-import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqspark.util.SingleStudyContext
-import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.annot.linkVariantDB
+import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.util.SingleStudyContext
+import org.dizhang.seqspark.worker.Genotypes._
+import org.dizhang.seqspark.worker.Samples._
+import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.LoggerFactory
-import Genotypes._
-import Variants._
-import Samples._
 
 /**
   * Created by zhangdi on 9/25/16.

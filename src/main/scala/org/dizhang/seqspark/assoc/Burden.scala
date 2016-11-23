@@ -1,9 +1,10 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.stats.distributions.Gaussian
-import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
+import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
+import org.dizhang.seqspark.util.General._
+
 import scala.language.existentials
 
 /**

@@ -1,11 +1,11 @@
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
-import breeze.stats._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.dizhang.seqspark.ds.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
+
 import scala.util.{Failure, Success, Try}
-import Phenotype._
 
  /**
   * Created by zhangdi on 9/13/16.

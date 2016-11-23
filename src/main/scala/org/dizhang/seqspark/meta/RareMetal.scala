@@ -1,12 +1,12 @@
 package org.dizhang.seqspark.meta
 
+import breeze.linalg.diag
 import org.dizhang.seqspark.annot.{IntervalTree, RefGene}
 import org.dizhang.seqspark.assoc.{RareMetalWorker => RMW}
+import org.dizhang.seqspark.ds.Variation
+import org.dizhang.seqspark.meta.RareMetal._
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.General._
-import RareMetal._
-import breeze.linalg.diag
-import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.util.UserConfig.MetaConfig
 
 /**

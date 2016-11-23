@@ -1,10 +1,9 @@
 package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.util.SingleStudyContext
-import org.dizhang.seqspark.util.{UserConfig => UC}
+import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
+import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig => UC}
 import org.slf4j.LoggerFactory
 
 /**

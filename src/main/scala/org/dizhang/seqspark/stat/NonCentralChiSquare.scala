@@ -1,6 +1,5 @@
 package org.dizhang.seqspark.stat
 
-import breeze.math._
 import breeze.numerics.{exp, gammp, gammq, lgamma}
 import breeze.stats.distributions.ChiSquared
 /**

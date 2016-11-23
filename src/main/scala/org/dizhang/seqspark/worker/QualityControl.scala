@@ -39,6 +39,8 @@ object QualityControl {
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
 
     simpleVCF.cache()
+    simpleVCF.checkpoint()
+    simpleVCF.foreach(_ => Unit)
 
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)

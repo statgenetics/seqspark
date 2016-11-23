@@ -92,6 +92,7 @@ object Encode {
       case MethodType.cmc => DefaultCMC(vars, config)
       case MethodType.brv => SimpleBRV(vars, config)
       case MethodType.skat => SimpleBRV(vars, config)
+      case MethodType.skato => SimpleBRV(vars, config)
       case MethodType.meta => DefaultRaw(vars, config)
       case _ => DefaultCMC(vars, config)
     }
@@ -104,6 +105,7 @@ object Encode {
       case MethodType.cmc => ControlsMafCMC(vars, controls, config)
       case MethodType.brv => ControlsMafSimpleBRV(vars, controls, config)
       case MethodType.skat => ControlsMafSimpleBRV(vars, controls, config)
+      case MethodType.skato => ControlsMafSimpleBRV(vars, controls, config)
       case MethodType.meta => ControlsMafRaw(vars, controls, config)
       case _ => ControlsMafCMC(vars, controls, config)
     }

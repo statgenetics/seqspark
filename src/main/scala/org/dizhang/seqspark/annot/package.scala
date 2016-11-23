@@ -83,7 +83,7 @@ package object annot {
     dbTerms.foreach{
       case (k, v) =>
         logger.info(s"join database ${k} with fields ${if (v.isEmpty) "None" else v.mkString(",")}")
-        val db = VariantDB(conf.annotation.config.getConfig(k), v)(sc)
+        val db = VariantDB(conf.annotation.config.getConfig(k), v, conf.jobs)(sc)
 
         paired = paired.leftOuterJoin(db.info).map{
           case (va, (vt, Some(info))) =>

@@ -21,11 +21,13 @@ object QualityControl {
     val annotated =  linkVariantDB(decompose(input))(conf, sc)
 
     annotated.cache()
+    annotated.checkpoint()
+    annotated.foreach(_ => Unit)
 
     val sums = ssc.userConfig.qualityControl.summaries
 
     if (sums.contains("annotation")) {
-
+      countByFunction(annotated)
     }
 
     if (sums.contains("gdgq")) {

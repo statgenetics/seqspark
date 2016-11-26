@@ -52,12 +52,17 @@ object SKAT {
         val vals = eg.eigenvalues
         val vecs = eg.eigenvectors
         val lambda = DV(vals.toArray.filter(v => v > 1e-6): _*)
-        val u = DV.horzcat(
-          (for {
-            i <- 0 until vals.length
-            if vals(i) > 1e-6
-          } yield vecs(::, i)): _*)
-        (Some(lambda), Some(u))
+        if (lambda.length == 0) {
+          (None, None)
+        } else {
+          val u = DV.horzcat(
+            (for {
+              i <- 0 until vals.length
+              if vals(i) > 1e-6
+            } yield vecs(::, i)): _*)
+          (Some(lambda), Some(u))
+
+        }
       case _ =>
         (None, None)
     }

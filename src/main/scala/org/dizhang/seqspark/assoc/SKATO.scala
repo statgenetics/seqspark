@@ -23,7 +23,7 @@ object SKATO {
 
   def apply(nullModel: NullModel,
             x: Encode[_]): SKATO = {
-    val method = x.config.misc.getString("method")
+    val method = x.config.misc.method
     method match {
       case "davies" => Davies(nullModel, x, method)
       case _ => LiuModified(nullModel, x, method)
@@ -306,7 +306,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     method match {
       case "optimal.adj" => RhosAdj
       case "optimal" => RhosOld
-      case _ => misc.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
+      case _ => misc.rCorr
     }
   }
   /**

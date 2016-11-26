@@ -150,15 +150,58 @@ object UserConfig {
     def filters = config.getStringList("filters").asScala.toArray
   }
 
+  case class MiscConfig(config: Config) extends UserConfig {
+    def groupBy: List[String] = {
+      if (config.hasPath("groupBy"))
+        config.getStringList("groupBy").asScala.toList
+      else
+        List("gene")
+    }
+    def variants: List[String] = {
+      if (config.hasPath("variants"))
+        config.getStringList("variants").asScala.toList
+      else
+        List("isFunctional")
+    }
+    def method: String = {
+      if (config.hasPath("method"))
+        config.getString("method")
+      else
+        "liu.mod"
+    }
+    def rCorr: Array[Double] = {
+      if (config.hasPath("rCorr"))
+        config.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
+      else
+        Array[Double]()
+    }
+    def kernel: String = {
+      if (config.hasPath("kernel"))
+        config.getString("kernel")
+      else
+        "linear.weighted"
+    }
+    def weightBete: List[Double] = {
+      if (config.hasPath("weightBeta"))
+        config.getDoubleList("weightBeta").asScala.toList.map(_.toDouble)
+      else
+        List(1.0, 25.0)
+    }
+    def smallSampleAdjustment: Boolean = {
+      if (config.hasPath("smallSampleAdjustment"))
+        config.getBoolean("smallSmapleAdjustment")
+      else
+        true
+    }
+  }
+
   case class MethodConfig(config: Config) extends UserConfig {
     def `type` = MethodType.withName(config.getString("type"))
     def weight = WeightMethod.withName(config.getString("weight"))
     def maf = config.getConfig("maf")
     def resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
     def test = TestMethod.withName("score")
-    def misc: Config = {
-      if (config.hasPath("misc")) config.getConfig("misc") else ConfigFactory.empty()
-    }
+    def misc: MiscConfig = MiscConfig(config.getConfig("misc"))
   }
 
   case class TraitConfig(config: Config) extends UserConfig {

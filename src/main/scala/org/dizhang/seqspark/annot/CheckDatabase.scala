@@ -51,8 +51,8 @@ object CheckDatabase {
     val methodList = assConf.methodList
     methodList.forall{m =>
       val mConf = assConf.method(m)
-      if (mConf.misc.hasPath("variants")) {
-        val cond = LogicalParser.parse(mConf.misc.getStringList("variants").asScala.toList)
+      if (mConf.misc.variants.nonEmpty) {
+        val cond = LogicalParser.parse(mConf.misc.variants)
         val assTerms = LogicalParser.names(cond)
         val dbRegex = """(\w+)\.(\w+)""".r
         val dbTerms = assTerms.filter{

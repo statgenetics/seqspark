@@ -48,7 +48,7 @@ object AssocMaster {
     logger.info("start encoding genotype ")
     //val sampleSize = y.value.length
     val codingScheme = config.`type`
-    val groupBy = config.misc.getStringList("groupBy").asScala.toList
+    val groupBy = config.misc.groupBy
     val annotated = codingScheme match {
       case MethodType.snv =>
         currentGenotype.map(v => (v.toVariation().toString(), v)).groupByKey()
@@ -263,7 +263,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
                          method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
     val config = cnf.association
     val methodConfig = config.method(method)
-    val cond = LogicalParser.parse(methodConfig.misc.getStringList("variants").asScala.toList)
+    val cond = LogicalParser.parse(methodConfig.misc.variants)
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 

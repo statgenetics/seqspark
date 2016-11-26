@@ -25,7 +25,7 @@ package object annot {
 
     if (conf.pipeline.last == "association") {
       val assDBs = conf.association.methodList.map{ m =>
-        val cond = LogicalParser.parse(conf.association.method(m).misc.getStringList("variants").asScala.toList)
+        val cond = LogicalParser.parse(conf.association.method(m).misc.variants)
         getDBs(cond)
       }.toList
       (annDBs :: qcDBs :: assDBs).reduce((a, b) => addMap(a, b))

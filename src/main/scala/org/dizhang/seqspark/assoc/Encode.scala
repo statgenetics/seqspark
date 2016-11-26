@@ -241,7 +241,8 @@ object Encode {
   }
 
   case class DefaultRaw[A: Genotype](vars: Array[Variant[A]],
-                           config: MethodConfig) extends Encode[A] with Raw[A] with PooledOrAnnotationMaf[A]
+                           config: MethodConfig)
+    extends Encode[A] with Raw[A] with PooledOrAnnotationMaf[A]
 
   case class ControlsMafRaw[A: Genotype](vars: Array[Variant[A]],
                             controls: Array[Boolean],

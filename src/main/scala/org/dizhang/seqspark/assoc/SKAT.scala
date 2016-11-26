@@ -21,7 +21,7 @@ object SKAT {
   def apply(nullModel: NullModel,
             x: Encode[_],
             rho: Double): SKAT = {
-    val method = x.config.misc.getString("method")
+    val method = x.config.misc.method
     method match {
       case "liu.mod" => LiuModified(nullModel, x, rho)
       case "liu" => Liu(nullModel, x, rho)

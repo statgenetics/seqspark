@@ -3,12 +3,15 @@ package org.dizhang.seqspark.assoc
 import java.io.{File, PrintWriter}
 
 import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.numerics.pow
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
+import org.dizhang.seqspark.assoc.SKATO.LiuPValue
 import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
+import org.dizhang.seqspark.util.General._
 import org.scalatest.FlatSpec
 
 /**
@@ -40,8 +43,8 @@ class SKATOSpec extends FlatSpec {
     SKATO.NullModel(reg)
   }
   "A SKATO" should "be fine" in {
-    val so = SKATO(nullModel, encode)
 
+    /**
     val pw = new PrintWriter(new File("skat.data"))
     val geno = so.geno.toDense
     for (i <- 0 until so.geno.cols) {
@@ -54,10 +57,30 @@ class SKATOSpec extends FlatSpec {
       pw.write(cov(::, i).toArray.mkString("\t") + "\n")
     }
     pw.close()
-    println(s"geno: ${so.geno.rows} x ${so.geno.cols} weight: ${so.weight.length}")
-    println(so.paramOpt)
-    println(so.lambdaUsOpt)
-    val sores = so.result
-    println(s"S: ${sores.statistic} P: ${sores.pValue.map(_.toString).getOrElse("NA")}")
+      */
+    //println("rhos: " + so.rhos.mkString(","))
+    //println("qvals: " + so.qScores.mkString(","))
+    //println("pvals: " + so.pValues.mkString(","))
+    //println(so.param)
+    //println("pmin.q" + so.pMinQuantiles.mkString(","))
+
+    //val so = SKATO(nullModel, encode)
+    /**
+    so match {
+      case x: LiuPValue =>
+        for (i <- 1 to 10) {
+          println(s"int ${pow(10.0, -i)}: ${x.integralFunc(pow(10.0, -i))}")
+        }
+        //println(s"adaptive quatrature ${quadrature(x.integralFunc, 0, 40)}")
+        //println(s"simpson ${simpson(x.integralFunc, 1e-6,1, 2000)}")
+        //println(s"tra ${trapezoid(x.integralFunc, 1e-6,1, 2000)}")
+    }
+    */
+    //val pz = so.P0SqrtZ(0 to 5, ::)
+    //for (i <- 0 until pz.rows) {
+    //  println(pz(i, ::).t.toArray.mkString(","))
+    //}
+    //val sores = so.result
+    //println(s"S: ${sores.statistic} P: ${sores.pValue.map(_.toString).getOrElse("NA")}")
   }
 }

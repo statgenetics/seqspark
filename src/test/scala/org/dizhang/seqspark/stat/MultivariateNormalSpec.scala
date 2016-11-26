@@ -19,7 +19,7 @@ class MultivariateNormalSpec extends FlatSpec {
   }
   "A MVN" should "be fine" in {
     val res = obj.cdf(DenseVector.fill(11)(0.0))
-    println(s"pval: ${res.pvalue} err: ${res.error} info: ${res.inform}")
+    //println(s"pval: ${res.pvalue} err: ${res.error} info: ${res.inform}")
   }
 
 }

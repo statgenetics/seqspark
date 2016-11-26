@@ -3,7 +3,7 @@ package org.dizhang.seqspark.assoc
 import breeze.linalg.{*, diag, eigSym, DenseMatrix => DM, DenseVector => DV}
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.SKAT._
-import org.dizhang.seqspark.stat.ScoreTest.{LogisticModel, NullModel}
+import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 
@@ -135,13 +135,19 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
     val r = (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
     diag(weight) * r * diag(weight)
   }
+  lazy val resVar: Double = {
+    nullModel match {
+      case lm: LinearModel => lm.residualsVariance
+      case _ => 1.0
+    }
+  }
   lazy val geno = x.getRare().get.coding
   lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
 
   def qScore: Double = {
     scoreTest.score.t * kernel * scoreTest.score
   }
-  lazy val scoreSigma = symMatrixSqrt(scoreTest.variance)
+  lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
   lazy val vc = scoreSigma * kernel * scoreSigma
   lazy val (lambda, u) = getLambdaU(vc)
   def pValue: Option[Double]

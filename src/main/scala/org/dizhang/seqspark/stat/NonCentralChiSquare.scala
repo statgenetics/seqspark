@@ -289,7 +289,7 @@ object NonCentralChiSquare {
             nonCentrality: Double): NonCentralChiSquare = {
     if (nonCentrality == 0.0) {
       CCS(degrees)
-    } else if (degrees >= 200) {
+    } else if (nonCentrality >= 80) {
       NCCSBentonKrishnamoorthy(degrees, nonCentrality)
     } else {
       NCCSDing(degrees, nonCentrality)

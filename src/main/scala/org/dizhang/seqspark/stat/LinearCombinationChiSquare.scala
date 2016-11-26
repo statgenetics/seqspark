@@ -15,7 +15,7 @@ trait LinearCombinationChiSquare extends Serializable {
   def cdf(cutoff: Double): CDF
 
   val meanLambda: Double = sum(lambda)
-  val size = lambda.length
+  val size: Int = lambda.length
 
 }
 

@@ -82,10 +82,10 @@ object LCCSDavies {
 
 @SerialVersionUID(7778530001L)
 trait LCCSDavies extends LCCS {
-  val sigma: Double
+  def sigma: Double
   var sigsq = sigma.square
-  val lmax = max(lambda)
-  val lmin = min(lambda.toArray :+ 0.0)
+  def lmax = max(lambda)
+  def lmin = min(lambda.toArray :+ 0.0)
   lazy val th: Array[Int] = {
     /** the order of abs(lambda)
       * with the largest labeled 0 */

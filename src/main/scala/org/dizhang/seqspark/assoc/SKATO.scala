@@ -8,7 +8,6 @@ import org.dizhang.seqspark.assoc.SKATO._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
-
 import scala.collection.JavaConverters._
 import scala.language.existentials
 /**
@@ -19,8 +18,8 @@ import scala.language.existentials
   */
 
 object SKATO {
-  val RhosOld = (0 to 10).map(x => x * 1.0/10.0).toArray
-  val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 1.0)
+  val RhosOld = (0 to 9).map(x => x * 1.0/10.0).toArray :+ 0.999
+  val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 0.999)
 
   def apply(nullModel: NullModel,
             x: Encode[_]): SKATO = {
@@ -40,14 +39,17 @@ object SKATO {
     val meanZ: DV[Double] = sum(p0sqrtZ(*, ::))/numVars.toDouble
     val meanZmat: DM[Double] = DM.zeros[Double](numSamples, numVars)
     meanZmat(::, *) := meanZ
-    val cof1 = (meanZ.t * meanZmat).t/sum(pow(meanZ, 2))
+
+    //val cof1 = (meanZ.t * meanZmat).t/sum(pow(meanZ, 2))
+    val cof1 = (meanZ.t * p0sqrtZ).t / sum(pow(meanZ, 2))
+
     val iterm1 = meanZmat * diag(cof1)
     val iterm2 = p0sqrtZ - iterm1
     /** w3 is the mixture chisq term
       * */
     val w3 = iterm2.t * iterm2
 
-    val varZeta = sum(iterm1.t * iterm1 * w3) * 4
+    val varZeta = sum((iterm1.t * iterm1) :* w3) * 4
 
     val (lambda, u) = SKAT.getLambdaU(w3)
 
@@ -56,7 +58,7 @@ object SKATO {
         val muQ = sum(l)
         val (varQ, kurQ) = resampled match {
           case None =>
-            val v = sum(pow(l, 2)) + varZeta
+            val v = 2 * sum(pow(l, 2)) + varZeta
             val k = sum(pow(l, 4))/sum(pow(l, 2)).square * 12
             (v, k)
           case Some(res) =>
@@ -72,7 +74,6 @@ object SKATO {
         Some(Parameters(muQ, varQ, kurQ, l, varZeta, taus))
       case (_, _) => None
     }
-
 
   }
 
@@ -90,7 +91,7 @@ object SKATO {
                   v1: Double, // varQ = Var(Qs) + Var(Zeta)
                   a1: Double, // 1 - rho(i)
                   a2: Double // tau(i)
-                         ): Double = {
+                  ): Double = {
     val v2 = 2 * df2
     val s41 = (12/df1 + 3) * v1.square
     val s42 = (12/df2 + 3) * v2.square
@@ -102,7 +103,7 @@ object SKATO {
 
   @SerialVersionUID(302L)
   trait NullModel extends Regression.Result with Serializable {
-    val informationInverse = inv(information)
+    val informationInverse: DM[Double] = inv(information)
     def STNullModel: STNull
   }
 
@@ -142,7 +143,17 @@ object SKATO {
                         lambda: DV[Double],
                         varZeta: Double,
                         taus: Array[Double]) extends Serializable {
-    def df = 12.0/kurQ
+    def df: Double = 12.0/kurQ
+
+    override def toString: String = {
+      s"""muQ: $muQ
+         |varQ: $varQ
+         |kurQ: $kurQ
+         |lambda: ${lambda.toArray.mkString(",")}
+         |varZeta: $varZeta
+         |taus: ${taus.mkString(",")}
+       """.stripMargin
+    }
   }
 
   final case class Moments(muQ: Double, varQ: Double, df: Double)
@@ -150,9 +161,17 @@ object SKATO {
 
   trait AsymptoticKur extends SKATO {
 
-    val paramOpt = getParameters(P0SqrtZ, rhos)
+    def paramOpt = getParameters(P0SqrtZ, rhos)
 
-    val pValues = {
+    def pValues = {
+
+      lambdas.zip(qScores).map{case (l, q) =>
+        1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+      }
+      /**
+        * The Davies method implementation here is bugy
+        * use the liu modified instead
+        *
       val cdf = lambdas.zip(qScores).map{case (l, q) =>
         (l, q, LCCSDavies.Simple(l).cdf(q))}
       for ((l, q, c) <- cdf) yield
@@ -161,8 +180,9 @@ object SKATO {
         } else {
           1.0 - c.pvalue
         }
+        */
     }
-    val pMinQuantiles = {
+    def pMinQuantiles = {
       lambdas.map{lb =>
         val lm = LCCSLiu.Modified(lb)
         val df = lm.df
@@ -197,10 +217,9 @@ object SKATO {
         case (None, _) => None
         case (_, (None, _)) => None
         case (_, _) =>
-          val re = simpson(integralFunc, 0.0, 40.0, 2000)
-          Some(1.0 - re)
+          val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
+          re.map(1.0 - _)
       }
-
     }
   }
 
@@ -208,11 +227,14 @@ object SKATO {
   trait LiuPValue extends SKATO {
 
     lazy val term1 = new ChiSquared(df)
-    lazy val term2 = new ChiSquared(1.0)
+    lazy val term2 = new ChiSquared(1)
+    lazy val tauDV = DV(param.taus: _*)
+    lazy val pmqDV = DV(pMinQuantiles: _*)
+    lazy val rDV = DV(rhos.map(1.0 - _): _*)
 
     def integralFunc(x: Double): Double = {
-      val tmp1 = DV(param.taus: _*) * x
-      val tmp = (DV(pMinQuantiles: _*) - tmp1) :/ DV(rhos.map(1.0 - _): _*)
+      val tmp1 = tauDV * x
+      val tmp = (pmqDV - tmp1) :/ rDV
       val tmpMin = min(tmp)
       val tmpQ = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       term1.cdf(tmpQ) * term2.pdf(x)
@@ -224,8 +246,8 @@ object SKATO {
         case (None, _) => None
         case (_, (None, _)) => None
         case (_, _) =>
-          val re = simpson(integralFunc, 0.0, 40.0, 2000)
-          Some(1.0 - re)
+          val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
+          re.map(1.0 - _)
       }
     }
   }

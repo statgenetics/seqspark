@@ -25,8 +25,8 @@ object SKATO {
             x: Encode[_]): SKATO = {
     val method = x.config.misc.getString("method")
     method match {
-      case "davies" => Davies(nullModel, x)
-      case _ => LiuModified(nullModel, x)
+      case "davies" => Davies(nullModel, x, method)
+      case _ => LiuModified(nullModel, x, method)
     }
   }
 
@@ -195,7 +195,8 @@ object SKATO {
 
   @SerialVersionUID(7727760101L)
   case class Davies(nullModel: NullModel,
-                    x: Encode[_]) extends SKATO with AsymptoticKur {
+                    x: Encode[_],
+                    method: String) extends SKATO with AsymptoticKur {
     lazy val term2 = new ChiSquared(1.0)
 
     def integralFunc(x: Double): Double = {
@@ -254,7 +255,8 @@ object SKATO {
 
   @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
-                         x: Encode[_]) extends LiuPValue with AsymptoticKur {
+                         x: Encode[_],
+                         method: String) extends LiuPValue with AsymptoticKur {
     //lazy val kurQ = {
     //  12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
     //}
@@ -262,7 +264,8 @@ object SKATO {
 
   case class SmallSampleAdjust(nullModel: LogisticModel,
                                x: Encode[_],
-                               resampled: DM[Double]) extends LiuPValue {
+                               resampled: DM[Double],
+                               method: String) extends LiuPValue {
 
     lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
 
@@ -298,7 +301,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     .map(_._1))
   def numVars: Int = weight.length
   lazy val misc = x.config.misc
-  lazy val method = misc.getString("method")
+  def method: String
   lazy val rhos: Array[Double] = {
     method match {
       case "optimal.adj" => RhosAdj

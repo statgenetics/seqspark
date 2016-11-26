@@ -2,6 +2,7 @@ package org.dizhang.seqspark.util
 
 import breeze.linalg.{*, CSCMatrix, DenseVector, eigSym, DenseMatrix => DM}
 import breeze.numerics._
+import breeze.integrate._
 import scala.annotation.tailrec
 
 /**
@@ -62,7 +63,7 @@ object General {
 
   def rowMultiply(cm: CSCMatrix[Double],
                   dv: DenseVector[Double]): CSCMatrix[Double] = {
-    require(cm.cols == dv.length, "length of the dense vector must equal columns of the matrix")
+    require(cm.cols == dv.length, "length of the dense vector must equal to columns of the matrix")
     val builder = new CSCMatrix.Builder[Double](cm.rows, cm.cols)
     cm.activeIterator.foreach{
       case ((r,c), v) => builder.add(r,c, v * dv(c))
@@ -70,15 +71,58 @@ object General {
     builder.result
   }
   def symMatrixSqrt(sm: DM[Double]): DM[Double] = {
+
     val de = eigSym(sm)
     val values = de.eigenvalues
     val vectors = de.eigenvectors
     (vectors(*, ::) :* pow(values, 0.5)) * vectors.t
   }
 
+  def simpson2(h: Double, fa: Double, fm: Double, fb: Double): Double = {
+    (fa + 4* fm + fb) * h/3
+  }
+
+  /** this class is to hold the interval end points and their values a, f(a), b, f(b) */
+  case class Mem(a: Double, m: Double, b: Double, fa: Double, fm: Double, fb: Double)
+
+  def quadrature(fun: Double => Double, a: Double, b: Double,
+                 maxLevel: Int = 2000, tol: Double = 1e-6): Option[Double] = {
+    @tailrec
+    def quadraInternal(intervals: List[Mem], acc: Double, level: Int): Option[Double] = {
+      if (level > maxLevel) {
+        None
+      } else {
+        if (intervals.isEmpty) {
+          Some(acc)
+        } else {
+          val cur = intervals.head
+          val a = cur.a
+          val b = cur.b
+          val ml = (a+cur.m)/2
+          val fml = fun(ml)
+          val mr = (cur.m+b)/2
+          val fmr = fun(mr)
+          val h = (b-a)/2
+          val old = simpson2(h, cur.fa, cur.fm, cur.fb)
+          val left = simpson2(h/2, cur.fa, fml, cur.fm)
+          val right = simpson2(h/2, cur.fm, fmr, cur.fb)
+          val all = left + right
+          if (abs(all - old) > tol) {
+            val newIntervals = Mem(cur.m, mr, b, cur.fm, fmr, b) :: Mem(a, ml, cur.m, cur.fa, fml, cur.fm) :: intervals.tail
+            quadraInternal(newIntervals, acc, level + 1)
+          } else {
+            quadraInternal(intervals.tail, acc + all, level)
+          }
+        }
+      }
+    }
+    quadraInternal(List(Mem(a, (a+b)/2, b, fun(a), fun((a+b)/2), fun(b))), 0.0, 0)
+  }
+
   def insert(array: Array[Int], x: Int): Int = {
     @tailrec
     def rec(low: Int, up: Int): Int = {
+
       if (low == up) {
         low
       } else if (x >= array(up)) {
@@ -88,7 +132,7 @@ object General {
       } else if (x < array((low + up)/2)) {
         rec(low, (low + up)/2 - 1)
       } else {
-        rec((low + up)/2, up)
+        rec((low + up)/2 + 1, up)
       }
     }
     rec(0, array.length - 1)

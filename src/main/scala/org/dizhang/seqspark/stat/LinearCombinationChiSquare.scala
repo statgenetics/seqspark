@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, sum}
-import LinearCombinationChiSquare._
+import org.dizhang.seqspark.stat.LinearCombinationChiSquare._
 
 /**
   * Linear Combination of Chi-Square distributions
@@ -15,7 +15,7 @@ trait LinearCombinationChiSquare extends Serializable {
   def cdf(cutoff: Double): CDF
 
   val meanLambda: Double = sum(lambda)
-  val size = lambda.length
+  val size: Int = lambda.length
 
 }
 

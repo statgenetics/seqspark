@@ -19,7 +19,7 @@ fi
 
 if [ -z $SEQSPARK_HOME ]
 then
-	SEQSPARK_HOME=$(dirname $0)
+	SEQSPARK_HOME=$(dirname $(dirname $0))
 fi
 export CLASSPATH=${SEQSPARK_HOME}/conf:$CLASSPATH
 
@@ -28,6 +28,6 @@ echo "run mode:        $Mode"
 echo "conf file:       $Conf"
 echo "spark options:   $Opts"
 
-spark-submit --class org.dizhang.seqspark.$Mode $Opts $SEQSPARK_HOME/SeqSpark.jar
+spark-submit --class org.dizhang.seqspark.$Mode $Opts $SEQSPARK_HOME/SeqSpark.jar $Conf
 
 exit 0

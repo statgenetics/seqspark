@@ -1,10 +1,10 @@
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, max, min, sum}
-import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
-import LCCSDavies._
 import breeze.numerics._
-import constants.Pi
+import breeze.numerics.constants.Pi
+import org.dizhang.seqspark.stat.LCCSDavies._
+import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
 /**
   * Based on Davies' method (1980)
   * The code is quite old, containing a lot of
@@ -82,10 +82,10 @@ object LCCSDavies {
 
 @SerialVersionUID(7778530001L)
 trait LCCSDavies extends LCCS {
-  val sigma: Double
+  def sigma: Double
   var sigsq = sigma.square
-  val lmax = max(lambda)
-  val lmin = min(lambda.toArray :+ 0.0)
+  def lmax = max(lambda)
+  def lmin = min(lambda.toArray :+ 0.0)
   lazy val th: Array[Int] = {
     /** the order of abs(lambda)
       * with the largest labeled 0 */

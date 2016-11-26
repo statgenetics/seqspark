@@ -67,6 +67,7 @@ object Constant {
       val Downstream = Value("Downstream")
       val InterGenic = Value("InterGenic")
       val CNV = Value("CNV")
+      val Unknown = Value("Unknown")
     }
 
     object Base extends Enumeration {
@@ -135,6 +136,7 @@ object Constant {
       val ref = (1.0, 0.0, 0.0)
     }
     def rawToSimple(g: String): Byte = {
+      /**
       """
         |the simple genotype system uses 5 bits to represent a genotype
         |b00010000: is diploid
@@ -142,6 +144,7 @@ object Constant {
         |b00000100: is missing
         |00-11 represent the four possible genotypes
       """.stripMargin
+        */
       val diploidPhased = if (g.contains('|')) {
         24 //b00011000
       } else if (g.contains('/')) {

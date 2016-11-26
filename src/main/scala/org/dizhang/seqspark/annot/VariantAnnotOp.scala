@@ -1,8 +1,9 @@
 package org.dizhang.seqspark.annot
 import org.apache.spark.broadcast.Broadcast
+import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant
-import VariantAnnotOp._
+
 import scala.language.implicitConversions
 /**
   * Created by zhangdi on 8/16/16.
@@ -12,15 +13,17 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
   def annotateByVariant(dict: Broadcast[RefGene]): Variant[A] = {
     val variation = v.toVariation()
 
-    val annot = IntervalTree.lookup(dict.value.loci, variation).map{l =>
+    val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
+      dict.value.seq.contains(l.mRNAName)).map{l =>
       (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
     annot match {
       case Nil =>
         //logger.warn(s"no annotation for variant ${variation.toString}")
+        v.addInfo(IK.anno, F.InterGenic.toString)
         v
       case _ =>
-        val consensus = annot.map(p => (p._1, p._3))
-          .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
+        //val consensus = annot.map(p => (p._1, p._3))
+        //  .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
         val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
           .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
           .mkString(",,")
@@ -83,8 +86,16 @@ object VariantAnnotOp {
   implicit def addAnnotOp[A](v: Variant[A]): VariantAnnotOp[A] = {
     new VariantAnnotOp[A](v)
   }
-  def parseAnnotation(value: String) = {
-    val geneRegex = """(\w+)::(\S+)""".r
+  def worstAnnotation(value: String): F.Value = {
+    if (value == F.InterGenic.toString) {
+      F.InterGenic
+    } else {
+      val genes = parseAnnotation(value)
+      genes.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b)
+    }
+  }
+  def parseAnnotation(value: String): Array[(String, F.Value)] = {
+    val geneRegex = """([\w][\w-\.]*)::(\S+)""".r
     val trsRegex = """(\w+):(\S+)""".r
     val genes = value.split(",,").map{
       case geneRegex(gene, rest) => gene -> rest.split(",").map{

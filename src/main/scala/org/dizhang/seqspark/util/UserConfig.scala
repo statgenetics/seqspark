@@ -1,10 +1,11 @@
 package org.dizhang.seqspark.util
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.annot._
+import org.dizhang.seqspark.ds.Region
+import org.dizhang.seqspark.util.LogicalParser.LogExpr
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 /**
@@ -49,7 +50,7 @@ object UserConfig {
     val skato = Value("skato")
     val meta = Value("meta")
     val cmc = Value("cmc")
-    val brv = Value("burden")
+    val brv = Value("brv")
     val snv = Value("snv")
   }
 
@@ -72,8 +73,10 @@ object UserConfig {
 
     def project = config.getString("project")
     def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
+    def outDir = localDir + "/output"
+    def dbDir = config.getString("dbDir")
     def pipeline = config.getStringList("pipeline").asScala.toList
+    def jobs = config.getInt("jobs")
 
     def qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
@@ -124,8 +127,9 @@ object UserConfig {
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
-    def genotypes = config.getString("genotypes")
-    def variants = config.getStringList("variants").asScala.toList
+    def genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
+    def variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
+    def summaries = config.getStringList("summaries").asScala.toList
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {
@@ -181,7 +185,7 @@ object UserConfig {
   case class MetaConfig(config: Config) extends UserConfig {
     def project = config.getString("project")
     def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
+    def dbDir = config.getString("dbDir")
     def studies = config.getStringList("studies").asScala.toArray
     def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
@@ -191,6 +195,6 @@ object UserConfig {
 
 }
 
-sealed trait UserConfig {
+sealed trait UserConfig extends Serializable {
   def config: Config
 }

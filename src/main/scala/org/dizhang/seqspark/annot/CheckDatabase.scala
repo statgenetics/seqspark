@@ -1,8 +1,9 @@
 package org.dizhang.seqspark.annot
 
-import org.dizhang.seqspark.util.LogicalExpression
+import org.dizhang.seqspark.util.LogicalParser
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.LoggerFactory
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
@@ -14,7 +15,7 @@ object CheckDatabase {
 
   def qcTermsInDB(conf: RootConfig): Boolean = {
     val qcVars = conf.qualityControl.variants
-    val qcTerms = qcVars.flatMap(s => LogicalExpression.analyze(s)).toSet
+    val qcTerms = LogicalParser.names(qcVars)
     val dbRegex = """(\w+)\.(\w+)""".r
     val dbTerms = getDBterms(qcTerms).toArray.map{
       case dbRegex(db, field) => (db, field)
@@ -30,12 +31,14 @@ object CheckDatabase {
     val annConf = conf.annotation.variants
     if (annConf.hasPath("addInfo")) {
       val terms = annConf.getObject("addInfo").flatMap{
-        case (k, v) => v.toString.split("/").map(_.replaceAll(" ", ""))
+        case (k, _) => annConf.getString(s"addInfo.$k").split("/").map(_.replaceAll(" ", ""))
       }.map(_.split("\\.")).groupBy(_.apply(0)).map{
         case (k, v) => k -> v.flatten.toArray
       }
       terms.forall{
-        case (db, fields) => checkDB(conf, db, fields)
+        case (db, fields) =>
+          logger.info(s"$db: ${fields.mkString(",")}")
+          checkDB(conf, db, fields)
       }
     } else {
       logger.info("no need to add info to VCF from databases")
@@ -49,9 +52,8 @@ object CheckDatabase {
     methodList.forall{m =>
       val mConf = assConf.method(m)
       if (mConf.misc.hasPath("variants")) {
-        val assTerms = mConf.misc.getStringList("variants").asScala.toArray.flatMap(s =>
-          LogicalExpression.analyze(s)
-        ).toSet
+        val cond = LogicalParser.parse(mConf.misc.getStringList("variants").asScala.toList)
+        val assTerms = LogicalParser.names(cond)
         val dbRegex = """(\w+)\.(\w+)""".r
         val dbTerms = assTerms.filter{
           case dbRegex(_, _) => true

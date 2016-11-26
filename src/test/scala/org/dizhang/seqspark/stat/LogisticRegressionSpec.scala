@@ -15,6 +15,6 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
   val x = breeze.linalg.DenseVector(breeze.stats.distributions.Gaussian(0.0, 1.0).sample(100).toArray)
   */
   "A LogisticRegression" should "do nothing" in {
-    println("Do not do anything here")
+    //println("Do not do anything here")
   }
 }

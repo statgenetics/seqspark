@@ -1,20 +1,24 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{DenseMatrix, DenseVector, sum}
+import java.io.{File, PrintWriter}
+
+import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
+import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.assoc.AssocMaster._
+import org.dizhang.seqspark.ds.Counter._
+import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.ds.{Genotype, Phenotype}
 import org.dizhang.seqspark.stat._
-import org.dizhang.seqspark.util.{Constant, SingleStudyContext}
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.geno.Genotype
-import AssocMaster._
-import org.dizhang.seqspark.ds.Counter._
+import org.dizhang.seqspark.util.{Constant, LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
-import org.dizhang.seqspark.geno.GeneralizedVCF._
+
 import scala.collection.JavaConverters._
 
 /**
@@ -28,34 +32,39 @@ object AssocMaster {
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
   val IK = Constant.Variant.InfoKey
   type Imputed = (Double, Double, Double)
+  val logger = LoggerFactory.getLogger(getClass)
 
-  def makeEncode[A](currentGenotype: Data[A],
+  def makeEncode[A: Genotype](currentGenotype: Data[A],
                     y: Broadcast[DenseVector[Double]],
                     cov: Broadcast[Option[DenseMatrix[Double]]],
                     controls: Broadcast[Array[Boolean]],
-                    config: MethodConfig)(implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode)] = {
+                    config: MethodConfig)(implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode[_])] = {
 
     /** this is quite tricky
       * some encoding methods require phenotype information
-      * e.g. to learning weight from data */
-    val sampleSize = y.value.length
+      * e.g. to learning weight from data
+      * */
+
+    logger.info("start encoding genotype ")
+    //val sampleSize = y.value.length
     val codingScheme = config.`type`
     val groupBy = config.misc.getStringList("groupBy").asScala.toList
     val annotated = codingScheme match {
       case MethodType.snv =>
-        currentGenotype.map(v => (s"${v.chr}:${v.pos}", v)).groupByKey()
+        currentGenotype.map(v => (v.toVariation().toString(), v)).groupByKey()
       case MethodType.meta =>
         currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
       case _ =>
         (groupBy match {
-          case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s(0).toInt, s(1).toInt))
-          case _ => currentGenotype.flatMap(v => v.groupByGene(onlyFunctional = true))
+          case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s.head.toInt, s(1).toInt))
+          case _ => currentGenotype.flatMap(v => v.groupByGene())
         }).groupByKey()
     }
 
-    annotated.map(p =>
+    val res: RDD[(String, Encode[_])] = annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, config))
-    )
+    ).filter{case (g, e) => e.isDefined && e.informative()}.map(x => x)
+    res
   }
 
   def adjustForCov(binaryTrait: Boolean,
@@ -77,7 +86,7 @@ object AssocMaster {
       thisLoopLimit
   }
 
-  def expand(data: RDD[(String, Encode)], cur: Int, target: Int): RDD[(String, Encode)] = {
+  def expand(data: RDD[(String, Encode[_])], cur: Int, target: Int): RDD[(String, Encode[_])] = {
     if (target == cur)
       data
     else
@@ -85,14 +94,16 @@ object AssocMaster {
   }
 
 
-  def permutationTest(encode: RDD[(String, Encode)],
+  def permutationTest(encode: RDD[(String, Encode[_])],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
-                      config: MethodConfig)(implicit sc: SparkContext): Map[String, TestResult] = {
+                      config: MethodConfig)(implicit sc: SparkContext): Map[String, AssocMethod.ResamplingResult] = {
+    logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     val nm = ScoreTest.NullModel(reg)
+    logger.info("get the reference statistics first")
     val asymptoticRes = asymptoticTest(encode, y, cov, binaryTrait, config).collect().toMap
     val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
     val sites = encode.count().toInt
@@ -104,10 +115,11 @@ object AssocMaster {
     var curEncode = encode
     var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
     for (i <- 0 to loops) {
+      logger.info(s"round $i of permutation test, ${curEncode.count()} genes")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
       curEncode = expand(curEncode, lastMax, curMax)
-      val curPCount = curEncode.map{x =>
+      val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
         val model =
           if (config.maf.getBoolean("fixed")) {
@@ -121,24 +133,35 @@ object AssocMaster {
       pCount = sc.broadcast(for ((k, v) <- pCount.value)
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
+      curEncode.persist(StorageLevel.MEMORY_AND_DISK)
     }
-    pCount.value.map(x => (x._1, TestResult(None, None, x._2._2.toDouble, x._2._1.toDouble/x._2._2)))
+    pCount.value.map{x =>
+      val asymp = asymptoticRes(x._1)
+      val vars = asymp.vars
+      val ref = asymp.statistic
+      (x._1, AssocMethod.ResamplingResult(vars, ref, x._2))
+    }
   }
 
-  def asymptoticTest(encode: RDD[(String, Encode)],
+  def asymptoticTest(encode: RDD[(String, Encode[_])],
                      y: Broadcast[DenseVector[Double]],
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
-                     config: MethodConfig)(implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+                     config: MethodConfig)
+                    (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+    logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
-    lazy val nm = sc.broadcast(ScoreTest.NullModel(reg))
-    lazy val snm = sc.broadcast(SKATO.NullModel(reg))
+    logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
+    logger.info(s"covariates design matrix rank: ${rank(reg.xs)}")
     config.`type` match {
       case MethodType.skat =>
+        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         encode.map(p => (p._1, SKAT(nm.value, p._2, 0.0).result))
       case MethodType.skato =>
+        val snm = sc.broadcast(SKATO.NullModel(reg))
         encode.map(p => (p._1, SKATO(snm.value, p._2).result))
       case _ =>
+        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         if (config.maf.getBoolean("fixed"))
           encode.map(p => (p._1, Burden.AnalyticTest(nm.value, p._2).result))
         else
@@ -146,7 +169,7 @@ object AssocMaster {
     }
   }
 
-  def rareMetalWorker(encode: RDD[(String, Encode)],
+  def rareMetalWorker(encode: RDD[(String, Encode[_])],
                       y: Broadcast[DenseVector[Double]],
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
@@ -156,43 +179,26 @@ object AssocMaster {
     encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
   }
 
-
-  case class SimpleMaster(genotype: Data[Byte], ssc: SingleStudyContext) extends AssocMaster[Byte] {
-
-    def geno: Genotype[Byte] = Genotype.Simple
-
-    def samples(input: Data[Byte], indicator: Array[Boolean]) = {
-      input.samples(indicator)(ssc.sparkContext)
+  def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: String): Unit = {
+    val pw = new PrintWriter(new java.io.File(outFile))
+    res match {
+      case _: AssocMethod.AnalyticResult => pw.write("name\tvars\tstatistic\tp-value\n")
+      case _: AssocMethod.ResamplingResult => pw.write("name\tvars\tstatistic\tp-count\tp-value\n")
+      case _ => pw.write("name\tvars\tstatistic\tp-value\n")
     }
-    def variantsFilter(input: Data[Byte], cond: List[String]) = {
-      input.variantsFilter(cond)(ssc)
+    res.sortBy(p => p._2.pValue).foreach{p =>
+      pw.write("%s\t%s\n".format(p._1, p._2.toString))
     }
+    pw.close()
   }
-
-  case class ImputedMaster(genotype: Data[Imputed], ssc: SingleStudyContext) extends AssocMaster[Imputed] {
-
-    def geno: Genotype[Imputed] = Genotype.Imputed
-
-    def samples(input: Data[Imputed], indicator: Array[Boolean]) = {
-      input.samples(indicator)(ssc.sparkContext)
-    }
-    def variantsFilter(input: Data[Imputed], cond: List[String]) = {
-      input.variantsFilter(cond)(ssc)
-    }
-  }
-
 
 }
 
-trait AssocMaster[A]{
-  def geno: Genotype[A]
-  def genotype: Data[A]
-  def ssc: SingleStudyContext
-  def samples(input: Data[A], indicator: Array[Boolean]): Data[A]
-  def variantsFilter(input: Data[A], cond: List[String]): Data[A]
+@SerialVersionUID(105L)
+class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
-  val phenotype = ssc.phenotype
+  val phenotype = Phenotype("phenotype")(ssc.sparkSession)
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -200,45 +206,53 @@ trait AssocMaster[A]{
 
   def run(): Unit = {
     val traits = assocConf.traitList
-    traits.foreach{
-      t => runTrait(t)
-    }
+    logger.info("we have traits: %s" format traits.mkString(","))
+    traits.foreach{t => runTrait(t)}
   }
 
-  def runTrait(traitName: String) = {
-    try {
-      logger.info(s"load trait $traitName from phenotype database")
-      phenotype.getTrait(traitName) match {
-        case Left(msg) => logger.warn(s"getting trait $traitName failed, skip")
-        case Right(tr) =>
-          val currentTrait = (traitName, sc.broadcast(tr))
-          val methods = assocConf.methodList
-          val indicator = sc.broadcast(phenotype.indicate(traitName))
-          val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
-            .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
-          val currentGenotype = samples(genotype, indicator.value).cache()
-          val traitConfig = assocConf.`trait`(traitName)
-          val forPCA = variantsFilter(currentGenotype, List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"y\""))
-          val pc = if (traitConfig.pc == 0) {
+  def runTrait(traitName: String): Unit = {
+   // try {
+    logger.info(s"load trait $traitName from phenotype database")
+    phenotype.getTrait(traitName) match {
+      case Left(msg) => logger.warn(s"getting trait $traitName failed, skip")
+      case Right(tr) =>
+        val currentTrait = (traitName, sc.broadcast(tr))
+        val methods = assocConf.methodList
+        val indicator = sc.broadcast(phenotype.indicate(traitName))
+        val controls = sc.broadcast(phenotype.select(Pheno.Header.control).zip(indicator.value)
+          .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
+        val chooseSample = genotype.samples(indicator.value)(sc)
+        val cond = LogicalParser.parse("informative")
+        val currentGenotype = chooseSample.variants(cond)(ssc)
+        currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
+        val traitConfig = assocConf.`trait`(traitName)
+        /**
+        val pc = if (traitConfig.pc == 0) {
+          None
+        } else {
+          logger.info("perform PCA for genotype data")
+          val forPCA = currentGenotype
+            .variants(List("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"Y\""))(ssc)
+          val res =  new PCA(forPCA).pc(traitConfig.pc)
+          logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
+          Some(res)
+        }
+          */
+        val cov =
+          if (traitConfig.covariates.nonEmpty) {
+            val all = traitConfig.covariates ++ (1 to traitConfig.pc).map(i => s"_pc$i")
+            phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
+              case Left(msg) =>
+                logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
+                None
+              case Right(dm) =>
+                logger.info(s"COV dimension: ${dm.rows} x ${dm.cols}")
+                Some(dm)
+            }
+          } else
             None
-          } else {
-            Some(new PCA(forPCA)(geno).pc(traitConfig.pc))
-          }
-          val cov =
-            if (traitConfig.covariates.nonEmpty) {
-              phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
-                case Left(msg) =>
-                  logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
-                  None
-                case Right(dm) => Some(dm)
-              }
-            } else
-              None
-          val currentCov = sc.broadcast(for {p <- pc; c <- cov} yield DenseMatrix.horzcat(p, c))
-          methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
-      }
-    } catch {
-      case e: Exception => logger.warn(e.getStackTrace.toString)
+        val currentCov = sc.broadcast(cov)
+        methods.foreach(m => runTraitWithMethod(currentGenotype, currentTrait, currentCov, controls, m)(sc, cnf))
     }
   }
 
@@ -249,19 +263,38 @@ trait AssocMaster[A]{
                          method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
     val config = cnf.association
     val methodConfig = config.method(method)
-    val cond = methodConfig.misc.getStringList("variants").asScala.toList
-    val chosenVars = variantsFilter(currentGenotype, cond)
+    val cond = LogicalParser.parse(methodConfig.misc.getStringList("variants").asScala.toList)
+    val chosenVars = currentGenotype.variants(cond)(ssc)
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
+
+    encode.cache()
+    if (cnf.config.getBoolean("benchmark")) {
+      encode.foreach(_ => Unit)
+      logger.info("encoding completed")
+    }
+
+    if (method == "vt") {
+      val summary = encode.map{case (g, e) =>
+        s"$g variants: ${e.vars.length} thresholds: ${e.thresholds.getOrElse(Array()).length}"}.collect()
+      val pw = new PrintWriter(new File(s"output/encode_${method}_summary.txt"))
+      for (s <- summary) {
+        pw.write(s"$s\n")
+      }
+      pw.close()
+    }
+
     val permutation = methodConfig.resampling
     val test = methodConfig.test
     val binary = config.`trait`(currentTrait._1).binary
-
+    logger.info(s"run trait ${currentTrait._1} with method $method")
     if (methodConfig.`type` == MethodType.meta) {
-      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)
+      rareMetalWorker(encode, currentTrait._2, cov, binary, methodConfig)(sc)
     } else if (permutation) {
-      permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)
+      val res = permutationTest(encode, currentTrait._2, cov, binary, controls, methodConfig)(sc).toArray
+      writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
-      asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)
+      val res = asymptoticTest(encode, currentTrait._2, cov, binary, methodConfig)(sc).collect()
+      writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }
 }

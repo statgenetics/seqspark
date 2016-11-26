@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.ds
 
-import breeze.linalg.{inv, DenseVector, DenseMatrix}
+import breeze.linalg.{DenseMatrix, DenseVector, inv}
 
 /**
   * type safe matrix, from Evan R. Sparks

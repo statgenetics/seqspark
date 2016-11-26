@@ -1,12 +1,12 @@
 package org.dizhang.seqspark.meta
 
+import breeze.linalg.diag
 import org.dizhang.seqspark.annot.{IntervalTree, RefGene}
 import org.dizhang.seqspark.assoc.{RareMetalWorker => RMW}
+import org.dizhang.seqspark.ds.Variation
+import org.dizhang.seqspark.meta.RareMetal._
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.General._
-import RareMetal._
-import breeze.linalg.diag
-import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.util.UserConfig.MetaConfig
 
 /**
@@ -25,7 +25,7 @@ trait RareMetal {
         .map(l => (l.geneName, l.annotate(v, refGene.seq(l.mRNAName))))
         .groupBy(_._1).mapValues(x => x.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b))
         .toArray.map{x =>
-        val newV = Variation(v.chr, v.start, v.end, v.ref, v.alt)
+        val newV = Variation(v.chr, v.start, v.end, v.ref, v.alt, None)
         newV.addInfo(IK.gene, x._1)
         newV.addInfo(IK.func, x._2.toString)
         (x._1, newV)}

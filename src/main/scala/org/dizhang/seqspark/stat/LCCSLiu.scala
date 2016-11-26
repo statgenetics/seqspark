@@ -1,12 +1,11 @@
 package org.dizhang.seqspark.stat
 
 
-import breeze.linalg.{DenseVector => DV, sum}
+import breeze.linalg.{sum, DenseVector => DV}
 import breeze.numerics.pow
-import breeze.stats.distributions.ChiSquared
-import org.dizhang.seqspark.util.General.RichDouble
+import org.dizhang.seqspark.stat.LCCSLiu._
 import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
-import LCCSLiu._
+import org.dizhang.seqspark.util.General.RichDouble
 
 /**
   * Use Liu et al. to compute p value for
@@ -20,12 +19,9 @@ object LCCSLiu {
     override def toString = "Pvalue:   %10f".format(pvalue)
   }
 
-  trait CentralOneDF extends LCCSLiu {
+  trait CentralOneDF extends LinearCombinationChiSquare {
     def degreeOfFreedom = DV.ones[Double](size)
     def nonCentrality = DV.zeros[Double](size)
-    override def ck(k: Int): Double = {
-      sum(pow(lambda, k))
-    }
   }
 
   trait Old extends LCCSLiu {
@@ -48,22 +44,22 @@ trait LCCSLiu extends LinearCombinationChiSquare {
     val lbk = pow(lambda, k)
     (lbk dot degreeOfFreedom) + k * (lbk dot nonCentrality)
   }
-  val c1 = ck(1)
-  val c2 = ck(2)
-  val c3 = ck(3)
-  val c4 = ck(4)
-  val s1 = c3/c2.cube.sqrt
-  val s2 = c4/c2.square
-  val muQ = c1
-  val sigmaQ = (2 * c2).sqrt
-  private val squareOfS1LargerThanS2: Boolean = {
+  def c1:Double = ck(1)
+  def c2:Double = ck(2)
+  def c3:Double = ck(3)
+  def c4:Double = ck(4)
+  def s1:Double = c3/c2.cube.sqrt
+  def s2:Double = c4/c2.square
+  def muQ:Double = c1
+  def sigmaQ:Double = (2 * c2).sqrt
+  protected lazy val squareOfS1LargerThanS2: Boolean = {
     s1.square > s2
   }
-  val a: Double
-  val delta = if (squareOfS1LargerThanS2) s1 * a.cube - a.square else 0.0
-  val df: Double
-  val sigmaX = 2.0.sqrt * a
-  val muX = df + delta
+  def a: Double
+  def delta:Double = if (squareOfS1LargerThanS2) s1 * a.cube - a.square else 0.0
+  def df: Double
+  def sigmaX:Double = 2.0.sqrt * a
+  def muX:Double = df + delta
 
   def cdf(cutoff: Double): CDFLiu = {
     val nccs = NonCentralChiSquare(df + delta, delta)

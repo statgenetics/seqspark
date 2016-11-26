@@ -2,7 +2,7 @@ package org.dizhang.seqspark.ds
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.assoc.RareMetalWorker
-import SummaryStatistic._
+import org.dizhang.seqspark.ds.SummaryStatistic._
 
 /**
   * for rare metal

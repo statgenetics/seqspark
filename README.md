@@ -96,8 +96,6 @@ user@sepspark: ~$ SEQSpark SingleStudy SEQSpark-demo.conf
 
 The configuration file contains all the options of SEQSpark. 
 
-### Single study
-
 Under the root braces of the configuration file, you can set up general runtime options for a certain submission.
 
 ```json
@@ -107,4 +105,4 @@ dbDir = SEQSpark_db
 pipeline = [ qualityControl, association ]
 ```
 
-### Meta analysis
+### 

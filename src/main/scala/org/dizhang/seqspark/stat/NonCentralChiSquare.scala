@@ -1,6 +1,5 @@
 package org.dizhang.seqspark.stat
 
-import breeze.math._
 import breeze.numerics.{exp, gammp, gammq, lgamma}
 import breeze.stats.distributions.ChiSquared
 /**
@@ -290,7 +289,7 @@ object NonCentralChiSquare {
             nonCentrality: Double): NonCentralChiSquare = {
     if (nonCentrality == 0.0) {
       CCS(degrees)
-    } else if (degrees >= 200) {
+    } else if (nonCentrality >= 80) {
       NCCSBentonKrishnamoorthy(degrees, nonCentrality)
     } else {
       NCCSDing(degrees, nonCentrality)

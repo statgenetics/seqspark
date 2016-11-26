@@ -3,16 +3,16 @@ package org.dizhang.seqspark
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
-import org.slf4j.{Logger, LoggerFactory}
+import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import util.General._
+import org.slf4j.{Logger, LoggerFactory}
 /**
   * meta analysis
   */
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def main(args: Array[String]): Unit = {
+  def meta(args: Array[String]): Unit = {
 
     if (badArgs(args)) {
       logger.error(s"bad arguments format: '${args.mkString(" ")}'")

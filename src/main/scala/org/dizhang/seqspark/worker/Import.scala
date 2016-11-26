@@ -1,10 +1,10 @@
 package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.ds.{Region, Variant}
-import org.dizhang.seqspark.geno.GeneralizedVCF._
-import org.dizhang.seqspark.util.SingleStudyContext
-import org.dizhang.seqspark.util.{UserConfig => UC}
+import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
+import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig => UC}
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 8/13/16.
@@ -12,27 +12,35 @@ import org.dizhang.seqspark.util.{UserConfig => UC}
 
 object Import {
 
+  val logger = LoggerFactory.getLogger(getClass)
+
   def fromVCF(ssc: SingleStudyContext): Data[String] = {
+    logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
       case Left(UC.Samples.none) => true
       case _ => false
     }
-    val raw = sc.textFile(imConf.path)
+    val raw = sc.textFile(imConf.path, conf.jobs)
     val default = "0/0"
     val s1 = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default, noSample = noSample))
+    //s1.cache()
+    //logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
     val s2 = imConf.variants match {
       case Left(UC.Variants.all) => s1
       case Left(UC.Variants.exome) =>
         val coord = conf.annotation.RefSeq.getString("coord")
-        val exome = sc.broadcast(Regions.makeExome(coord))
+        val exome = sc.broadcast(Regions.makeExome(coord)(sc))
         s1 filter (v => exome.value.overlap(v.toRegion))
       case Left(_) => s1
       case Right(tree) => s1 filter (v => tree.overlap(v.toRegion))
     }
+    //s2.cache()
+    //s1.unpersist()
+    //logger.info(s"imported variants: ${s2.count()}")
     val s3 = if (noSample) {
       s2
     } else {
@@ -43,18 +51,20 @@ object Import {
           s2.samples(samples)(sc)
       }
     }
+    //s2.unpersist()
     s3
   }
 
   def fromImpute2(ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
+    logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val pheno = ssc.phenotype
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val imConf = conf.input
     val imputedFile = imConf.genotype.path
     val imputedInfoFile = imConf.genotype.path + "_info"
     val default = (1.0, 0.0, 0.0)
-    val imputedGeno = sc.textFile(imputedFile).map{l =>
+    val imputedGeno = sc.textFile(imputedFile, conf.jobs).map{l =>
       val v = Variant.fromImpute2(l, default)
       (v.toRegion, v)
     }
@@ -63,12 +73,15 @@ object Import {
       (Region(s(0), s(2).toInt), s(4))
     }
     val imputed = imputedGeno.leftOuterJoin(imputedInfo)
-    imputed.map{
+    val res = imputed.map{
       case (r, (v, Some(i))) =>
         v.addInfo("IMS", i)
         v
       case (r, (v, None)) =>
         v
     }
+    //logger.info(s"imported variants: ${res.count()}")
+    //res.unpersist()
+    res
   }
 }

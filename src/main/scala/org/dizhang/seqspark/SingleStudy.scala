@@ -1,17 +1,20 @@
 package org.dizhang.seqspark
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.dizhang.seqspark.ds.{Bed, Counter}
-import org.dizhang.seqspark.util.InputOutput._
-import org.dizhang.seqspark.util.UserConfig.RootConfig
-import com.typesafe.config.{Config, ConfigFactory}
 import java.io.File
 
-import org.dizhang.seqspark.pheno.Phenotype
+import com.typesafe.config.ConfigFactory
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.{SparkConf, SparkContext}
+import org.dizhang.seqspark.assoc.AssocMaster
+import org.dizhang.seqspark.ds.{Bed, Counter, Genotype, Phenotype}
+import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.InputOutput._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
-import org.dizhang.seqspark.worker.QualityControl
+import org.dizhang.seqspark.worker.{Import, QualityControl}
 import org.slf4j.LoggerFactory
-import util.General._
+
+import scala.collection.JavaConverters._
 
 /**
  * Main function
@@ -24,28 +27,44 @@ object SingleStudy {
   def main(args: Array[String]) {
     /** check args */
     if (badArgs(args)) {
+      logger.error(s"bad argument: ${args.mkString(" ")}")
       System.exit(1)
     }
 
     /** quick run */
-    val userConfFile = new File(args(0))
-    require(userConfFile.exists())
-    try {
-      val userConf = ConfigFactory
-        .parseFile(userConfFile)
-        .withFallback(ConfigFactory.load().getConfig("seqspark"))
-        .resolve()
 
-      val rootConf = RootConfig(userConf)
-      if (checkConf(rootConf))
+    try {
+
+      val rootConf = readConf(args(0))
+
+      if (checkConf(rootConf)) {
         run(rootConf)
+      } else {
+        logger.error("Configuration error, exit")
+      }
+
     } catch {
       case e: Exception => {
+        logger.error("Something went wrong, exit")
         e.printStackTrace()
       }
     }
   }
 
+  def readConf(file: String): RootConfig = {
+    val userConfFile = new File(file)
+    require(userConfFile.exists())
+    val userConf = ConfigFactory
+      .parseFile(userConfFile)
+      .withFallback(ConfigFactory.load().getConfig("seqspark"))
+      .resolve()
+
+    val show = userConf.root().render()
+
+    logger.debug("Conf detail:\n" + show)
+    val rootConfig = RootConfig(userConf)
+    rootConfig
+  }
 
   def checkConf(conf: RootConfig): Boolean = {
     if (! annot.CheckDatabase.qcTermsInDB(conf)) {
@@ -59,6 +78,7 @@ object SingleStudy {
       false
     } else {
       logger.info("Conf file fine")
+      new File(conf.outDir).mkdir()
       true
     }
   }
@@ -67,21 +87,53 @@ object SingleStudy {
     val project = cnf.project
 
     /** Spark configuration */
-    val scConf = new SparkConf().setAppName("SeqA-%s" format project)
+    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
+    sc.setCheckpointDir(cnf.dbDir + "/checkpoint")
 
-    val pipeline = cnf.pipeline
+    val ss: SparkSession = SparkSession
+      .builder()
+      .appName("SeqSpark Phenotype")
+      .getOrCreate()
 
-    val phenotype = Phenotype(cnf.input.phenotype.path, sc)
+    Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
 
-    implicit val ssc = SingleStudyContext(cnf, sc, phenotype)
+    implicit val ssc = SingleStudyContext(cnf, sc, ss)
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
-      runVCF
+      val clean = try {
+        val res = sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+        logger.info(s"read from cache, rec: ${res.count()}")
+        res
+      } catch {
+        case e: Exception =>
+          logger.info("no cache, compute from start")
+          val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
+          res.cache()
+          //res.saveAsObjectFile(cnf.project)
+          res
+      }
+      runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
-      runImputed
+      val clean = try {
+        val res =sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        logger.info(s"read from cache, rec: ${res.count()}")
+        res
+      } catch {
+        case e: Exception =>
+          logger.info("no cache, compute from start")
+          val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
+          res.cache()
+          if (cnf.config.getBoolean("benchmark")) {
+            res.foreach(_ => Unit)
+            logger.info("quality control completed")
+          }
+          //res.saveAsObjectFile(cnf.project)
+          res
+      }
+      runAssoc(clean)
     } else {
       logger.error(s"unrecognized genotype format ${cnf.input.genotype.format.toString}")
     }
@@ -100,14 +152,28 @@ object SingleStudy {
     //PropertyConfigurator.configure("log4j.properties")
   }
 
-  def runVCF(implicit ssc: SingleStudyContext): Unit = {
-    val input = worker.Import.fromVCF(ssc)
-    QualityControl.cleanVCF(input)
+  def runAssoc[A: Genotype](input: worker.Data[A])
+                           (implicit ssc: SingleStudyContext): Unit = {
+    if (ssc.userConfig.pipeline.length > 1) {
+      val assocConf = ssc.userConfig.association
+      val methods = assocConf.methodList
+      val annotated = if (methods.exists(m =>
+        assocConf.method(m).misc.getStringList("groupBy").asScala.contains("gene"))) {
+        annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+      } else {
+        input
+      }
+      annotated.cache()
+      if (ssc.userConfig.config.getBoolean("benchmark")) {
+        annotated.foreach(_ => Unit)
+        logger.info("functional annotation completed")
+      }
+      //annotated.map(v => v.site).saveAsTextFile("test")
+      val assoc = new AssocMaster(annotated)(ssc)
+      assoc.run()
+    }
   }
 
-  def runImputed(implicit ssc: SingleStudyContext): Unit = {
-    val input = worker.Import.fromImpute2(ssc)
-    QualityControl.cleanImputed(input)
-  }
+
 
 }

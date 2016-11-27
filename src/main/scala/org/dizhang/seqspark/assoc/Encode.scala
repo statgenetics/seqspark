@@ -370,7 +370,7 @@ abstract class Encode[A: Genotype] extends Serializable {
 
   def isDefined: Boolean
   def getCommon(cutoff: Double = fixedCutoff): Option[Common] = {
-    if (maf.forall(m => m < cutoff || m > (1 - cutoff))) {
+    if (maf.forall(_.isRare(cutoff))) {
       None
     } else {
       val res = DenseVector.horzcat(vars.zip(maf).filter(v =>
@@ -395,7 +395,7 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
 
   def getRare(cutoff: Double = fixedCutoff): Option[Encode.Rare] = {
-    if (maf.exists(m => m < cutoff || m > (1 - cutoff))) {
+    if (maf.exists(_.isRare(cutoff))) {
       val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(m => m < cutoff || m > (1 - cutoff)))
       val cnt = vars.zip(maf).filter(v => v._2 < cutoff || v._2 > (1 - cutoff)).map{ v =>
         v._1.toCounter(genotype.toBRV(_, v._2), 0.0).toMap}

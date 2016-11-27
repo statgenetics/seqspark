@@ -64,7 +64,7 @@ object AssocMaster {
     val sm: String = config.config.root().render()
     val res: RDD[(String, Encode[_])] = annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, sm))
-    ).filter{case (g, e) => e.isDefined && e.informative()}.map(x => x)
+    ).filter{case (_, e) => e.isDefined && e.informative()}.map(x => x)
     res
   }
 

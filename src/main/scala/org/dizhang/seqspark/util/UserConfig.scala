@@ -189,7 +189,7 @@ object UserConfig {
     }
     val smallSampleAdjustment: Boolean = {
       if (config.hasPath("smallSampleAdjustment"))
-        config.getBoolean("smallSmapleAdjustment")
+        config.getBoolean("smallSampleAdjustment")
       else
         true
     }

@@ -22,8 +22,8 @@ object SKATO {
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 0.999)
 
   def apply(nullModel: NullModel,
-            x: Encode[_]): SKATO = {
-    val method = x.config.misc.method
+            x: Encode[_],
+            method: String): SKATO = {
     method match {
       case "davies" => Davies(nullModel, x, method)
       case _ => LiuModified(nullModel, x, method)

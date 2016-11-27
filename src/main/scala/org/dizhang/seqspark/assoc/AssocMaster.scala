@@ -159,7 +159,8 @@ object AssocMaster {
         encode.map(p => (p._1, SKAT(nm.value, p._2, 0.0).result))
       case MethodType.skato =>
         val snm = sc.broadcast(SKATO.NullModel(reg))
-        encode.map(p => (p._1, SKATO(snm.value, p._2).result))
+        val method = config.misc.method
+        encode.map(p => (p._1, SKATO(snm.value, p._2, method).result))
       case _ =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))
         if (config.maf.getBoolean("fixed"))

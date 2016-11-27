@@ -300,7 +300,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
     .map(_._1))
   def numVars: Int = weight.length
-  lazy val misc = x.config.misc
+  //lazy val misc = x.config.misc
   def method: String
   lazy val rhos: Array[Double] = {
     method match {

@@ -26,7 +26,7 @@ class SKATSpec extends FlatSpec {
       val geno = randg.sample(2000).map(g => Genotype.Raw.toSimpleGenotype(gt(g)))
       Variant.fromIndexedSeq(meta, geno, 16.toByte)
     }
-    val sm = SharedMethod{method}
+    val sm = method.config.root().render()
     Encode(vars, None, None, None, sm)
   }
 

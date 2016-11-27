@@ -21,7 +21,7 @@ class EncodeSpec extends FlatSpec {
       val geno = randg.sample(1000).map(_.toByte)
       Variant.fromIndexedSeq(meta, geno, 0.toByte)
     }
-    val sm = SharedMethod{method}
+    val sm = method.config.root().render()
     Encode(vars, None, None, None, sm)
   }
 

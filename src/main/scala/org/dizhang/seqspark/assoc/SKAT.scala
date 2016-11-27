@@ -94,7 +94,16 @@ object SKAT {
                                rho: Double = 0.0) extends SKAT {
 
     def pValue: Option[Double] = {
-      lambda.map(l => 1.0 - LCCSLiu.Modified(l).cdf(qScore).pvalue)
+
+      lambda match {
+        case None => None
+        case Some(l) =>
+          val cdf = LCCSLiu.Modified(l).cdf(qScore)
+          if (cdf.ifault != 0.0)
+            None
+          else
+            Some(1.0 - cdf.pvalue)
+      }
     }
   }
   @SerialVersionUID(7727750401L)

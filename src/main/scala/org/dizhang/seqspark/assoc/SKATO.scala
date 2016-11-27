@@ -367,6 +367,13 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def pValue: Option[Double]
 
-  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, pMin, pValue)
+  def result = {
+    val vs = x.getRare().get.vars
+    paramOpt match {
+      case None => AssocMethod.AnalyticResult(vs, -1.0, None)
+      case Some(_) => AssocMethod.AnalyticResult(vs, pMin, pValue)
+    }
+
+  }
 
 }

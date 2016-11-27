@@ -13,8 +13,7 @@ import org.dizhang.seqspark.util.General.RichDouble
   */
 object LCCSLiu {
 
-  case class CDFLiu(pvalue: Double) extends LCCS.CDF {
-    def ifault = 0
+  case class CDFLiu(pvalue: Double, ifault: Double) extends LCCS.CDF {
     def trace = Array(0.0)
     override def toString = "Pvalue:   %10f".format(pvalue)
   }
@@ -25,12 +24,12 @@ object LCCSLiu {
   }
 
   trait Old extends LCCSLiu {
-    val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s1
-    val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else c2.cube/c3.square
+    def a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s1
+    def df = if (squareOfS1LargerThanS2) a.square - 2 * delta else c2.cube/c3.square
   }
   trait New extends LCCSLiu {
-    val a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s2.sqrt
-    val df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
+    def a = if (squareOfS1LargerThanS2) 1.0/(s1 - (s1.square - s2).sqrt) else 1.0/s2.sqrt
+    def df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
   }
   @SerialVersionUID(7778550101L)
   case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old
@@ -65,6 +64,11 @@ trait LCCSLiu extends LinearCombinationChiSquare {
     val nccs = NonCentralChiSquare(df + delta, delta)
     val norm =  (cutoff - muQ)/sigmaQ
     val norm1 = norm * sigmaX + muX
-    CDFLiu(nccs.cdf(norm1))
+    val pv = nccs.cdf(norm1)
+    if (pv >= 0.0 && pv <= 1.0) {
+      CDFLiu(pv, 0.0)
+    } else {
+      CDFLiu(pv, 1.0)
+    }
   }
 }

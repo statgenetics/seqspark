@@ -151,43 +151,43 @@ object UserConfig {
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
-    def groupBy: List[String] = {
+    val groupBy: List[String] = {
       if (config.hasPath("groupBy"))
         config.getStringList("groupBy").asScala.toList
       else
         List("gene")
     }
-    def variants: List[String] = {
+    val variants: List[String] = {
       if (config.hasPath("variants"))
         config.getStringList("variants").asScala.toList
       else
         List("isFunctional")
     }
-    def method: String = {
+    val method: String = {
       if (config.hasPath("method"))
         config.getString("method")
       else
         "liu.mod"
     }
-    def rCorr: Array[Double] = {
+    val rCorr: Array[Double] = {
       if (config.hasPath("rCorr"))
         config.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
       else
         Array[Double]()
     }
-    def kernel: String = {
+    val kernel: String = {
       if (config.hasPath("kernel"))
         config.getString("kernel")
       else
         "linear.weighted"
     }
-    def weightBete: List[Double] = {
+    val weightBete: List[Double] = {
       if (config.hasPath("weightBeta"))
         config.getDoubleList("weightBeta").asScala.toList.map(_.toDouble)
       else
         List(1.0, 25.0)
     }
-    def smallSampleAdjustment: Boolean = {
+    val smallSampleAdjustment: Boolean = {
       if (config.hasPath("smallSampleAdjustment"))
         config.getBoolean("smallSmapleAdjustment")
       else
@@ -196,12 +196,12 @@ object UserConfig {
   }
 
   case class MethodConfig(config: Config) extends UserConfig {
-    def `type` = MethodType.withName(config.getString("type"))
-    def weight = WeightMethod.withName(config.getString("weight"))
-    def maf = config.getConfig("maf")
-    def resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
-    def test = TestMethod.withName("score")
-    def misc: MiscConfig = MiscConfig(config.getConfig("misc"))
+    val `type` = MethodType.withName(config.getString("type"))
+    val weight = WeightMethod.withName(config.getString("weight"))
+    val maf = config.getConfig("maf")
+    val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
+    val test = TestMethod.withName("score")
+    val misc: MiscConfig = MiscConfig(config.getConfig("misc"))
   }
 
   case class TraitConfig(config: Config) extends UserConfig {

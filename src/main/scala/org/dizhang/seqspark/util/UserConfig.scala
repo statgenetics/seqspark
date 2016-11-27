@@ -71,38 +71,39 @@ object UserConfig {
 
   case class RootConfig(config: Config) extends UserConfig {
 
-    def project = config.getString("project")
-    def localDir = config.getString("localDir")
-    def outDir = localDir + "/output"
-    def dbDir = config.getString("dbDir")
-    def pipeline = config.getStringList("pipeline").asScala.toList
-    def jobs = config.getInt("jobs")
+    val project = config.getString("project")
+    val localDir = config.getString("localDir")
+    val outDir = localDir + "/output"
+    val dbDir = config.getString("dbDir")
+    val pipeline = config.getStringList("pipeline").asScala.toList
+    val jobs = config.getInt("jobs")
+    val benchmark = config.getBoolean("benchmark")
 
-    def qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
+    val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
-    def input = InputConfig(config.getConfig("input"))
-    def annotation = AnnotationConfig(config.getConfig("annotation"))
-    def association = AssociationConfig(config.getConfig("association"))
+    val input = InputConfig(config.getConfig("input"))
+    val annotation = AnnotationConfig(config.getConfig("annotation"))
+    val association = AssociationConfig(config.getConfig("association"))
   }
 
   case class InputConfig(config: Config) extends UserConfig {
-    def genotype = GenotypeConfig(config.getConfig("genotype"))
-    def phenotype = PhenotypeConfig(config.getConfig("phenotype"))
+    val genotype = GenotypeConfig(config.getConfig("genotype"))
+    val phenotype = PhenotypeConfig(config.getConfig("phenotype"))
   }
 
   case class GenotypeConfig(config: Config) extends UserConfig {
 
-    def format = ImportGenotypeType.withName(config.getString("format"))
+    val format = ImportGenotypeType.withName(config.getString("format"))
 
 
-    def path = config.getString("path")
+    val path = config.getString("path")
 
 
-    def filters = config.getStringList("filters").asScala.toArray
+    val filters = config.getStringList("filters").asScala.toArray
 
-    def genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+    val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
-    def samples: Either[Samples.Value, String] = {
+    val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {
         case "all" => Left(Samples.all)
         case "none" => Left(Samples.none)
@@ -110,7 +111,7 @@ object UserConfig {
       }
     }
 
-    def variants: Either[Variants.Value, Regions] = {
+    val variants: Either[Variants.Value, Regions] = {
       val file = """file://(.+)""".r
       config.getString("variants") match {
         case "all" => Left(Variants.all)
@@ -122,14 +123,14 @@ object UserConfig {
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
-    def path = config.getString("path")
-    def batch = config.getString("batch")
+    val path = config.getString("path")
+    val batch = config.getString("batch")
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
-    def genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
-    def variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
-    def summaries = config.getStringList("summaries").asScala.toList
+    val genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
+    val variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
+    val summaries = config.getStringList("summaries").asScala.toList
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {

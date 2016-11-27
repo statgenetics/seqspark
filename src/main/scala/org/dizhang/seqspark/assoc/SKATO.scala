@@ -305,8 +305,8 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val rhos: Array[Double] = {
     method match {
       case "optimal.adj" => RhosAdj
-      case "optimal" => RhosOld
-      case _ => misc.rCorr
+      case _ => RhosOld
+      //case _ => misc.rCorr
     }
   }
   /**

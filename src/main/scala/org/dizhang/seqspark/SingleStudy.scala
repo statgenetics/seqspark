@@ -2,7 +2,7 @@ package org.dizhang.seqspark
 
 import java.io.File
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 import org.dizhang.seqspark.assoc.AssocMaster
@@ -89,7 +89,7 @@ object SingleStudy {
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
+    scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
     sc.setCheckpointDir(cnf.dbDir + "/checkpoint")
 
@@ -126,7 +126,7 @@ object SingleStudy {
           logger.info("no cache, compute from start")
           val res = QualityControl.cleanImputed(Import.fromImpute2(ssc))
           res.cache()
-          if (cnf.config.getBoolean("benchmark")) {
+          if (cnf.benchmark) {
             res.foreach(_ => Unit)
             logger.info("quality control completed")
           }
@@ -164,7 +164,7 @@ object SingleStudy {
         input
       }
       annotated.cache()
-      if (ssc.userConfig.config.getBoolean("benchmark")) {
+      if (ssc.userConfig.benchmark) {
         annotated.foreach(_ => Unit)
         logger.info("functional annotation completed")
       }

@@ -237,7 +237,7 @@ object UserConfig {
   }
 
 }
-@SerialVersionUID(1L)
-sealed trait UserConfig extends Serializable {
+
+sealed trait UserConfig {
   def config: Config
 }

@@ -188,7 +188,7 @@ object AssocMaster {
       case _: AssocMethod.ResamplingResult => pw.write("name\tvars\tstatistic\tp-count\tp-value\n")
       case _ => pw.write("name\tvars\tstatistic\tp-value\n")
     }
-    res.sortBy(p => p._2.pValue).foreach{p =>
+    res.sortBy(p => p._2.pValue match {case None => 2.0; case Some(x) => x}).foreach{p =>
       pw.write("%s\t%s\n".format(p._1, p._2.toString))
     }
     pw.close()

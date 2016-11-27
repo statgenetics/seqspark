@@ -1,8 +1,8 @@
 package org.dizhang.seqspark.util
 
-import breeze.linalg.{*, CSCMatrix, DenseVector, eigSym, DenseMatrix => DM}
+import breeze.linalg.{*, CSCMatrix, DenseVector, eigSym, sum, DenseMatrix => DM}
 import breeze.numerics._
-import breeze.integrate._
+import breeze.linalg.linspace
 import scala.annotation.tailrec
 
 /**
@@ -80,6 +80,47 @@ object General {
 
   def simpson2(h: Double, fa: Double, fm: Double, fb: Double): Double = {
     (fa + 4* fm + fb) * h/3
+  }
+  def simpsonN(h: Double, fn: DenseVector[Double]): Double = {
+    val n = fn.length
+    val s = fn(0) + fn(-1) + 2.0 * sum(fn(Range(2, n, 2))) + 4.0 * sum(fn(Range(1,n,2)))
+    s * h / 3
+  }
+
+  def quadratureN(fun: DenseVector[Double] => DenseVector[Double],
+                  a: Double, b: Double,
+                  cells: Int = 80,
+                  maxLevel: Int = 2000,
+                  tol: Double = 1e-6): Option[Double] = {
+    @tailrec
+    def quadra(intervals: List[(Double, Double, Double)], acc: Double, level: Int): Option[Double] = {
+      if (level > maxLevel) {
+        None
+      } else {
+        if (intervals.isEmpty) {
+          Some(acc)
+        } else {
+          val cur = intervals.head
+          val a = cur._1
+          val b = cur._2
+          val m = (a + b)/2
+          val old = cur._3
+          val fl = fun(linspace(a, m, cells))
+          val fr = fun(linspace(m, b, cells))
+          val left = simpsonN((m-a)/cells, fl)
+          val right = simpsonN((b-m)/cells, fr)
+          val all = left + right
+          if (abs(all - old) > tol) {
+            val newIntervals = (m, b, right) :: (a, m, left) :: intervals.tail
+            quadra(newIntervals, acc, level + 1)
+          } else {
+            quadra(intervals.tail, acc + all, level)
+          }
+        }
+      }
+    }
+    val init = simpsonN((b-a)/cells, fun(linspace(a, b, cells)))
+    quadra(List((a, b, init)), 0.0, 0)
   }
 
   /** this class is to hold the interval end points and their values a, f(a), b, f(b) */

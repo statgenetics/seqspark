@@ -1,13 +1,15 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.integrate._
+import breeze.numerics._
 import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
-import breeze.numerics.pow
+import breeze.numerics.{lgamma, pow}
 import breeze.stats.distributions.ChiSquared
+import org.apache.spark.ml.linalg.DenseVector
 import org.dizhang.seqspark.assoc.SKATO._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
+
 import scala.collection.JavaConverters._
 import scala.language.existentials
 /**
@@ -241,13 +243,38 @@ object SKATO {
       term1.cdf(tmpQ) * term2.pdf(x)
     }
 
+    def df1pdf(x: DV[Double]): DV[Double] = {
+      (pow(x, -0.5) :* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
+    }
+    def dfcdf(x: DV[Double]): DV[Double] = {
+      gammp(df/2, x/2.0)
+    }
+
+    def integralFunc2(x: DV[Double]): DV[Double] = {
+      val tmp1: DM[Double] = tile(tauDV, 1, x.length) * diag(x)
+      val tmp: DM[Double] = (tile(pmqDV, 1, x.length) - tmp1) :/ tile(rDV, 1, x.length)
+      val tmpMin: DV[Double] = min(tmp(::, *)).t
+      val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN) 0.0 else i)
+    }
 
     def pValue: Option[Double] = {
       (paramOpt, lambdaUsOpt) match {
         case (None, _) => None
         case (_, (None, _)) => None
         case (_, _) =>
-          val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
+          val re = quadratureN(integralFunc2, 1e-6, 39.5 + 1e-6, 320)
+          re.map(1.0 - _)
+      }
+    }
+
+
+    def pValue2: Option[Double] = {
+      (paramOpt, lambdaUsOpt) match {
+        case (None, _) => None
+        case (_, (None, _)) => None
+        case (_, _) =>
+          val re = quadrature(integralFunc, 1e-6, 39.5 + 1e-6)
           re.map(1.0 - _)
       }
     }

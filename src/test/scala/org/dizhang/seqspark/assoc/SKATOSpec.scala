@@ -2,7 +2,7 @@ package org.dizhang.seqspark.assoc
 
 import java.io.{File, PrintWriter}
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.{DenseMatrix, DenseVector, linspace}
 import breeze.numerics.pow
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
@@ -12,12 +12,12 @@ import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.General._
-import org.scalatest.FlatSpec
+import org.scalatest.{FlatSpec, Matchers}
 
 /**
   * Created by zhangdi on 11/23/16.
   */
-class SKATOSpec extends FlatSpec {
+class SKATOSpec extends FlatSpec with Matchers {
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
 
   val encode: Encode[Byte] = {
@@ -43,7 +43,17 @@ class SKATOSpec extends FlatSpec {
     val reg = LinearRegression(y, dm.t)
     SKATO.NullModel(reg)
   }
+  def time[R](block: => R)(tag: String): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    println(s"$tag Elapsed time: " + (t1 - t0)/1e6 + "ms")
+    result
+  }
+
   "A SKATO" should "be fine" in {
+
+
 
     /**
     val pw = new PrintWriter(new File("skat.data"))
@@ -65,18 +75,25 @@ class SKATOSpec extends FlatSpec {
     //println(so.param)
     //println("pmin.q" + so.pMinQuantiles.mkString(","))
 
-    //val so = SKATO(nullModel, encode)
-    /**
+    val so = SKATO(nullModel, encode, "optimal.adj")
+    val xv = linspace(1e-10, 19 + 1e-10, 20)
     so match {
       case x: LiuPValue =>
-        for (i <- 1 to 10) {
-          println(s"int ${pow(10.0, -i)}: ${x.integralFunc(pow(10.0, -i))}")
-        }
+        time {
+          x.pValue2
+        }("old")
+        time {
+          x.pValue
+        }("new")
+        val old = for (i <- xv) yield x.integralFunc(i)
+        //println(s"old: df=${x.df} " + old.toArray.mkString(","))
+        //println(s"new: df=${x.df} " + x.integralFunc2(xv).toArray.mkString(","))
+
+        x.pValue.get should be (x.pValue2.get +- 1e-3)
         //println(s"adaptive quatrature ${quadrature(x.integralFunc, 0, 40)}")
         //println(s"simpson ${simpson(x.integralFunc, 1e-6,1, 2000)}")
         //println(s"tra ${trapezoid(x.integralFunc, 1e-6,1, 2000)}")
     }
-    */
     //val pz = so.P0SqrtZ(0 to 5, ::)
     //for (i <- 0 until pz.rows) {
     //  println(pz(i, ::).t.toArray.mkString(","))

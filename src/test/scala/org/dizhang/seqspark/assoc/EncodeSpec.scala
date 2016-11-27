@@ -2,6 +2,7 @@ package org.dizhang.seqspark.assoc
 
 import breeze.stats.distributions.Binomial
 import com.typesafe.config.ConfigFactory
+import org.dizhang.seqspark.assoc.Encode.SharedMethod
 import org.dizhang.seqspark.ds.Variant
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.scalatest.FlatSpec
@@ -20,7 +21,8 @@ class EncodeSpec extends FlatSpec {
       val geno = randg.sample(1000).map(_.toByte)
       Variant.fromIndexedSeq(meta, geno, 0.toByte)
     }
-    Encode(vars, None, None, None, method)
+    val sm = SharedMethod{method}
+    Encode(vars, None, None, None, sm)
   }
 
   "thresholds" should "work" in {

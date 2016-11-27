@@ -4,6 +4,7 @@ import breeze.linalg._
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
+import org.dizhang.seqspark.assoc.Encode.SharedMethod
 import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
@@ -25,7 +26,8 @@ class SKATSpec extends FlatSpec {
       val geno = randg.sample(2000).map(g => Genotype.Raw.toSimpleGenotype(gt(g)))
       Variant.fromIndexedSeq(meta, geno, 16.toByte)
     }
-    Encode(vars, None, None, None, method)
+    val sm = SharedMethod{method}
+    Encode(vars, None, None, None, sm)
   }
 
   val nullModel = {

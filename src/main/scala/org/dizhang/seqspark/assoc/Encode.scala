@@ -20,6 +20,16 @@ import org.dizhang.seqspark.util.UserConfig._
 
 object Encode {
 
+
+  class SharedMethod(makeConfig: => MethodConfig) extends Serializable {
+    @transient private lazy val instance: MethodConfig = makeConfig
+    def get: MethodConfig = instance
+  }
+  object SharedMethod {
+    def apply(makeConfig: => MethodConfig): SharedMethod = new SharedMethod(makeConfig)
+  }
+
+
   type Imputed = (Double, Double, Double)
 
   val DummySV = SparseVector.fill[Double](1)(0.0)
@@ -69,62 +79,62 @@ object Encode {
             controls: Option[Array[Boolean]] = None,
             y: Option[DenseVector[Double]],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A] = {
-    val codingScheme = config.`type`
-    val mafSource = config.maf.getString("source")
-    val weightMethod = config.weight
+                         sm: SharedMethod): Encode[A] = {
+    val codingScheme = sm.get.`type`
+    val mafSource = sm.get.maf.getString("source")
+    val weightMethod = sm.get.weight
     (codingScheme, mafSource, weightMethod) match {
       case (MethodType.brv, "controls", WeightMethod.erec) =>
-        apply(vars, controls.get, y.get, cov, config)
+        apply(vars, controls.get, y.get, cov, sm)
       case (MethodType.brv, _, WeightMethod.erec) =>
-        apply(vars, y.get, cov, config)
+        apply(vars, y.get, cov, sm)
       case (_, "controls", _) =>
-        apply(vars, controls.get, config)
+        apply(vars, controls.get, sm)
       case (_, _, _) =>
-        apply(vars, config)
+        apply(vars, sm)
     }
   }
 
-  def apply[A: Genotype](varsIter: Iterable[Variant[A]], config: MethodConfig): Encode[A]= {
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]], sm: SharedMethod): Encode[A]= {
     val vars = varsIter.toArray
-    config.`type` match {
-      case MethodType.snv => DefaultSingle(vars, config)
-      case MethodType.cmc => DefaultCMC(vars, config)
-      case MethodType.brv => SimpleBRV(vars, config)
-      case MethodType.skat => SimpleBRV(vars, config)
-      case MethodType.skato => SimpleBRV(vars, config)
-      case MethodType.meta => DefaultRaw(vars, config)
-      case _ => DefaultCMC(vars, config)
+    sm.get.`type` match {
+      case MethodType.snv => DefaultSingle(vars, sm)
+      case MethodType.cmc => DefaultCMC(vars, sm)
+      case MethodType.brv => SimpleBRV(vars, sm)
+      case MethodType.skat => SimpleBRV(vars, sm)
+      case MethodType.skato => SimpleBRV(vars, sm)
+      case MethodType.meta => DefaultRaw(vars, sm)
+      case _ => DefaultCMC(vars, sm)
     }
   }
 
-  def apply[A: Genotype](varsIter: Iterable[Variant[A]], controls: Array[Boolean], config: MethodConfig): Encode[A]= {
+  def apply[A: Genotype](varsIter: Iterable[Variant[A]], controls: Array[Boolean], sm: SharedMethod): Encode[A]= {
     val vars = varsIter.toArray
-    config.`type` match {
-      case MethodType.snv => ControlsMafSingle(vars, controls, config)
-      case MethodType.cmc => ControlsMafCMC(vars, controls, config)
-      case MethodType.brv => ControlsMafSimpleBRV(vars, controls, config)
-      case MethodType.skat => ControlsMafSimpleBRV(vars, controls, config)
-      case MethodType.skato => ControlsMafSimpleBRV(vars, controls, config)
-      case MethodType.meta => ControlsMafRaw(vars, controls, config)
-      case _ => ControlsMafCMC(vars, controls, config)
+    sm.get.`type` match {
+      case MethodType.snv => ControlsMafSingle(vars, controls, sm)
+      case MethodType.cmc => ControlsMafCMC(vars, controls, sm)
+      case MethodType.brv => ControlsMafSimpleBRV(vars, controls, sm)
+      case MethodType.skat => ControlsMafSimpleBRV(vars, controls, sm)
+      case MethodType.skato => ControlsMafSimpleBRV(vars, controls, sm)
+      case MethodType.meta => ControlsMafRaw(vars, controls, sm)
+      case _ => ControlsMafCMC(vars, controls, sm)
     }
   }
 
   def apply[A: Genotype](varsIter: Iterable[Variant[A]],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A] = {
-    ErecBRV(varsIter.toArray, y, cov, config)
+                         sm: SharedMethod): Encode[A] = {
+    ErecBRV(varsIter.toArray, y, cov, sm)
   }
 
   def apply[A: Genotype](varsIter: Iterable[Variant[A]],
             controls: Array[Boolean],
             y: DenseVector[Double],
             cov: Option[DenseMatrix[Double]],
-            config: MethodConfig): Encode[A] = {
+                         sm: SharedMethod): Encode[A] = {
     val vars = varsIter.toArray
-    ControlsMafErecBRV(vars, controls, y, cov, config)
+    ControlsMafErecBRV(vars, controls, y, cov, sm)
   }
 
   trait Coding
@@ -241,53 +251,53 @@ object Encode {
   }
 
   case class DefaultRaw[A: Genotype](vars: Array[Variant[A]],
-                           config: MethodConfig)
+                                     sm: SharedMethod)
     extends Encode[A] with Raw[A] with PooledOrAnnotationMaf[A]
 
   case class ControlsMafRaw[A: Genotype](vars: Array[Variant[A]],
                             controls: Array[Boolean],
-                            config: MethodConfig)
+                                         sm: SharedMethod)
     extends Encode[A] with Raw[A] with ControlsMaf[A]
 
   case class DefaultSingle[A: Genotype](vars: Array[Variant[A]],
-                           config: MethodConfig)
+                                        sm: SharedMethod)
     extends Encode[A] with Single[A] with PooledOrAnnotationMaf[A]
 
   case class ControlsMafSingle[A: Genotype](vars: Array[Variant[A]],
                                controls: Array[Boolean],
-                               config: MethodConfig)
+                                            sm: SharedMethod)
     extends Encode[A] with Single[A] with ControlsMaf[A]
 
   case class DefaultCMC[A: Genotype](vars: Array[Variant[A]],
-                        config: MethodConfig)
+                                     sm: SharedMethod)
     extends Encode[A] with CMC[A] with PooledOrAnnotationMaf[A]
 
   case class ControlsMafCMC[A: Genotype](vars: Array[Variant[A]],
                             controls: Array[Boolean],
-                            config: MethodConfig)
+                                         sm: SharedMethod)
     extends Encode[A] with CMC[A] with ControlsMaf[A]
 
   case class SimpleBRV[A: Genotype](vars: Array[Variant[A]],
-                       config: MethodConfig)
+                                    sm: SharedMethod)
     extends Encode[A] with BRV[A] with PooledOrAnnotationMaf[A] with SimpleWeight[A]
 
 
   case class ControlsMafSimpleBRV[A: Genotype](vars: Array[Variant[A]],
                                   controls: Array[Boolean],
-                                  config: MethodConfig)
+                                               sm: SharedMethod)
     extends Encode[A] with BRV[A] with ControlsMaf[A] with SimpleWeight[A]
 
   case class ErecBRV[A: Genotype](vars: Array[Variant[A]],
                      y: DenseVector[Double],
                      cov: Option[DenseMatrix[Double]],
-                     config: MethodConfig)
+                                  sm: SharedMethod)
     extends Encode[A] with BRV[A] with PooledOrAnnotationMaf[A] with LearnedWeight[A]
 
   case class ControlsMafErecBRV[A: Genotype](vars: Array[Variant[A]],
                                 controls: Array[Boolean],
                                 y: DenseVector[Double],
                                 cov: Option[DenseMatrix[Double]],
-                                config: MethodConfig)
+                                             sm: SharedMethod)
     extends Encode[A] with BRV[A] with ControlsMaf[A] with LearnedWeight[A]
 
 
@@ -313,7 +323,8 @@ abstract class Encode[A: Genotype] extends Serializable {
   def mafCount: Array[(Double, Double)]
   def maf: Array[Double]
   def sampleSize: Int = if (vars.isEmpty) 0 else vars.head.length
-  def config: MethodConfig
+  def sm: SharedMethod
+  def config: MethodConfig = sm.get
   lazy val fixedCutoff: Double = config.maf.getDouble("cutoff")
   def thresholds: Option[Array[Double]] = {
     val n = sampleSize

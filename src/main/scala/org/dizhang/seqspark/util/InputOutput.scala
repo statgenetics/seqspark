@@ -3,11 +3,14 @@ package org.dizhang.seqspark.util
 import java.io._
 
 import breeze.linalg.DenseMatrix
+import com.esotericsoftware.kryo.io.Output
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.Variant
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
+import com.esotericsoftware.kryo.{Kryo, Serializer}
+import com.typesafe.config.Config
 
 import scala.io.Source
 /**
@@ -144,4 +147,9 @@ object InputOutput {
     baos.toByteArray
   }
 
+  /**
+  class ConfigSerializer extends Serializer[Config] {
+    override def write(kryo: Kryo, output: Output, `object`: Config) = ???
+  }
+  */
 }

@@ -21,7 +21,7 @@ object QualityControl {
 
     annotated.cache()
     annotated.checkpoint()
-    if (conf.config.getBoolean("benchmark")) {
+    if (conf.benchmark) {
       annotated.foreach(_ => Unit)
       logger.info("annotated data ready")
     }
@@ -42,7 +42,7 @@ object QualityControl {
 
     simpleVCF.cache()
     simpleVCF.checkpoint()
-    if (conf.config.getBoolean("benchmark")) {
+    if (conf.benchmark) {
       simpleVCF.foreach(_ => Unit)
       logger.info("genotype QC completed")
     }

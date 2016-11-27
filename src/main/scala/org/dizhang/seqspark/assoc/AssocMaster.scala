@@ -9,6 +9,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.assoc.AssocMaster._
+import org.dizhang.seqspark.assoc.Encode.SharedMethod
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Genotype, Phenotype}
@@ -49,6 +50,7 @@ object AssocMaster {
     //val sampleSize = y.value.length
     val codingScheme = config.`type`
     val groupBy = config.misc.groupBy
+    val sm = SharedMethod {config}
     val annotated = codingScheme match {
       case MethodType.snv =>
         currentGenotype.map(v => (v.toVariation().toString(), v)).groupByKey()
@@ -62,7 +64,7 @@ object AssocMaster {
     }
 
     val res: RDD[(String, Encode[_])] = annotated.map(p =>
-      (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, config))
+      (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, sm))
     ).filter{case (g, e) => e.isDefined && e.informative()}.map(x => x)
     res
   }
@@ -269,7 +271,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val encode = makeEncode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
     encode.cache()
-    if (cnf.config.getBoolean("benchmark")) {
+    if (cnf.benchmark) {
       encode.foreach(_ => Unit)
       logger.info("encoding completed")
     }

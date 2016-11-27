@@ -256,7 +256,9 @@ object SKATO {
   @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
                          x: Encode[_],
-                         method: String) extends LiuPValue with AsymptoticKur {
+                         method: String) extends LiuPValue with AsymptoticKur
+
+  {
     //lazy val kurQ = {
     //  12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
     //}

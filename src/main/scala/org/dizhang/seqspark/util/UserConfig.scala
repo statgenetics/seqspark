@@ -239,6 +239,7 @@ object UserConfig {
 
 }
 
-sealed trait UserConfig {
-  def config: Config
+sealed trait UserConfig extends Serializable {
+
+  @transient def config: Config
 }

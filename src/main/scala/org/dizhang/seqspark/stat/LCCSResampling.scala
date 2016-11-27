@@ -28,7 +28,7 @@ class LCCSResampling(val lambda: DV[Double],
   def cdf(cutoff: Double): CDFLiu = {
     val cs = new ChiSquared(df)
     val norm = (cutoff - muQ) * (2 * df).sqrt/varQ.sqrt + df
-    CDFLiu(cs.cdf(norm))
+    CDFLiu(cs.cdf(norm), 0)
   }
 }
 

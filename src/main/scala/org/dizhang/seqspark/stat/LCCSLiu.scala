@@ -13,7 +13,7 @@ import org.dizhang.seqspark.util.General.RichDouble
   */
 object LCCSLiu {
 
-  case class CDFLiu(pvalue: Double, ifault: Double) extends LCCS.CDF {
+  case class CDFLiu(pvalue: Double, ifault: Int) extends LCCS.CDF {
     def trace = Array(0.0)
     override def toString = "Pvalue:   %10f".format(pvalue)
   }
@@ -66,9 +66,9 @@ trait LCCSLiu extends LinearCombinationChiSquare {
     val norm1 = norm * sigmaX + muX
     val pv = nccs.cdf(norm1)
     if (pv >= 0.0 && pv <= 1.0) {
-      CDFLiu(pv, 0.0)
+      CDFLiu(pv, 0)
     } else {
-      CDFLiu(pv, 1.0)
+      CDFLiu(pv, 1)
     }
   }
 }

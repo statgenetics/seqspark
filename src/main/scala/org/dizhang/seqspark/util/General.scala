@@ -87,6 +87,88 @@ object General {
     s * h / 3
   }
 
+  def simpsonScan(cur: (Double, Double),
+                  fun: DenseVector[Double] => DenseVector[Double],
+                  cells: Int,
+                  tol: Double): (Double, List[(Double, Double)]) = {
+    require(cells >= 32 && cells%16 == 0)
+    val a = cur._1
+    val b = cur._2
+    val h = (b-a)/cells
+    val fn = fun(linspace(a, b, cells + 1))
+    //println(s"${fn.toArray.zipWithIndex.filter(_._1 != 0.0).map(p => s"(${p._1},${a + p._2 * h})").mkString("::")}")
+
+    /**
+    val left = simpsonN(2*h, fn(Range(0, cells/2 + 1, 2)))
+    val leftLeft = simpsonN(h,fn(Range(0, cells/4 + 1)))
+    val leftRight = simpsonN(h, fn(Range(cells/4, cells/2 + 1)))
+    val right = simpsonN(2*h, fn(Range(cells/2, cells + 1, 2)))
+    val rightLeft = simpsonN(h, fn(Range(cells/2, cells * 3/ 4 + 1)))
+    val rightRight = simpsonN(h, fn(Range(cells * 3/4, cells + 1)))
+    var intervals: List[(Double, Double)] = Nil
+    var acc = 0.0
+    if (abs(leftLeft + leftRight - left) > tol) {
+      intervals = (a, (a+b)/2) :: intervals
+    } else {
+      acc += left
+    }
+    if (abs(rightLeft + rightRight - right) > tol) {
+      intervals = ((a+b)/2, b) :: intervals
+    } else {
+      acc += right
+    }
+    (acc, intervals)
+
+      */
+
+    var i = 0
+    var acc = 0.0
+    var intervals: List[(Int, Int)] = Nil
+    val step = cells/4
+    while (i < 4) {
+      val left = simpsonN(h, fn(Range(i * step, i * step + step/2 + 1, 1)))
+      val right = simpsonN(h, fn(Range(i * step + step/2, i * step + step + 1, 1)))
+      val all = simpsonN(2*h, fn(Range(i * step, i * step + step + 1, 2)))
+      //println(s"i: $i left: $left right: $right all: $all")
+      if (abs(left + right - all) > tol) {
+        intervals =
+          intervals match {
+            case Nil => (i, i + 1) :: intervals
+            case l => (i, i+1) :: l
+          }
+      } else {
+        acc += all
+      }
+      i += 1
+    }
+    (acc, intervals.map(p => (a + step * h * p._1, a + step * h * p._2)))
+
+
+  }
+
+  def quadratureScan(fun: DenseVector[Double] => DenseVector[Double],
+                     a: Double, b: Double,
+                     cells: Int = 80,
+                     maxLevel: Int = 1000,
+                     tol: Double = 1e-6): Option[Double] = {
+    @tailrec
+    def quadra(intervals: List[(Double, Double)], acc: Double, level: Int): Option[Double] = {
+      if (level > maxLevel) {
+        None
+      } else {
+        if (intervals.isEmpty) {
+          Some(acc)
+        } else {
+          val cur = intervals.head
+          val res = simpsonScan(cur, fun, cells, tol)
+          //println(s"level: $level res: ${res._1 + acc} intervals: ${(res._2 ::: intervals.tail).mkString("::")}")
+          quadra(intervals.tail ::: res._2, acc + res._1, level + 1)
+        }
+      }
+    }
+    quadra(List(a -> b), 0.0, 0)
+  }
+
   def quadratureN(fun: DenseVector[Double] => DenseVector[Double],
                   a: Double, b: Double,
                   cells: Int = 80,
@@ -100,13 +182,14 @@ object General {
         if (intervals.isEmpty) {
           Some(acc)
         } else {
+          //println(s"old level: $level res: $acc intervals: ${intervals.mkString("::")}")
           val cur = intervals.head
           val a = cur._1
           val b = cur._2
           val m = (a + b)/2
           val old = cur._3
-          val fl = fun(linspace(a, m, cells))
-          val fr = fun(linspace(m, b, cells))
+          val fl = fun(linspace(a, m, cells + 1))
+          val fr = fun(linspace(m, b, cells + 1))
           val left = simpsonN((m-a)/cells, fl)
           val right = simpsonN((b-m)/cells, fr)
           val all = left + right

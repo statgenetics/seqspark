@@ -74,26 +74,30 @@ class SKATOSpec extends FlatSpec with Matchers {
     //println("pvals: " + so.pValues.mkString(","))
     //println(so.param)
     //println("pmin.q" + so.pMinQuantiles.mkString(","))
-
+    /**
     val so = SKATO(nullModel, encode, "optimal.adj")
-    val xv = linspace(1e-10, 19 + 1e-10, 20)
+    //val xv = linspace(1e-10, 19 + 1e-10, 20)
     so match {
       case x: LiuPValue =>
         time {
-          x.pValue2
-        }("old")
+          //for (i <- 0 to 10)
+          //  println(x.pValue.get)
+        }("adaptive")
         time {
-          x.pValue
-        }("new")
-        val old = for (i <- xv) yield x.integralFunc(i)
+          //for (i <- 0 to 10)
+          //  println(x.pValue3.get)
+        }("naive")
+
+        //val old = for (i <- xv) yield x.integralFunc(i)
         //println(s"old: df=${x.df} " + old.toArray.mkString(","))
         //println(s"new: df=${x.df} " + x.integralFunc2(xv).toArray.mkString(","))
 
-        x.pValue.get should be (x.pValue2.get +- 1e-3)
+        //x.pValue.get should be (x.pValue3.get +- 5e-3)
         //println(s"adaptive quatrature ${quadrature(x.integralFunc, 0, 40)}")
         //println(s"simpson ${simpson(x.integralFunc, 1e-6,1, 2000)}")
         //println(s"tra ${trapezoid(x.integralFunc, 1e-6,1, 2000)}")
     }
+    */
     //val pz = so.P0SqrtZ(0 to 5, ::)
     //for (i <- 0 until pz.rows) {
     //  println(pz(i, ::).t.toArray.mkString(","))

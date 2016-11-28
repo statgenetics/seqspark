@@ -257,14 +257,43 @@ object SKATO {
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN) 0.0 else i)
     }
+    def pValue3: Option[Double] = {
+      (paramOpt, lambdaUsOpt) match {
+        case (None, _) => None
+        case (_, (None, _)) => None
+        case (_, _) =>
+          val re = quadratureN(integralFunc2, 1e-6, 40.0 + 1e-6, 320)
+          re.map(1.0 - _)
+      }
+    }
 
+    /** adaptive pvalue
+      * integration is a little bit heavy here
+      * */
     def pValue: Option[Double] = {
       (paramOpt, lambdaUsOpt) match {
         case (None, _) => None
         case (_, (None, _)) => None
         case (_, _) =>
-          val re = quadratureN(integralFunc2, 1e-6, 39.5 + 1e-6, 320)
-          re.map(1.0 - _)
+          var continue: Boolean = true
+          var i: Int = 0
+          var last: Option[Double] = None
+          var cur: Option[Double] = None
+          while (continue) {
+            //println(s"here we go: $i")
+            cur = quadratureScan(integralFunc2, 1e-6, 40.0 + 1e-6, 320, (i + 1) * 1000, 1e-5 * pow(10, -i * 2))
+            continue =
+              cur match {
+                case None =>
+                  cur = last
+                  false //if no pvalue,
+                case Some(v) =>
+                  last = cur
+                  (1.0 - v) < 1e-4 * pow(10, -i * 2)
+              }
+            i += 1
+          }
+          cur.map(1.0 - _)
       }
     }
 
@@ -274,7 +303,7 @@ object SKATO {
         case (None, _) => None
         case (_, (None, _)) => None
         case (_, _) =>
-          val re = quadrature(integralFunc, 1e-6, 39.5 + 1e-6)
+          val re = quadrature(integralFunc, 1e-6, 40.0 + 1e-6)
           re.map(1.0 - _)
       }
     }

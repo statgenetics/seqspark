@@ -44,14 +44,14 @@ class EncodeSpec extends FlatSpec with BeforeAndAfter with Matchers {
 
 
 
-  "thresholds" should "work" in {
-    val a = sc.parallelize(Array.fill(10)(1.0))
-    val sm = ConfigFactory.load().getConfig("seqspark.association.method.vt").root().render()
-    val ec = a.map(x => Encode(EncodeSpec.vars, None, None, None, sm))
-    val cnt = ec.map(_.config.`type`).collect()
-    cnt.length should be (10)
+  //"thresholds" should "work" in {
+    //val a = sc.parallelize(Array.fill(10)(1.0))
+    //val sm = ConfigFactory.load().getConfig("seqspark.association.method.vt").root().render()
+    //val ec = a.map(x => Encode(EncodeSpec.vars, None, None, None, sm))
+    //val cnt = ec.map(_.config.`type`).collect()
+    //cnt.length should be (10)
     //val th = encode.thresholds.get
     //println(th.mkString(","))
-  }
+  //}
 
 }

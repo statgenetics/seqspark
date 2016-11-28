@@ -255,7 +255,7 @@ object SKATO {
       val tmp: DM[Double] = (tile(pmqDV, 1, x.length) - tmp1) :/ tile(rDV, 1, x.length)
       val tmpMin: DV[Double] = min(tmp(::, *)).t
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
-      (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN) 0.0 else i)
+      (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
     }
     def pValue3: Option[Double] = {
       (paramOpt, lambdaUsOpt) match {

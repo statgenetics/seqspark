@@ -15,7 +15,7 @@ import scala.reflect.ClassTag
 
 object Variant {
   val THRESHOLD = 0.25
-  val MINIMIUM = 10000
+  val MINIMIUM = 1000
 
   def fill[A: Genotype](meta: Array[String], size: Int)(default: A): Variant[A] = {
     if (size == 0) {

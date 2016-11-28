@@ -19,7 +19,7 @@ object QualityControl {
     val sc = ssc.sparkContext
     val annotated =  linkVariantDB(decompose(input))(conf, sc)
 
-    annotated.cache()
+    //annotated.cache()
     annotated.checkpoint()
     if (conf.benchmark) {
       annotated.foreach(_ => Unit)

@@ -69,7 +69,7 @@ object LogicalParser {
     logExpr match {
       case T => true
       case F => false
-      case EX(id) => vm(id) == "1"
+      case EX(id) => vm.contains(id)
       case LT(id, v) => vm(id).toDouble < v
       case LE(id, v) => vm(id).toDouble <= v
       case GT(id, v) => vm(id).toDouble > v

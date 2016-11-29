@@ -3,7 +3,8 @@ package org.dizhang.seqspark.worker
 import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
-import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig => UC}
+import org.dizhang.seqspark.util.LogicalParser.LogExpr
+import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext, UserConfig => UC}
 import org.slf4j.LoggerFactory
 
 /**
@@ -15,43 +16,89 @@ object Import {
   val logger = LoggerFactory.getLogger(getClass)
 
   def fromVCF(ssc: SingleStudyContext): Data[String] = {
+
+    def pass(l: String)
+            (logExpr: LogExpr,
+             names: Set[String],
+             regions: Option[Regions] = None): Boolean = {
+      /** This function "pass"
+        * check if this variant should be included
+        * before parse the whole line
+        * */
+      val isNotComment: Boolean = !l.startsWith("#")
+      val cond = {
+        if (logExpr == LogicalParser.T) {
+          true
+        } else {
+          /** grab the first 8 fields using regex,
+            * split will be slow when the line is very long
+            * */
+          val metaMatcher = """^([^\t]*\t){7}[^\t]*""".r
+          val meta: Array[String] = metaMatcher.findFirstIn(l).get.split("\t")
+          /** prepare the var map for the logical expression */
+          val vmf = Map("FILTER" -> meta(6)) //the FORMAT field
+          val vmi = if (names.exists(p => p.startsWith("INFO."))) {
+            Variant.parseInfo(meta(7)).map { case (k, v) => s"INFO.$k" -> v }
+          } else {
+            Map.empty[String, String]
+          } //the info filed
+          val in = if (regions.isEmpty) {
+            /** none is yes, no need to do the interval tree search */
+            true
+          } else {
+            val start = meta(1).toInt
+            val end = start + meta(4).split(",").map(_.length).max
+            val r = Region(meta(0), start, end)
+            regions.get.overlap(r)
+          }
+          LogicalParser.eval(logExpr)(vmf ++ vmi) && in
+        }
+      }
+      isNotComment && cond
+    }
     logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
+    val coord = conf.annotation.RefSeq.getString("coord")
+    val exome = sc.broadcast(Regions.makeExome(coord)(sc))
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
       case Left(UC.Samples.none) => true
       case _ => false
     }
+    val filter = imConf.filter
+    val terms = LogicalParser.names(filter)
     val raw = sc.textFile(imConf.path, conf.jobs)
     val default = "0/0"
-    val s1 = raw filter (l => ! l.startsWith("#") ) map (l => Variant.fromString(l, default, noSample = noSample))
-    //s1.cache()
-    //logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
-    val s2 = imConf.variants match {
-      case Left(UC.Variants.all) => s1
+    /** prepare a regions tree to filter variants */
+    val regions = sc.broadcast(imConf.variants match {
+      case Left(UC.Variants.all) => None
       case Left(UC.Variants.exome) =>
         val coord = conf.annotation.RefSeq.getString("coord")
-        val exome = sc.broadcast(Regions.makeExome(coord)(sc))
-        s1 filter (v => exome.value.overlap(v.toRegion))
-      case Left(_) => s1
-      case Right(tree) => s1 filter (v => tree.overlap(v.toRegion))
-    }
-    //s2.cache()
-    //s1.unpersist()
+        Some(Regions.makeExome(coord)(sc))
+      case Left(_) => None
+      case Right(tree) => Some(tree)
+    })
+    /** filter variants based on meta information
+      * before making the actual genotype data for each sample
+      * */
+    val s1 = raw.filter{l =>
+      pass(l)(filter, terms, regions.value)
+    }.map(l => Variant.fromString(l, default, noSample = noSample))
+    //logger.info(s"total variants: ${s1.count()} in ${imConf.path}")
     //logger.info(s"imported variants: ${s2.count()}")
+    /** now filter unwanted samples if specified */
     val s3 = if (noSample) {
-      s2
+      s1
     } else {
       imConf.samples match {
-        case Left(_) => s2
+        case Left(_) => s1
         case Right(s) =>
           val samples = pheno.indicate(s)
-          s2.samples(samples)(sc)
+          s1.samples(samples)(sc)
       }
     }
-    //s2.unpersist()
     s3
   }
 

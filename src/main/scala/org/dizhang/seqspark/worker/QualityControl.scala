@@ -20,21 +20,22 @@ object QualityControl {
     val annotated =  linkVariantDB(decompose(input))(conf, sc)
 
     //annotated.cache()
-    annotated.checkpoint()
-    if (conf.benchmark) {
-      annotated.foreach(_ => Unit)
-      logger.info("annotated data ready")
+    val sums = ssc.userConfig.qualityControl.summaries
+    if (sums.contains("gdgq")) {
+      annotated.checkpoint()
+      statGdGq(annotated)(ssc)
+      if (conf.benchmark) {
+        annotated.foreach(_ => Unit)
+        logger.info("annotated data ready")
+      }
     }
 
-    val sums = ssc.userConfig.qualityControl.summaries
 
     if (sums.contains("annotation")) {
       countByFunction(annotated)
     }
 
-    if (sums.contains("gdgq")) {
-      statGdGq(annotated)(ssc)
-    }
+
 
     val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
 

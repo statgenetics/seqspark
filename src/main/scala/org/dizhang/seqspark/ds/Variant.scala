@@ -101,6 +101,17 @@ object Variant {
     }
   }
 
+  def parseInfo(info: String): Map[String, String] = {
+    if (info == ".")
+      Map[String, String]()
+    else
+      (for {
+        item <- info.split(";")
+        s = item.split("=")
+        if item != "."
+      } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+  }
+
   def mutType(ref: String, alt: String): MutType.Value = {
     val cnvReg = """[\[\]\<\>]""".r
     cnvReg.findFirstIn(alt) match {
@@ -192,14 +203,7 @@ abstract class Variant[A: Genotype] extends Serializable {
   }
 
   def parseInfo: Map[String, String] = {
-    if (this.info == ".")
-      Map[String, String]()
-    else
-      (for {
-        item <- this.info.split(";")
-        s = item.split("=")
-        if item != "."
-      } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+    Variant.parseInfo(info)
   }
 
   def addInfo(key: String): Unit = {

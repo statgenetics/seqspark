@@ -99,7 +99,9 @@ object UserConfig {
     val path = config.getString("path")
 
 
-    val filters = config.getStringList("filters").asScala.toArray
+    //val filters = config.getStringList("filters").asScala.toArray
+
+    val filter: LogExpr = LogicalParser.parse(config.getStringList("filter").asScala.toList)
 
     val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 

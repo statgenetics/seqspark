@@ -17,21 +17,6 @@ import scala.collection.JavaConverters._
 package object annot {
   val logger = LoggerFactory.getLogger(getClass)
 
-  val CHRLEN = Array[Int](250, 244, 199, 191, 181, 172, 160, 147, 142, 136, 136,
-    134, 116, 108, 103, 91, 82, 79, 60, 64,49, 52, 156, 60)
-
-  object VariationPartitioner extends Partitioner {
-    def numPartitions = CHRLEN.sum + 1
-    def getPartition(key: Any): Int = key match {
-      case Variation(chr, start, _, _, _, _) =>
-        if (chr == 0) {
-          CHRLEN.sum
-        } else {
-          CHRLEN.slice(0, chr - 1).sum + start/1000000
-        }
-      case _ => CHRLEN.sum
-    }
-  }
 
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = getDBs(conf.qualityControl.variants)

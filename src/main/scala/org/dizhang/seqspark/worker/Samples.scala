@@ -103,24 +103,24 @@ object Samples {
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val fid = pheno.select("fid").map(_.get)
-    logger.info(s"fid ${fid.length}")
+    //logger.info(s"fid ${fid.length}")
     val iid = pheno.select("iid").map(_.get)
-    logger.info(s"fid ${iid.length}")
+    //logger.info(s"fid ${iid.length}")
     val sex = pheno.select("sex").map{
       case None => "NA"
       case Some(s) => s
     }
-    logger.info(s"sex ${sex.length}")
+    //logger.info(s"sex ${sex.length}")
     val pw = new PrintWriter(new File(outFile))
     pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
-    logger.info(s"before counter")
+    //logger.info(s"before counter")
     val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
     val y: Counter[(Double, Double)] = data._2.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
-    logger.info(s"this should be the sample size: ${iid.length} ${x.length} ${y.length}")
+    //logger.info(s"this should be the sample size: ${iid.length} ${x.length} ${y.length}")
     for (i <- iid.indices) {
       pw.write("%s,%s,%s,%f,%f,%f,%f\n" format (fid(i), iid(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
     }
     pw.close()
-    logger.info("are we done now?")
+    //logger.info("are we done now?")
   }
 }

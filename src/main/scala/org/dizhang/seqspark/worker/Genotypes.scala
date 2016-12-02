@@ -33,7 +33,9 @@ object Genotypes {
     //logger.info("still all right?")
     val first = self.first()
     val fm = first.format.split(":").toList
-    val all = self.map(v =>
+    val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
+    /** this function works on raw data, so limit to a subset can greatly enhance the performance*/
+    val all = self.sample(withReplacement = false, frac).map(v =>
       v.toCounter(makeGdGq(_, fm), new Int2IntOpenHashMap(Array(0), Array(1)))
         .reduceByKey(keyFunc))
     //logger.info("going to reduce")

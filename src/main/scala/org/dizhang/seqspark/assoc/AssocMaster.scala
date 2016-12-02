@@ -53,7 +53,7 @@ object AssocMaster {
       case MethodType.snv =>
         currentGenotype.map(v => (v.toVariation().toString(), v)).groupByKey()
       case MethodType.meta =>
-        currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1e6}", v)).groupByKey()
+        currentGenotype.map(v => (s"${v.chr}:${v.pos.toInt/1000000}", v)).groupByKey()
       case _ =>
         (groupBy match {
           case "slidingWindow" :: s => currentGenotype.flatMap(v => v.groupByRegion(s.head.toInt, s(1).toInt))
@@ -69,7 +69,7 @@ object AssocMaster {
   }
 
   def adjustForCov(binaryTrait: Boolean,
-                  y: DenseVector[Double],
+                   y: DenseVector[Double],
                   cov: DenseMatrix[Double]): Regression = {
       if (binaryTrait) {
         LogisticRegression(y, cov)
@@ -155,6 +155,9 @@ object AssocMaster {
     logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
     logger.info(s"covariates design matrix rank: ${rank(reg.xs)}")
     config.`type` match {
+      case MethodType.snv =>
+        val nm = sc.broadcast(ScoreTest.NullModel(reg))
+        encode.map(p => (p._1, SNV.AnalyticTest(nm.value, p._2).result))
       case MethodType.skat =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))
         encode.map(p => (p._1, SKAT(nm.value, p._2, 0.0).result))

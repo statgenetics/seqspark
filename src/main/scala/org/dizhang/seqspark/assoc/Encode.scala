@@ -143,12 +143,14 @@ object Encode {
 
   sealed trait Raw[A] extends Encode[A] {
     lazy val isDefined = maf.exists(m => m > 0.0 && m < 1.0)
+    override def informative(cutoff: Double) = true
     def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
     def weight = DummyDV
   }
 
   sealed trait Single[A] extends Encode[A] {
     override def getRare(cutoff: Double) = None
+    override def informative(cutoff: Double) = true
     def weight = DummyDV
     lazy val isDefined = maf.exists(m => m.isCommon(fixedCutoff))
     def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)

@@ -39,16 +39,16 @@ case class LinearRegression(responses: DenseVector[Double], independents: DenseM
   extends Regression {
 
   val coefficients = {
-    val qrMatrix = qr(xs)
-    val r1 = qrMatrix.r(0 until xs.cols, ::)
-    val q1 = qrMatrix.q(::, 0 until xs.cols)
+    val qrMatrix = qr.reduced(xs)
+    val r1 = qrMatrix.r
+    val q1 = qrMatrix.q
     inv(r1) * (q1.t * responses)
   }
 
   val estimates = xs * coefficients
 
   lazy val residualsVariance = sum(pow(residuals, 2))/residuals.length.toDouble
-  lazy val xsRotated = if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
+  lazy val xsRotated = xs //if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
   lazy val information: DenseMatrix[Double] = xsRotated.t * xsRotated * residualsVariance
 
 }
@@ -97,7 +97,7 @@ case class LogisticRegression(responses: DenseVector[Double],
 
   lazy val residualsVariance: DenseVector[Double] = estimates :* estimates.map(1.0 - _)
 
-  lazy val xsRotated = if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
+  lazy val xsRotated = xs //if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
 
   lazy val information: DenseMatrix[Double] = {
     /** this is essentially (xs.t * diag(residualsVariance) * xs) */

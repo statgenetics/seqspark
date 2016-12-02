@@ -6,14 +6,14 @@ import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.worker.Genotypes._
 import org.dizhang.seqspark.worker.Samples._
 import org.dizhang.seqspark.worker.Variants._
-import org.slf4j.LoggerFactory
+import org.slf4j.{LoggerFactory, Logger}
 
 /**
   * Created by zhangdi on 9/25/16.
   */
 object QualityControl {
 
-  val logger = LoggerFactory.getLogger(getClass)
+  val logger: Logger = LoggerFactory.getLogger(getClass)
 
   def cleanVCF(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
     logger.info("start quality control")
@@ -25,11 +25,11 @@ object QualityControl {
     val sums = ssc.userConfig.qualityControl.summaries
     if (sums.contains("gdgq")) {
       annotated.checkpoint()
-      statGdGq(annotated)(ssc)
       if (conf.benchmark) {
         annotated.foreach(_ => Unit)
         logger.info("annotated data ready")
       }
+      statGdGq(annotated)(ssc)
     }
 
 

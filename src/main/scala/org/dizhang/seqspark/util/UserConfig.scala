@@ -1,10 +1,11 @@
 package org.dizhang.seqspark.util
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.annot._
+import org.dizhang.seqspark.ds.Region
+import org.dizhang.seqspark.util.LogicalParser.LogExpr
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 /**
@@ -49,7 +50,7 @@ object UserConfig {
     val skato = Value("skato")
     val meta = Value("meta")
     val cmc = Value("cmc")
-    val brv = Value("burden")
+    val brv = Value("brv")
     val snv = Value("snv")
   }
 
@@ -70,36 +71,41 @@ object UserConfig {
 
   case class RootConfig(config: Config) extends UserConfig {
 
-    def project = config.getString("project")
-    def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
-    def pipeline = config.getStringList("pipeline").asScala.toList
+    val project = config.getString("project")
+    val localDir = config.getString("localDir")
+    val outDir = localDir + "/output"
+    val dbDir = config.getString("dbDir")
+    val pipeline = config.getStringList("pipeline").asScala.toList
+    val jobs = config.getInt("jobs")
+    val benchmark = config.getBoolean("benchmark")
 
-    def qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
+    val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
-    def input = InputConfig(config.getConfig("input"))
-    def annotation = AnnotationConfig(config.getConfig("annotation"))
-    def association = AssociationConfig(config.getConfig("association"))
+    val input = InputConfig(config.getConfig("input"))
+    val annotation = AnnotationConfig(config.getConfig("annotation"))
+    val association = AssociationConfig(config.getConfig("association"))
   }
 
   case class InputConfig(config: Config) extends UserConfig {
-    def genotype = GenotypeConfig(config.getConfig("genotype"))
-    def phenotype = PhenotypeConfig(config.getConfig("phenotype"))
+    val genotype = GenotypeConfig(config.getConfig("genotype"))
+    val phenotype = PhenotypeConfig(config.getConfig("phenotype"))
   }
 
   case class GenotypeConfig(config: Config) extends UserConfig {
 
-    def format = ImportGenotypeType.withName(config.getString("format"))
+    val format = ImportGenotypeType.withName(config.getString("format"))
 
 
-    def path = config.getString("path")
+    val path = config.getString("path")
 
 
-    def filters = config.getStringList("filters").asScala.toArray
+    //val filters = config.getStringList("filters").asScala.toArray
 
-    def genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+    val filter: LogExpr = LogicalParser.parse(config.getStringList("filter").asScala.toList)
 
-    def samples: Either[Samples.Value, String] = {
+    val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+
+    val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {
         case "all" => Left(Samples.all)
         case "none" => Left(Samples.none)
@@ -107,7 +113,7 @@ object UserConfig {
       }
     }
 
-    def variants: Either[Variants.Value, Regions] = {
+    val variants: Either[Variants.Value, Regions] = {
       val file = """file://(.+)""".r
       config.getString("variants") match {
         case "all" => Left(Variants.all)
@@ -119,13 +125,14 @@ object UserConfig {
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
-    def path = config.getString("path")
-    def batch = config.getString("batch")
+    val path = config.getString("path")
+    val batch = config.getString("batch")
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
-    def genotypes = config.getStringList("genotypes").asScala.toList
-    def variants = config.getStringList("variants").asScala.toList
+    val genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
+    val variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
+    val summaries = config.getStringList("summaries").asScala.toList
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {
@@ -146,15 +153,58 @@ object UserConfig {
     def filters = config.getStringList("filters").asScala.toArray
   }
 
-  case class MethodConfig(config: Config) extends UserConfig {
-    def `type` = MethodType.withName(config.getString("type"))
-    def weight = WeightMethod.withName(config.getString("weight"))
-    def maf = config.getConfig("maf")
-    def resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
-    def test = TestMethod.withName("score")
-    def misc: Config = {
-      if (config.hasPath("misc")) config.getConfig("misc") else ConfigFactory.empty()
+  case class MiscConfig(config: Config) extends UserConfig {
+    val groupBy: List[String] = {
+      if (config.hasPath("groupBy"))
+        config.getStringList("groupBy").asScala.toList
+      else
+        List("gene")
     }
+    val variants: List[String] = {
+      if (config.hasPath("variants"))
+        config.getStringList("variants").asScala.toList
+      else
+        List("isFunctional")
+    }
+    val method: String = {
+      if (config.hasPath("method"))
+        config.getString("method")
+      else
+        "liu.mod"
+    }
+    val rCorr: Array[Double] = {
+      if (config.hasPath("rCorr"))
+        config.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
+      else
+        Array[Double]()
+    }
+    val kernel: String = {
+      if (config.hasPath("kernel"))
+        config.getString("kernel")
+      else
+        "linear.weighted"
+    }
+    val weightBete: List[Double] = {
+      if (config.hasPath("weightBeta"))
+        config.getDoubleList("weightBeta").asScala.toList.map(_.toDouble)
+      else
+        List(1.0, 25.0)
+    }
+    val smallSampleAdjustment: Boolean = {
+      if (config.hasPath("smallSampleAdjustment"))
+        config.getBoolean("smallSampleAdjustment")
+      else
+        true
+    }
+  }
+
+  case class MethodConfig(config: Config) extends UserConfig {
+    val `type` = MethodType.withName(config.getString("type"))
+    val weight = WeightMethod.withName(config.getString("weight"))
+    val maf = config.getConfig("maf")
+    val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
+    val test = TestMethod.withName("score")
+    val misc: MiscConfig = MiscConfig(config.getConfig("misc"))
   }
 
   case class TraitConfig(config: Config) extends UserConfig {
@@ -181,7 +231,7 @@ object UserConfig {
   case class MetaConfig(config: Config) extends UserConfig {
     def project = config.getString("project")
     def localDir = config.getString("localDir")
-    def hdfsDir = config.getString("hdfsDir")
+    def dbDir = config.getString("dbDir")
     def studies = config.getStringList("studies").asScala.toArray
     def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
@@ -191,6 +241,7 @@ object UserConfig {
 
 }
 
-sealed trait UserConfig {
-  def config: Config
+sealed trait UserConfig extends Serializable {
+
+  @transient def config: Config
 }

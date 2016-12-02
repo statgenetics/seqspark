@@ -1,7 +1,6 @@
 package org.dizhang.seqspark.annot
 
-import com.typesafe.config.ConfigValue
-import org.dizhang.seqspark.util.LogicalExpression
+import org.dizhang.seqspark.util.LogicalParser
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.LoggerFactory
 
@@ -16,7 +15,7 @@ object CheckDatabase {
 
   def qcTermsInDB(conf: RootConfig): Boolean = {
     val qcVars = conf.qualityControl.variants
-    val qcTerms = qcVars.flatMap(s => LogicalExpression.analyze(s)).toSet
+    val qcTerms = LogicalParser.names(qcVars)
     val dbRegex = """(\w+)\.(\w+)""".r
     val dbTerms = getDBterms(qcTerms).toArray.map{
       case dbRegex(db, field) => (db, field)
@@ -52,10 +51,9 @@ object CheckDatabase {
     val methodList = assConf.methodList
     methodList.forall{m =>
       val mConf = assConf.method(m)
-      if (mConf.misc.hasPath("variants")) {
-        val assTerms = mConf.misc.getStringList("variants").asScala.toArray.flatMap(s =>
-          LogicalExpression.analyze(s)
-        ).toSet
+      if (mConf.misc.variants.nonEmpty) {
+        val cond = LogicalParser.parse(mConf.misc.variants)
+        val assTerms = LogicalParser.names(cond)
         val dbRegex = """(\w+)\.(\w+)""".r
         val dbTerms = assTerms.filter{
           case dbRegex(_, _) => true

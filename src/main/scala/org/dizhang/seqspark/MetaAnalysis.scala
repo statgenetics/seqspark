@@ -3,9 +3,9 @@ package org.dizhang.seqspark
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
-import org.slf4j.{Logger, LoggerFactory}
+import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import util.General._
+import org.slf4j.{Logger, LoggerFactory}
 /**
   * meta analysis
   */

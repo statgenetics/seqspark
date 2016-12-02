@@ -1,7 +1,8 @@
 package org.dizhang.seqspark.util
 
-import scala.sys.process._
 import com.typesafe.config.Config
+
+import scala.sys.process._
 /**
   * This is for the task that can be run concurrently, include but not
   * limited to external commands like plink and king

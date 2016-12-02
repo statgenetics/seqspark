@@ -2,6 +2,7 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg.{*, CSCMatrix, DenseMatrix, DenseVector, SparseVector, inv, sum}
 import breeze.numerics.pow
+import org.dizhang.seqspark.stat.ScoreTest.NullModel
 import org.dizhang.seqspark.util.General._
 /**
   * score test for regression model

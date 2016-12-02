@@ -3,10 +3,10 @@ package org.dizhang.seqspark.meta
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.RareMetalWorker
 import org.dizhang.seqspark.ds.{SummaryStatistic, Variation}
-import org.dizhang.seqspark.util.UserConfig.{MetaConfig, TraitConfig}
-import org.slf4j.LoggerFactory
-import MetaMaster._
+import org.dizhang.seqspark.meta.MetaMaster._
 import org.dizhang.seqspark.util.MetaAnalysisContext
+import org.dizhang.seqspark.util.UserConfig.TraitConfig
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 6/13/16.

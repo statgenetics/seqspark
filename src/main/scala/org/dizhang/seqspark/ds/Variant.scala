@@ -1,8 +1,8 @@
 package org.dizhang.seqspark.ds
 
-import scala.annotation.tailrec
 import org.dizhang.seqspark.util.UserConfig.MutType
 
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 /**
@@ -15,9 +15,9 @@ import scala.reflect.ClassTag
 
 object Variant {
   val THRESHOLD = 0.25
-  val MINIMIUM = 10000
+  val MINIMIUM = 1000
 
-  def fill[A](meta: Array[String], size: Int)(default: A): Variant[A] = {
+  def fill[A: Genotype](meta: Array[String], size: Int)(default: A): Variant[A] = {
     if (size == 0) {
       DummyVariant(meta, default)
     } else {
@@ -44,7 +44,7 @@ object Variant {
     }
   }
 
-  def fromIndexedSeq[A](meta: Array[String], iseq: IndexedSeq[A], default: A): Variant[A] = {
+  def fromIndexedSeq[A: Genotype](meta: Array[String], iseq: IndexedSeq[A], default: A): Variant[A] = {
     if (iseq.isEmpty)
       fill(meta, 0)(default)
     else {
@@ -56,7 +56,7 @@ object Variant {
         DenseVariant(meta, iseq, default, denseSize)
     }
   }
-  def fromMap[A](meta: Array[String], m: Map[Int, A], default: A, size: Int): Variant[A] = {
+  def fromMap[A: Genotype](meta: Array[String], m: Map[Int, A], default: A, size: Int): Variant[A] = {
     if (m.isEmpty)
       fill[A](meta, size)(default)
     else {
@@ -70,35 +70,46 @@ object Variant {
     }
   }
 
-  def toIndexedSeq[A](m: Map[Int, A], default: A, size: Int): IndexedSeq[A] = {
+  def toIndexedSeq[A: Genotype](m: Map[Int, A], default: A, size: Int): IndexedSeq[A] = {
     val buf = collection.mutable.Buffer.fill[A](size)(default)
     m.foreach {case (idx, v) => buf(idx) = v}
     IndexedSeq(buf: _*)
   }
 
-  def toIndexedSeq[A](v: Variant[A]): IndexedSeq[A] =
+  def toIndexedSeq[A: Genotype](v: Variant[A]): IndexedSeq[A] =
     v match {
       case DenseVariant(_, iseq, _, _) => iseq
       case SparseVariant(_, m, default, size) => toIndexedSeq(m, default, size)
       case DummyVariant(_, _) => IndexedSeq[A]()
     }
 
-  def toMap[A](iseq: IndexedSeq[A], default: A): Map[Int, A] =
+  def toMap[A: Genotype](iseq: IndexedSeq[A], default: A): Map[Int, A] =
     iseq.view.zipWithIndex.filter { _._1 != default }.map { _.swap }.toMap
 
-  def toMap[A](v: Variant[A]): Map[Int, A] =
+  def toMap[A: Genotype](v: Variant[A]): Map[Int, A] =
     v match {
       case DenseVariant(_, iseq, default, _) => toMap(iseq, default)
       case SparseVariant(_, m, _, _) => m
       case DummyVariant(_, _) => Map.empty[Int, A]
     }
 
-  def toCounter[A, B](variant: Variant[A], make: A => B, default: B): Counter[B] = {
+  def toCounter[A: Genotype, B](variant: Variant[A], make: A => B, default: B): Counter[B] = {
     variant match {
       case DenseVariant(_, iseq, _, _) => Counter.fromIndexedSeq(iseq.map(make), default)
       case SparseVariant(_, m, _, size) => Counter.fromMap(m.map(x => x._1 -> make(x._2)), default, size)
       case DummyVariant(_, _) => Counter.fill(0)(default)
     }
+  }
+
+  def parseInfo(info: String): Map[String, String] = {
+    if (info == ".")
+      Map[String, String]()
+    else
+      (for {
+        item <- info.split(";")
+        s = item.split("=")
+        if item != "."
+      } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
   }
 
   def mutType(ref: String, alt: String): MutType.Value = {
@@ -118,7 +129,7 @@ object Variant {
 }
 
 @SerialVersionUID(7737820001L)
-sealed trait Variant[A] extends Serializable {
+abstract class Variant[A: Genotype] extends Serializable {
 
   def size: Int
   def default: A
@@ -144,7 +155,7 @@ sealed trait Variant[A] extends Serializable {
   def geno(implicit make: A => String): IndexedSeq[String] =
     Variant.toIndexedSeq(this.map(g => make(g)))
 
-  def map[B](f: A => B): Variant[B]
+  def map[B: Genotype](f: A => B): Variant[B]
 
   def select(indicator: Array[Boolean]): Variant[A]
 
@@ -192,16 +203,22 @@ sealed trait Variant[A] extends Serializable {
   }
 
   def parseInfo: Map[String, String] = {
-    if (this.info == ".")
-      Map[String, String]()
-    else
-      (for {item <- this.info.split(";")
-            s = item.split("=")}
-        yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+    Variant.parseInfo(info)
+  }
+
+  def addInfo(key: String): Unit = {
+    if (! this.parseInfo.contains(key)) {
+      this.meta(7) = s"$info;$key"
+    }
   }
 
   def addInfo(key: String, value: String): Unit = {
-    require(! this.parseInfo.contains(key))
+    //require(! this.parseInfo.contains(key))
+
+    if (this.parseInfo.contains(key)) {
+      println(s"WARN: info key exists -- key: $key value: ${parseInfo(key)} new value: $value")
+    }
+
     this.meta(7) = s"$info;$key=$value"
   }
 
@@ -242,12 +259,12 @@ sealed trait Variant[A] extends Serializable {
 }
 
 @SerialVersionUID(7737820101L)
-case class DummyVariant[A](var meta: Array[String], default: A)
+case class DummyVariant[A: Genotype](var meta: Array[String], default: A)
   extends Variant[A] {
   def size = 0
   def select(indicator: Array[Boolean]): DummyVariant[A] = this
   def denseSize = 0
-  def map[B](f: A => B): DummyVariant[B] = DummyVariant(meta.clone(), f(default))
+  def map[B: Genotype](f: A => B): DummyVariant[B] = DummyVariant(meta.clone(), f(default))
   def apply(i: Int): A = default
 }
 
@@ -257,7 +274,7 @@ case class DummyVariant[A](var meta: Array[String], default: A)
  * */
 
 @SerialVersionUID(7737820201L)
-case class DenseVariant[A](var meta: Array[String],
+case class DenseVariant[A: Genotype](var meta: Array[String],
                            elems: IndexedSeq[A],
                            default: A,
                            denseSize: Int)
@@ -274,7 +291,7 @@ case class DenseVariant[A](var meta: Array[String],
 
   def apply(i: Int) = elems(i)
 
-  def map[B](f: A => B): Variant[B] = {
+  def map[B: Genotype](f: A => B): Variant[B] = {
     val iseq = elems.map(f)
     Variant.fromIndexedSeq(meta.clone(), iseq, f(default))
   }
@@ -286,7 +303,7 @@ case class DenseVariant[A](var meta: Array[String],
  * */
 
 @SerialVersionUID(7737820301L)
-case class SparseVariant[A](var meta: Array[String],
+case class SparseVariant[A: Genotype](var meta: Array[String],
                        elems: Map[Int, A],
                        default: A,
                        size: Int)
@@ -299,7 +316,7 @@ case class SparseVariant[A](var meta: Array[String],
     elems.getOrElse(i, default)
   }
 
-  def map[B](f: A => B): Variant[B] = {
+  def map[B: Genotype](f: A => B): Variant[B] = {
     val newDefault = f(default)
     val newElems: Map[Int, B] = elems.map{case (k, v) => k -> f(v)}
     Variant.fromMap(meta.clone(), newElems, newDefault, size)

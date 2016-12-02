@@ -1,11 +1,11 @@
 package org.dizhang.seqspark.annot
 
-import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.annot.IntervalTree._
 import org.dizhang.seqspark.ds._
-import IntervalTree._
+import org.dizhang.seqspark.util.General._
 import org.slf4j.LoggerFactory
 
-import annotation.tailrec
+import scala.annotation.tailrec
 
 /**
   * location tree to hold locations

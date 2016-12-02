@@ -1,12 +1,17 @@
 package org.dizhang.seqspark.util
 
 import java.io._
-import com.typesafe.config.Config
+
+import breeze.linalg.DenseMatrix
+import com.esotericsoftware.kryo.io.Output
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
-import Constant._
 import org.dizhang.seqspark.ds.Variant
+import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
+import com.esotericsoftware.kryo.{Kryo, Serializer}
+import com.typesafe.config.Config
+
 import scala.io.Source
 /**
  * defines some input/output functions here
@@ -43,7 +48,7 @@ object InputOutput {
   }
 
   def saveDir(implicit cnf: RootConfig, name: WorkerName): String = {
-    "%s/%s" format (cnf.hdfsDir, name)
+    "%s/%s" format (cnf.dbDir, name)
   }
 
   def sitesFile(implicit cnf: RootConfig, name: WorkerName): String = {
@@ -83,6 +88,22 @@ object InputOutput {
   def writeAny(file: String, data: String): Unit = {
     val pw = new PrintWriter(new File(file))
     pw.write(data + "\n")
+    pw.close()
+  }
+
+  def writeDenseMatrix(file: String,
+                       dm: DenseMatrix[Double],
+                       header: Option[String] = None,
+                       rowNames: Option[Array[String]] = None): Unit = {
+    val pw = new PrintWriter(new File(file))
+
+    header.foreach(h => pw.write(h + "\n"))
+
+    (0 until dm.rows).foreach{i =>
+      val rn = rowNames.map(a => a(i)).getOrElse("")
+      val res = rn +: dm(i, ::).t.toArray.map(_.toString)
+      pw.write(res.mkString(",") + "\n")
+    }
     pw.close()
   }
 
@@ -126,4 +147,9 @@ object InputOutput {
     baos.toByteArray
   }
 
+  /**
+  class ConfigSerializer extends Serializer[Config] {
+    override def write(kryo: Kryo, output: Output, `object`: Config) = ???
+  }
+  */
 }

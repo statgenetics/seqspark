@@ -1,10 +1,12 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg._
-import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
-import org.dizhang.seqspark.util.General.{RichDouble}
+import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
+import org.dizhang.seqspark.util.General.RichDouble
 
+import scala.language.existentials
+import scala.util.{Success, Try}
 
 /**
   * Variable threshold association method
@@ -12,30 +14,40 @@ import org.dizhang.seqspark.util.General.{RichDouble}
 @SerialVersionUID(7727880001L)
 trait VT extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode
+  def x: Encode[_]
   def result: AssocMethod.Result
 }
 
 object VT {
 
   def getStatistic(st: ScoreTest): Double = {
+    //println(s"scores: ${st.score.toArray.mkString(",")}")
+    //println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
     val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
     max(ts)
   }
 
   @SerialVersionUID(7727880101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode) extends VT with AssocMethod.AnalyticTest {
-    val geno = x.getVT.get
-    val scoreTest = ScoreTest(nullModel, geno.coding)
+                                x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
+    val geno = x.getVT
+    val scoreTest = {
+      val cnt = geno.coding.activeSize
+      //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
+      //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
+      ScoreTest(nullModel, geno.coding)
+    }
     val statistic = getStatistic(scoreTest)
     val pValue = {
       val ss = diag(scoreTest.variance).map(_.sqrt)
       val ts = scoreTest.score :/ ss
       val maxT = max(ts)
       val cutoff = maxT * ss
-      val dis = MultivariateNormal.Centered(scoreTest.variance)
-      dis.cdf(cutoff).pvalue
+      val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff).pvalue)
+      pTry match {
+        case Success(p) => Some(1.0 - p)
+        case _ => None
+      }
     }
     def result = AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
   }
@@ -45,11 +57,11 @@ object VT {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode) extends VT with AssocMethod.ResamplingTest {
+                                  x: Encode[_]) extends VT with AssocMethod.ResamplingTest {
     def pCount = {
       Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     }
-    def result = AssocMethod.ResamplingResult(x.getVT.get.vars, refStatistic, pCount)
+    def result = AssocMethod.ResamplingResult(x.getVT.vars, refStatistic, pCount)
   }
 
 }

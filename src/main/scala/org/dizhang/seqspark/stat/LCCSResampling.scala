@@ -1,13 +1,12 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
+import breeze.linalg.{DenseMatrix => DM, DenseVector => DV, _}
 import breeze.numerics._
 import breeze.stats._
-import breeze.linalg._
-import org.dizhang.seqspark.util.General._
-import LCCSResampling._
-import LCCSLiu.CDFLiu
 import breeze.stats.distributions.ChiSquared
+import org.dizhang.seqspark.stat.LCCSLiu.CDFLiu
+import org.dizhang.seqspark.stat.LCCSResampling._
+import org.dizhang.seqspark.util.General._
 /**
   * This is also a moment matching method
   * to approximate LCCS with a Chi-squared distribution
@@ -29,7 +28,7 @@ class LCCSResampling(val lambda: DV[Double],
   def cdf(cutoff: Double): CDFLiu = {
     val cs = new ChiSquared(df)
     val norm = (cutoff - muQ) * (2 * df).sqrt/varQ.sqrt + df
-    CDFLiu(cs.cdf(norm))
+    CDFLiu(cs.cdf(norm), 0)
   }
 }
 

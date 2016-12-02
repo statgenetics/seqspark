@@ -1,8 +1,8 @@
 package org.dizhang.seqspark.annot
 
 import org.apache.spark.SparkContext
-import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.Region
+import org.slf4j.LoggerFactory
 
 /**
   * Exome regions implemented with interval trees

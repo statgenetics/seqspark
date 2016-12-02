@@ -12,7 +12,9 @@ import org.slf4j.LoggerFactory
   * Created by zhangdi on 9/25/16.
   */
 object QualityControl {
+
   val logger = LoggerFactory.getLogger(getClass)
+
   def cleanVCF(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
     logger.info("start quality control")
     val conf = ssc.userConfig

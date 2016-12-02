@@ -1,9 +1,8 @@
 package org.dizhang.seqspark.annot
 
 import org.apache.spark.SparkContext
-import org.slf4j.LoggerFactory
 import org.dizhang.seqspark.ds.Region
-import it.unimi.dsi.fastutil.bytes.{Byte2ObjectArrayMap => B2M}
+import org.slf4j.LoggerFactory
 
 /**
   * Exome regions implemented with interval trees
@@ -49,12 +48,14 @@ object Regions {
     rs
   }
 
-  def makeExome(coordFile: String): Regions = {
-    val iter = scala.io.Source.fromFile(coordFile).getLines()
-    val header = iter.next().split("\t")
-    val raw = iter.filterNot(l => l.split("\t")(2).contains("_"))
-      .map(l => RefGene.makeExons(l, header))
-      .flatten
+  def makeExome(coordFile: String)(sc: SparkContext): Regions = {
+
+    val locRaw = sc.textFile(coordFile).cache()
+    val header = locRaw.first().split("\t")
+    val locRdd = locRaw.zipWithUniqueId().filter(_._2 > 0).map(_._1)
+    //val iter = scala.io.Source.fromFile(coordFile).getLines()
+    val raw = locRdd.filter(l => ! l.split("\t")(2).contains("_"))
+      .flatMap(l => RefGene.makeExons(l, header)).toLocalIterator
     apply(raw)
   }
 }

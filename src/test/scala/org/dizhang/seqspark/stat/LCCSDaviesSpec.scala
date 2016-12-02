@@ -4,7 +4,6 @@ import java.util.logging
 
 import breeze.linalg.DenseVector
 import org.scalatest._
-import org.dizhang.seqspark.stat.{LCCSDavies}
 
 /**
   * Test the linear combination chi-square distribution class
@@ -61,8 +60,12 @@ class LCCSDaviesSpec extends FlatSpec with Matchers {
   }
   "Method cdf" should "work fine" in new SLCCS5 {
     val res = slccs.cdf(5.0)
-    println(res.toString)
+    //println(res.toString)
     res.pvalue should be (0.58412 +- 1e6)
+    val dis = LCCSDavies.Simple(DenseVector(61647.171903,7.266117,6.872818,     6.608951,     6.569637 ,    6.516321,
+     6.406619 ,    6.284201  ,   6.027278    , 5.939418))
+    //println(dis.cdf(32189.63).toString)
+    //println(s"th ${dis.th.mkString(",")} sigsq: ${dis.sigsq} lambda: ${dis.lambda.toArray.mkString(",")}")
   }
   /**
   *it should "be ok" in new SLCCS {

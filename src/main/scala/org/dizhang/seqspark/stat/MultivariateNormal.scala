@@ -1,9 +1,9 @@
 package org.dizhang.seqspark.stat
 
-import org.dizhang.seqspark.util.General._
 import breeze.linalg.{*, diag, DenseMatrix => DM, DenseVector => DV}
-import com.sun.jna.{Library, Native}
 import com.sun.jna.ptr._
+import com.sun.jna.{Library, Native}
+import org.dizhang.seqspark.util.General._
 
 /**
   * multi-variate normal distribution cdf
@@ -47,7 +47,7 @@ object MultivariateNormal {
   case class CDF(pvalue: Double, error: Double, inform: Int) extends Serializable
 
   trait MVNImpl extends Library {
-    def mvndst(N: IntByReference,
+    def mvndst_(N: IntByReference,
                LOWER: Array[Double],
                UPPER: Array[Double],
                INFIN: Array[Int],
@@ -69,7 +69,7 @@ object MultivariateNormal {
     val v: DoubleByReference = new DoubleByReference(0.0)
     val e: DoubleByReference = new DoubleByReference(0.0)
     val i: IntByReference = new IntByReference(0)
-    MVNImpl.Instance.mvndst(new IntByReference(n), lower, upper, infin, correl,
+    MVNImpl.Instance.mvndst_(new IntByReference(n), lower, upper, infin, correl,
       new IntByReference(maxpts), new DoubleByReference(abseps),
       new DoubleByReference(releps), e, v, i)
     CDF(v.getValue, e.getValue, i.getValue)

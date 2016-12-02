@@ -3,7 +3,7 @@ package org.dizhang.seqspark.annot
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.dbNSFP.Record
-import org.dizhang.seqspark.ds.{Region, Single, Variation}
+import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
 
 /**

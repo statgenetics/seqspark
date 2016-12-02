@@ -2,8 +2,9 @@ package org.dizhang.seqspark.annot
 
 import org.dizhang.seqspark.ds._
 import org.slf4j.LoggerFactory
-import scala.io.Source
+
 import scala.collection.mutable.{Map => MMap}
+import scala.io.Source
 
 /**
   * Created by zhangdi on 9/28/16.

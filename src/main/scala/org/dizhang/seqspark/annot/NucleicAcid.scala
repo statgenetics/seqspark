@@ -1,13 +1,12 @@
 package org.dizhang.seqspark.annot
 
+import org.dizhang.seqspark.annot.NucleicAcid._
 import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
 import org.dizhang.seqspark.util.Constant.Annotation.{AminoAcid, Base, codeTable}
 
-import scala.collection.{IndexedSeqLike, mutable}
-import scala.collection.mutable.ArrayBuffer
-import NucleicAcid._
-
 import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{IndexedSeqLike, mutable}
 
 /**
   * DNA, cDNA/mRNA sequences

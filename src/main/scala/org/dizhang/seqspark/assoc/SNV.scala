@@ -8,17 +8,15 @@ import org.dizhang.seqspark.util.General._
 import scala.language.existentials
 
 /**
-  * Created by zhangdi on 5/20/16.
+  * Created by zhangdi on 12/1/16.
   */
-@SerialVersionUID(7727280001L)
-trait Burden extends AssocMethod {
+trait SNV extends AssocMethod {
   def nullModel: NullModel
   def x: Encode[_]
   def result: AssocMethod.Result
 }
 
-object Burden {
-
+object SNV {
   def apply(nullModel: NullModel,
             x: Encode[_]): Burden = {
     AnalyticTest(nullModel, x)
@@ -31,7 +29,7 @@ object Burden {
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode[_]) extends Burden with AssocMethod.AnalyticTest {
-    val geno = x.getFixed
+    val geno = x.getCommon().get
     val scoreTest = ScoreTest(nullModel, geno.coding)
     val statistic = getStatistic(scoreTest)
     val pValue = {
@@ -50,9 +48,10 @@ object Burden {
                                   max: Int,
                                   nullModel: NullModel,
                                   x: Encode[_]) extends Burden with AssocMethod.ResamplingTest {
+    val geno = x.getCommon().get
     def pCount = Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
     def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(x.getFixed.vars, refStatistic, pCount)
+      AssocMethod.ResamplingResult(geno.vars, refStatistic, pCount)
     }
   }
 }

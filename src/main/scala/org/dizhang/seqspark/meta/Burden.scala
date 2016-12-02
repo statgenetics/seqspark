@@ -1,7 +1,6 @@
 package org.dizhang.seqspark.meta
 
 import org.dizhang.seqspark.assoc.RareMetalWorker
-import org.dizhang.seqspark.ds.Variation
 
 /**
   * meta analysis

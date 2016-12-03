@@ -25,18 +25,23 @@ object Genotypes {
       (Array("all"), (i: Int) => 0)
     } else {
       val batchStr = phenotype.batch(batch)
-      val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray
-      val batchMap = batchKeys.zipWithIndex.toMap
-      val batchIdx = batchStr.map(b => batchMap(b))
-      (batchKeys, (i: Int) => batchIdx(i))
+      if (batchStr.toSet.size == 1) {
+        (batchStr.slice(0,1), (i: Int) => 0)
+      } else {
+        val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray //the batch names
+        val batchMap = batchKeys.zipWithIndex.toMap //batch name indices
+        val batchIdx = batchStr.map(b => batchMap(b)) //individual -> batch index
+        (batchKeys, (i: Int) => batchIdx(i))
+      }
     }
     //logger.info("still all right?")
     val first = self.first()
     val fm = first.format.split(":").toList
     val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
-    /** this function works on raw data, so limit to a subset can greatly enhance the performance*/
+    //val counter = Counter.CounterElementSemiGroup.Longs(400)
+    /** this function works on raw data, so limit to a subset can greatly enhance the performance */
     val all = self.sample(withReplacement = false, frac).map(v =>
-      v.toCounter(makeGdGq(_, fm), new Int2IntOpenHashMap(Array(0), Array(1)))
+      v.toCounter(makeGdGq(_, fm), Map.empty[Int, Long])
         .reduceByKey(keyFunc))
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
@@ -79,19 +84,19 @@ object Genotypes {
   val gdTicks: Array[Int] = (0 to 10).toArray ++ Array(15, 20, 25, 30, 35, 40, 60, 80, 100)
   val gqTicks: Array[Int] = Range(0, 100, 5).toArray
 
-  def makeGdGq(g: String, format: List[String]): Int2IntOpenHashMap = {
+  def makeGdGq(g: String, format: List[String]): Map[Int, Long] = {
     if (g.startsWith(".")) {
-      new Int2IntOpenHashMap(Array(0), Array(1))
+      Map.empty[Int, Long]
     } else {
       val fs = Genotype.Raw.fields(g, format)
       val gd = General.insert(gdTicks, fs.getOrElse("DP", "0").toInt)
       val gq = math.min(fs.getOrElse("GQ", "0").toDouble.toInt, 99) / 5
       val key = 20 * gd + gq
-      new Int2IntOpenHashMap(Array(key), Array(1))
+      Map(key -> 1L)
     }
   }
 
-  def writeBcnt(b: Map[Int, Int2IntOpenHashMap], batchKeys: Array[String], outFile: String) {
+  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: String) {
     val pw = new PrintWriter(new File(outFile))
     pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {
@@ -100,7 +105,7 @@ object Genotypes {
         val key = iter.next
         val gd: Int = gdTicks(key / 20)
         val gq: Int = gqTicks(key % 20)
-        val c = cnt.get(key).toInt
+        val c = cnt(key)
         pw.write("%s\t%d\t%d\t%d\n" format (batchKeys(i), gd, gq, c))
       }
     }

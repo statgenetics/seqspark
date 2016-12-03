@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory
 /**
   * Created by zhangdi on 8/13/16.
   */
-
 object Import {
 
   val logger = LoggerFactory.getLogger(getClass)

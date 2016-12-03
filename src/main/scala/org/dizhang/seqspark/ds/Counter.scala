@@ -21,6 +21,18 @@ object Counter {
     type PairDouble = (Double, Double)
     type TripleDouble = (Double, Double, Double)
     type MapCounter = Map[PairInt, Int]
+    type MapCounterLong = Map[Int, Long]
+
+    case class Longs(n: Int) extends CounterElementSemiGroup[IndexedSeq[Long]] {
+      val zero: IndexedSeq[Long] = Vector.fill(n)(0L)
+      def op(x: IndexedSeq[Long], y: IndexedSeq[Long]): IndexedSeq[Long] = {
+        for (i <- x.indices) yield x(i) + y(i)
+      }
+      def pow(x: IndexedSeq[Long], k: Int): IndexedSeq[Long] = {
+        for (i <- x.indices) yield x(i) * k
+      }
+    }
+
     implicit object AtomInt extends CounterElementSemiGroup[Int] {
       def zero = 0
       def op (x: Int, y: Int) = x + y
@@ -62,6 +74,16 @@ object Counter {
         x ++ (for ((k, v) <- y) yield k -> (v + x.getOrElse(k, 0)))
       def pow (x: MapCounter, i: Int) =
         for ((k,v) <- x) yield k -> (v * i)
+    }
+
+    implicit object MapCounterLong extends CounterElementSemiGroup[MapCounterLong] {
+      def zero: MapCounterLong = Map.empty[Int, Long]
+      def op (x: MapCounterLong, y: MapCounterLong): MapCounterLong = {
+        x ++ (for ((k, v) <- y) yield k -> (v + x.getOrElse(k, 0L)))
+      }
+      def pow(x: MapCounterLong, n: Int): MapCounterLong = {
+        for ((k,v) <- x) yield k -> (v * n)
+      }
     }
 
     implicit object MapI2I extends CounterElementSemiGroup[IMap] {

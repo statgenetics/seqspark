@@ -16,12 +16,12 @@ class LogicalParser extends JavaTokenParsers with Serializable {
   def factor: Parser[LogExpr] = comparison | ("("~expr~")" ^^ { case "("~x~")" => x })
   def comparison: Parser[LogExpr] = stringComparison | numberComparison | existence
   def stringComparison: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r~("=="|"!=")~stringLiteral ^^ {
+    """[a-zA-Z_](\w|\.)*""".r~("=="|"!=")~stringLiteral ^^ {
       case name~"=="~value => SEQ(name, value.substring(1,value.length - 1))
       case name~"!="~value => SNE(name, value.substring(1,value.length - 1))
     }
   def numberComparison: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r~(">="|"<="|"=="|"!="|">"|"<")~floatingPointNumber ^^ {
+    """[a-zA-Z_](\w|\.)*""".r~(">="|"<="|"=="|"!="|">"|"<")~floatingPointNumber ^^ {
       case name~">"~value => GT(name, value.toDouble)
       case name~">="~value => GE(name, value.toDouble)
       case name~"<"~value => LT(name, value.toDouble)

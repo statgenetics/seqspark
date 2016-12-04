@@ -6,7 +6,7 @@ import org.dizhang.seqspark.annot.IntervalTree
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype}
 import org.dizhang.seqspark.stat.PCA
-import org.dizhang.seqspark.util.Constant.{Hg19, Hg38}
+import org.dizhang.seqspark.util.Constant.{Hg19, Hg38, Pheno}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.GenomeBuild
 import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
@@ -27,7 +27,7 @@ object Samples {
     logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val sn = phenotype.sampleNames
-    val header = "iid," + (1 to 10).map(i => s"_pc$i").mkString(",")
+    val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
     val path = ssc.userConfig.localDir + "/output/pca.csv"
     writeDenseMatrix(path, res, Some(header), Some(sn))
     Phenotype.update("file://" + path, "phenotype")(ssc.sparkSession)

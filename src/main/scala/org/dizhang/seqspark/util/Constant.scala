@@ -28,7 +28,7 @@ object Constant {
       val mid = "mid"
       val sex = "sex"
       val control = "control"
-      val pcPrefix = "pc"
+      val pcPrefix = "_pc"
       val batch = "batch"
     }
     val delim = "\t"

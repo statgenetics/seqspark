@@ -102,7 +102,7 @@ object InputOutput {
     (0 until dm.rows).foreach{i =>
       val rn = rowNames.map(a => a(i)).getOrElse("")
       val res = rn +: dm(i, ::).t.toArray.map(_.toString)
-      pw.write(res.mkString(",") + "\n")
+      pw.write(res.mkString(Pheno.delim) + "\n")
     }
     pw.close()
   }

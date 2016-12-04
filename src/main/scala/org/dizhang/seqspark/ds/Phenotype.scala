@@ -4,6 +4,7 @@ import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.dizhang.seqspark.ds.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success, Try}
 
@@ -12,6 +13,8 @@ import scala.util.{Failure, Success, Try}
   */
 object Phenotype {
 
+   val logger: Logger = LoggerFactory.getLogger(getClass)
+
    def update(path: String, table: String)(spark: SparkSession): Phenotype = {
      val options = Map(
        "nullValue" -> Pheno.mis,
@@ -19,6 +22,7 @@ object Phenotype {
        "header" -> "true"
      )
      val dataFrame = spark.read.options(options).csv(path)
+     logger.info(s"add ${dataFrame.columns.mkString(",")} to phenotype dataframe")
      val old = spark.table(table)
      val newdf = old.join(dataFrame, usingColumn = "iid")
      newdf.createOrReplaceTempView(table)
@@ -34,6 +38,8 @@ object Phenotype {
     )
 
     val dataFrame = spark.read.options(options).csv(path)
+
+    logger.info(s"create phenotype dataframe from $path")
 
     dataFrame.createOrReplaceTempView(table)
 

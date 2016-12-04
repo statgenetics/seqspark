@@ -30,7 +30,7 @@ object Samples {
     val header = (1 to 10).map(i => s"_pc$i").mkString(",")
     val path = ssc.userConfig.localDir + "/output/pca.csv"
     writeDenseMatrix(path, res, Some(header))
-    Phenotype.update(path, "phenotype")(ssc.sparkSession)
+    Phenotype.update("file://" + path, "phenotype")(ssc.sparkSession)
   }
 
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {

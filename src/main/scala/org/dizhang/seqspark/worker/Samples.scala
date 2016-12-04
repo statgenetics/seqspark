@@ -27,9 +27,9 @@ object Samples {
     logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val sn = phenotype.sampleNames
-    val header = (1 to 10).map(i => s"_pc$i").mkString(",")
+    val header = "iid," + (1 to 10).map(i => s"_pc$i").mkString(",")
     val path = ssc.userConfig.localDir + "/output/pca.csv"
-    writeDenseMatrix(path, res, Some(header))
+    writeDenseMatrix(path, res, Some(header), Some(sn))
     Phenotype.update("file://" + path, "phenotype")(ssc.sparkSession)
   }
 

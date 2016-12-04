@@ -46,8 +46,7 @@ object QualityControl {
     simpleVCF.cache()
     simpleVCF.checkpoint()
     if (conf.benchmark) {
-      simpleVCF.foreach(_ => Unit)
-      logger.info("genotype QC completed")
+      logger.info(s"genotype QC completed: ${simpleVCF.count()} variants")
     }
 
     //simpleVCF.checkpoint()

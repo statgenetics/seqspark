@@ -19,4 +19,8 @@ class LogicalParserSpec extends FlatSpec with Matchers {
     LogicalParser.eval(lp)(Map("INFO.AN"->"3900", "INFO.AC"->"3775")) should be (false)
   }
 
+  "A LogicalParser" should "handle String comparisons" in {
+    val lp = LogicalParser.parse("chr != \"X\" and chr != \"Y\"")
+    LogicalParser.eval(lp)(Map("chr" -> "11")) should be (true)
+  }
 }

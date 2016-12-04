@@ -1,6 +1,5 @@
 package org.dizhang.seqspark.ds
 
-import org.dizhang.seqspark.util.Constant.Genotype.rawToSimple
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.LogicalParser
 /**
@@ -30,6 +29,8 @@ object Genotype {
     *   Imp for imputed data, Impute2 output format
     *   */
   type Imp = (Double, Double, Double)
+  private val diploidGT = """([0-9.])([/|])([0-9.])(?::.+)?""".r
+  private val monoGT = """([0-9.])(?::.+)?""".r
   implicit object Simple extends Genotype[Byte] {
     def gt(g: Byte): Int = (g << 30) >>> 30
     def toRaw(g: Byte): String = {
@@ -131,7 +132,48 @@ object Genotype {
     def gt(g: String): String = g.split(":")(0)
 
     def toSimpleGenotype(g: String): Byte = {
-      rawToSimple(gt(g))
+
+      g match {
+        case diploidGT(a1, sep, a2) =>
+          val phased = if (sep == "/") 16 else 24
+          val gt = if (a1 == ".") 4 else a1.toInt * 2 + a2.toInt
+          (gt | phased).toByte
+        case monoGT(a) =>
+          if (a == ".") 4.toByte else a.toByte
+        case _ =>
+          20.toByte
+      }
+
+      //rawToSimple(gt(g))
+    }
+    def rawToSimple(g: String): Byte = {
+      /**
+      """
+        |the simple genotype system uses 5 bits to represent a genotype
+        |b00010000: is diploid
+        |b00001000: is phased, notice that there is no 8, but 24
+        |b00000100: is missing
+        |00-11 represent the four possible genotypes
+      """.stripMargin
+        */
+
+
+      val diploidPhased = if (g.contains('|')) {
+        24 //b00011000
+      } else if (g.contains('/')) {
+        16 //b00010000
+      } else {
+        0
+      }
+      val gt = try {
+
+        g.split("[/|]").map(_.toInt).sum //0-3 for normal genotype
+      } catch {
+        case e: Exception => 4 //b00000100 for missing
+      }
+
+      (diploidPhased | gt).toByte
+
     }
 
     def isMis(g: String): Boolean = g.startsWith(".")

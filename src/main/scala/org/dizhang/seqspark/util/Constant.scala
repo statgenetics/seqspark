@@ -135,32 +135,7 @@ object Constant {
       val mis = (0.0, 0.0, 0.0)
       val ref = (1.0, 0.0, 0.0)
     }
-    def rawToSimple(g: String): Byte = {
-      /**
-      """
-        |the simple genotype system uses 5 bits to represent a genotype
-        |b00010000: is diploid
-        |b00001000: is phased, notice that there is no 8, but 24
-        |b00000100: is missing
-        |00-11 represent the four possible genotypes
-      """.stripMargin
-        */
-      val diploidPhased = if (g.contains('|')) {
-        24 //b00011000
-      } else if (g.contains('/')) {
-        16 //b00010000
-      } else {
-        0
-      }
-      val gt = try {
-        g.split("[/|]").map(_.toInt).sum //0-3 for normal genotype
-      } catch {
-        case e: Exception => 4 //b00000100 for missing
-      }
 
-      (diploidPhased | gt).toByte
-
-    }
   }
 
   object Hg19 {

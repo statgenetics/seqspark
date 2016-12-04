@@ -20,7 +20,7 @@ object Samples {
   val logger = LoggerFactory.getLogger(getClass)
 
   def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
-    val cond = LogicalParser.parse("(maf >= 0.01 or maf <= 0.99) and chr != \"X\" and chr != \"Y\"")
+    val cond = LogicalParser.parse("(maf >= 0.01 and maf <= 0.99) and chr != \"X\" and chr != \"Y\"")
     val common = self.variants(cond)(ssc)
     val res =  new PCA(common).pc(10)
     logger.info(s"PC dimension: ${res.rows} x ${res.cols}")

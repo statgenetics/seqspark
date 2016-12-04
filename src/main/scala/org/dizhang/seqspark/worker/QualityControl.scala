@@ -26,8 +26,8 @@ object QualityControl {
     if (sums.contains("gdgq")) {
       annotated.checkpoint()
       if (conf.benchmark) {
-        annotated.foreach(_ => Unit)
-        logger.info("annotated data ready")
+        //annotated.foreach(_ => Unit)
+        logger.info(s"annotated data ready: ${annotated.count()} variants")
       }
       statGdGq(annotated)(ssc)
     }

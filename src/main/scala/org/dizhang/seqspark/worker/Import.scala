@@ -63,8 +63,7 @@ object Import {
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    val coord = conf.annotation.RefSeq.getString("coord")
-    val exome = sc.broadcast(Regions.makeExome(coord)(sc))
+
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
       case Left(UC.Samples.none) => true
@@ -76,12 +75,21 @@ object Import {
     val default = "0/0"
     /** prepare a regions tree to filter variants */
     val regions = sc.broadcast(imConf.variants match {
-      case Left(UC.Variants.all) => None
+      case Left(UC.Variants.all) =>
+        logger.info("using all variants")
+        None
       case Left(UC.Variants.exome) =>
+        logger.info("using variants on exome")
+        //val coord = conf.annotation.RefSeq.getString("coord")
+        //val exome = sc.broadcast(Regions.makeExome(coord)(sc))
         val coord = conf.annotation.RefSeq.getString("coord")
         Some(Regions.makeExome(coord)(sc))
-      case Left(_) => None
-      case Right(tree) => Some(tree)
+      case Left(_) =>
+        logger.info("using all variants")
+        None
+      case Right(tree) =>
+        logger.info(s"using user specified regions")
+        Some(tree)
     })
     /** filter variants based on meta information
       * before making the actual genotype data for each sample

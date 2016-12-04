@@ -257,7 +257,7 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
     elems.getOrElse(i, default)
   }
   def reduce(implicit sg: CounterElementSemiGroup[A]): A = {
-    val dense = elems.values.reduce((a, b) => sg.op(a, b))
+    val dense = elems.values.fold(sg.zero)((a, b) => sg.op(a, b))
     val sparse = sg.pow(default, size - elems.size)
     sg.op(dense, sparse)
   }

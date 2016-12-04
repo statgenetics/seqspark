@@ -146,6 +146,7 @@ object Genotype {
 
       //rawToSimple(gt(g))
     }
+    /**
     def rawToSimple(g: String): Byte = {
       /**
       """
@@ -175,6 +176,7 @@ object Genotype {
       (diploidPhased | gt).toByte
 
     }
+    */
 
     def isMis(g: String): Boolean = g.startsWith(".")
 

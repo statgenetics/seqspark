@@ -83,7 +83,7 @@ object SingleStudy {
     }
   }
 
-  def run(cnf: RootConfig) {
+  def makeSCC(cnf: RootConfig): SingleStudyContext = {
     val project = cnf.project
 
     /** Spark configuration */
@@ -100,7 +100,13 @@ object SingleStudy {
 
     Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
 
-    implicit val ssc = SingleStudyContext(cnf, sc, ss)
+    SingleStudyContext(cnf, sc, ss)
+  }
+
+  def run(cnf: RootConfig) {
+
+    implicit val ssc = makeSCC(cnf)
+    val sc = ssc.sparkContext
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {

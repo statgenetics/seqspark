@@ -25,7 +25,7 @@ object Import {
         * before parse the whole line
         * */
       val isNotComment: Boolean = !l.startsWith("#")
-      val cond = {
+      isNotComment && {
         if (logExpr == LogicalParser.T) {
           true
         } else {
@@ -56,7 +56,8 @@ object Import {
           LogicalParser.evalExists(logExpr)(vmf ++ vmi) && in
         }
       }
-      isNotComment && cond
+
+
     }
     logger.info("start import ...")
     val conf = ssc.userConfig

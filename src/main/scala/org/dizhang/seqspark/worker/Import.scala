@@ -35,11 +35,14 @@ object Import {
           val metaMatcher = """^([^\t]*\t){7}[^\t]*""".r
           val meta: Array[String] = metaMatcher.findFirstIn(l).get.split("\t")
           /** prepare the var map for the logical expression */
-          val vmf = Map("FILTER" -> meta(6)) //the FORMAT field
+          val vmf = Map("FILTER" -> List(meta(6))) //the FORMAT field
           val vmi = if (names.exists(p => p.startsWith("INFO."))) {
-            Variant.parseInfo(meta(7)).map { case (k, v) => s"INFO.$k" -> v }
+            Variant.parseInfo(meta(7)).map {
+              case (k, v) =>
+                s"INFO.$k" -> v.split(",").toList
+            }
           } else {
-            Map.empty[String, String]
+            Map.empty[String, List[String]]
           } //the info filed
           val in = if (regions.isEmpty) {
             /** none is yes, no need to do the interval tree search */
@@ -50,7 +53,7 @@ object Import {
             val r = Region(meta(0), start, end)
             regions.get.overlap(r)
           }
-          LogicalParser.eval(logExpr)(vmf ++ vmi) && in
+          LogicalParser.evalExists(logExpr)(vmf ++ vmi) && in
         }
       }
       isNotComment && cond

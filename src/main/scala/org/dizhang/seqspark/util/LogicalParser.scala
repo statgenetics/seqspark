@@ -65,6 +65,26 @@ object LogicalParser {
   case class AND(e1: LogExpr, e2: LogExpr) extends LogExpr
   case class OR(e1: LogExpr, e2: LogExpr) extends LogExpr
 
+  def evalExists(logExpr: LogExpr)(vm: Map[String, List[String]]): Boolean ={
+    logExpr match {
+      case T => true
+      case F => false
+      case EX(id) => vm.contains(id)
+      case LT(id, v) => vm(id).exists(_.toDouble < v)
+      case LE(id, v) => vm(id).exists(_.toDouble <= v)
+      case GT(id, v) => vm(id).exists(_.toDouble > v)
+      case GE(id, v) => vm(id).exists(_.toDouble >= v)
+      case EQ(id, v) => vm(id).exists(_.toDouble == v)
+      case NE(id, v) => vm(id).exists(_.toDouble != v)
+      case SEQ(id, v) => vm(id).contains(v)
+      case SNE(id, v) => vm(id).exists(_ != v)
+      case AND(_, F) => false
+      case AND(e1, e2) => evalExists(e1)(vm) && evalExists(e2)(vm)
+      case OR(_, T) => true
+      case OR(e1, e2) => evalExists(e1)(vm) || evalExists(e2)(vm)
+    }
+  }
+
   def eval(logExpr: LogExpr)(vm: Map[String, String]): Boolean = {
     logExpr match {
       case T => true

@@ -4,7 +4,7 @@ import java.io.{File, PrintWriter}
 
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Variant, SparseVariant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
 
@@ -54,6 +54,9 @@ object Variants {
         }
         newV.meta(4) = alleles(i)
         newV
+      }.filter{
+        case SparseVariant(_,e,_,_) => e.nonEmpty
+        case _ => true
       }
     }
   }

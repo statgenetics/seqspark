@@ -141,7 +141,7 @@ object Counter {
   /** Start define some functions for Counter */
 
   val THRESHOLD = 0.25
-  val MINIMIUM = 10000
+  val MINIMIUM = 1000
   def fill[A](size: Int)(sparseValue: A): Counter[A] = SparseCounter[A](Map.empty[Int, A], sparseValue, size)
   def fromIndexedSeq[A](iseq: IndexedSeq[A], default: A): Counter[A] = {
     if (iseq.isEmpty) {

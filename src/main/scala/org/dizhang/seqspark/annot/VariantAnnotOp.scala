@@ -40,7 +40,12 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
 
     val variation = v.toVariation()
 
-    val genes = parseAnnotation(v.parseInfo(IK.anno))
+    val anno = v.parseInfo(IK.anno)
+    val genes =
+      if (anno == F.InterGenic.toString)
+        Array[(String, F.Value)]()
+      else
+        parseAnnotation(v.parseInfo(IK.anno))
 
     val res = if (onlyFunctional) {
       genes.filter(p => FM(p._2) <= 4)

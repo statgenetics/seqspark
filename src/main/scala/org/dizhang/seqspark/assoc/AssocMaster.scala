@@ -244,7 +244,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         }
           */
         val cov =
-          if (traitConfig.covariates.nonEmpty) {
+          if (traitConfig.covariates.nonEmpty || traitConfig.pc > 0) {
             val all = traitConfig.covariates ++ (1 to traitConfig.pc).map(i => s"_pc$i")
             phenotype.getCov(traitName, traitConfig.covariates, Array.fill(traitConfig.covariates.length)(0.05)) match {
               case Left(msg) =>

@@ -37,9 +37,9 @@ object Phenotype {
       "header" -> "true"
     )
 
-    val dataFrame = spark.read.options(options).csv(path)
+    logger.info(s"creating phenotype dataframe from $path")
 
-    logger.info(s"create phenotype dataframe from $path")
+    val dataFrame = spark.read.options(options).csv(path)
 
     dataFrame.createOrReplaceTempView(table)
 

@@ -4,9 +4,10 @@ import java.io.{File, PrintWriter}
 
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.ds.{Genotype, Variant, SparseVariant}
+import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
 /**
@@ -14,9 +15,12 @@ import scala.language.implicitConversions
   */
 object Variants {
 
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
   def decompose(self: Data[String]): Data[String] = {
+    logger.info("decompose multi-allelic variants")
     self.flatMap(v => decomposeVariant(v))
   }
 

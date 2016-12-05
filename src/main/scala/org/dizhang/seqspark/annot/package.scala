@@ -21,8 +21,8 @@ package object annot {
   def getDBs(conf: RootConfig): Map[String, Set[String]] = {
     val qcDBs = getDBs(conf.qualityControl.variants)
     val annDBs = getDBs(conf.annotation.variants)
-    logger.info(s"qcDBs: ${qcDBs.keys.mkString(",")}")
-    logger.info(s"annDBs: ${annDBs.keys.mkString(",")}")
+    //logger.info(s"qcDBs: ${qcDBs.keys.mkString(",")}")
+    //logger.info(s"annDBs: ${annDBs.keys.mkString(",")}")
 
     if (conf.pipeline.last == "association") {
       val assDBs = conf.association.methodList.map{ m =>
@@ -68,26 +68,33 @@ package object annot {
   }
 
   def linkVariantDB[A](input: Data[A])(conf: RootConfig, sc: SparkContext): Data[A] = {
-    logger.info("link variant database ...")
-    val dbTerms = getDBs(conf)
-    logger.info(s"dbs: ${dbTerms.keys.mkString(",")}")
-    var paired = input.map(v => (v.toVariation(), v))
-    dbTerms.foreach{
-      case (k, v) =>
-        logger.info(s"join database ${k} with fields ${if (v.isEmpty) "None" else v.mkString(",")}")
-        val db = VariantDB(conf.annotation.config.getConfig(k), v, conf.jobs)(sc)
 
-        paired = paired.leftOuterJoin(db.info).map{
-          case (va, (vt, Some(info))) =>
-            vt.addInfo(k)
-            db.header.zip(info).foreach{
-              case (ik, iv) => vt.addInfo(ik, iv)}
-            va -> vt
-          case (va, (vt, None)) => va -> vt
-        }
+    val dbTerms = getDBs(conf)
+    if (dbTerms.isEmpty) {
+      logger.info("no need to join variant databases")
+      input
+    } else {
+      logger.info("link variant database ...")
+      logger.info(s"dbs: ${dbTerms.keys.mkString(",")}")
+      var paired = input.map(v => (v.toVariation(), v))
+      dbTerms.foreach{
+        case (k, v) =>
+          logger.info(s"join database ${k} with fields ${if (v.isEmpty) "None" else v.mkString(",")}")
+          val db = VariantDB(conf.annotation.config.getConfig(k), v, conf.jobs)(sc)
+
+          paired = paired.leftOuterJoin(db.info).map{
+            case (va, (vt, Some(info))) =>
+              vt.addInfo(k)
+              db.header.zip(info).foreach{
+                case (ik, iv) => vt.addInfo(ik, iv)}
+              va -> vt
+            case (va, (vt, None)) => va -> vt
+          }
         //val cnt = paired.map{_.2}.reduce(_ + _)
         //logger.info(s"database $k annotated: $cnt")
+      }
+      paired.map(_._2)
     }
-    paired.map(_._2)
+
   }
 }

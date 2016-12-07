@@ -42,7 +42,7 @@ class SKATSpec extends FlatSpec {
 
   "A SKAT" should "be fine" in {
     for (r <- 0 to 10) {
-      val sk = SKAT(nullModel, encode, r/10.0)
+      val sk = SKAT(nullModel, encode.getCoding, "liu.mod", r/10.0)
       val pv = sk.result.pValue.map(_.toString).getOrElse("NA")
       val l = sk.lambda.get.toArray.mkString(",")
       //println(s"r: ${r/10.0} pvalue: ${pv} q: ${sk.qScore} method: ${sk.x.config.misc.getString("method")} lambda: ${l} weight: ${sk.weight}")

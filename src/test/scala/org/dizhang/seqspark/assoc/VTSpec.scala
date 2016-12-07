@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.{DenseMatrix, DenseVector, sum}
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
@@ -26,7 +26,7 @@ class VTSpec extends FlatSpec {
       Variant.fromIndexedSeq(meta, geno, 16.toByte)
     }
     val sm = method.config.root().render()
-    Encode(vars, None, None, None, sm)
+    Encode(vars, sm)
   }
   val nullModel = {
     val rand = Gaussian(2, 0.25)(randBasis)
@@ -40,7 +40,8 @@ class VTSpec extends FlatSpec {
   }
   "A VT" should "be fine" in {
 
-    val vt = VT.AnalyticTest(nullModel, encode)
+    println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
+    val vt = VT(nullModel, encode.getVT)
     //println(s"S: ${vt.statistic} P: ${vt.pValue}")
   }
 }

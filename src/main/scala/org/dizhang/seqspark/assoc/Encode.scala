@@ -135,13 +135,33 @@ object Encode {
     ControlsMafErecBRV(vars, controls, y, cov, sm)
   }
 
-  sealed trait Coding
-  case object Empty extends Coding
-  case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
-  case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding
-  case class Mixed(rare: Rare, common: Common) extends Coding
-  case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding
-  case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
+  sealed trait Coding {
+    def isDefined: Boolean = {
+      this match {
+        case Empty => false
+        case _ => true
+      }
+    }
+    def informative: Boolean
+  }
+  case object Empty extends Coding {
+    def informative = false
+  }
+  case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
+    def informative = true
+  }
+  case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
+    def informative = true
+  }
+  case class Mixed(rare: Rare, common: Common) extends Coding {
+    def informative = true
+  }
+  case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding {
+    def informative = sum(coding) >= 3.0
+  }
+  case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
+    def informative = coding.cols > 1
+  }
 
   sealed trait Raw[A] extends Encode[A] {
     lazy val isDefined = maf.exists(m => m > 0.0 && m < 1.0)
@@ -302,7 +322,6 @@ object Encode {
                                 sm: String)
     extends Encode[A] with BRV[A] with ControlsMaf[A] with LearnedWeight[A]
 
-
 }
 
 @SerialVersionUID(7727390001L)
@@ -320,7 +339,7 @@ abstract class Encode[A: Genotype] extends Serializable {
   def vars: Array[Variant[A]]
   def informative(cutoff: Double = 3.0): Boolean = {
     val mut = sum(getFixed.coding)
-    mut >= cutoff && mut <= (sampleSize - cutoff)
+    mut >= cutoff
   }
   def mafCount: Array[(Double, Double)]
   def maf: Array[Double]
@@ -390,7 +409,7 @@ abstract class Encode[A: Genotype] extends Serializable {
         if (isDefined && informative()) getVT else Empty
       case (MethodType.skat|MethodType.skato, _) =>
         getRare() match {
-          case Some(r) => r
+          case Some(r) => if (r.vars.length > 1) r else Empty
           case None => Empty
         }
       case _ => Empty

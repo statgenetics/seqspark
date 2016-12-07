@@ -65,7 +65,7 @@ object AssocMaster {
     val sm: String = config.config.root().render()
     annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, sm))
-    ).filter{case (_, e) => e.isDefined && e.informative()}.map(x => x._1 -> x._2.getCoding)
+    ).map(x => x._1 -> x._2.getCoding).filter(p => p._2.isDefined && p._2.informative)
   }
 
   def adjustForCov(binaryTrait: Boolean,
@@ -115,10 +115,12 @@ object AssocMaster {
     var curEncode = codings
     var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
     for (i <- 0 to loops) {
-      logger.info(s"round $i of permutation test, ${curEncode.count()} genes")
+      logger.info(s"round $i of permutation test, ${curEncode.count()} groups before expand")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
       curEncode = expand(curEncode, lastMax, curMax)
+      curEncode.cache()
+      logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
         val model =
@@ -135,7 +137,7 @@ object AssocMaster {
       pCount = sc.broadcast(for ((k, v) <- pCount.value)
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
       curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
-      curEncode.persist(StorageLevel.MEMORY_AND_DISK)
+      //curEncode.persist(StorageLevel.MEMORY_AND_DISK)
     }
     pCount.value.map{x =>
       val asymp = asymptoticRes(x._1)

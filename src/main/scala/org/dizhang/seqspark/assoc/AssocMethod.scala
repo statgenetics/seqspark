@@ -43,7 +43,8 @@ object AssocMethod {
                               pCount: (Int, Int)) extends Result {
     def pValue: Option[Double] = Some(pCount._1/pCount._2.toDouble)
     override def toString: String = {
-      s"${vars.map(_.toString).mkString(",")}\t$refStatistic\t${pCount._1},${pCount._2}\t${pValue}"
+      s"${vars.map(_.toString).mkString(",")}\t$refStatistic\t" +
+        s"${pCount._1},${pCount._2}\t${pValue.map(_.toString).getOrElse("NA")}"
     }
   }
 }

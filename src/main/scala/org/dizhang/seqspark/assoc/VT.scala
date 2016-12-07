@@ -42,7 +42,7 @@ object VT {
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode.VT) extends VT with AssocMethod.AnalyticTest {
     val scoreTest = {
-      val cnt = x.coding.activeSize
+      //val cnt = x.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
       //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
       ScoreTest(nullModel, x.coding)

@@ -135,9 +135,11 @@ object Encode {
     ControlsMafErecBRV(vars, controls, y, cov, sm)
   }
 
-  trait Coding
+  sealed trait Coding
+  case object Empty extends Coding
   case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
   case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding
+  case class Mixed(rare: Rare, common: Common) extends Coding
   case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding
   case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding
 
@@ -347,6 +349,7 @@ abstract class Encode[A: Genotype] extends Serializable {
           a ++ b})
     }
   }
+
   def weight: DenseVector[Double]
   def getFixedBy(cutoff: Double = fixedCutoff): Encode.Fixed
 
@@ -370,21 +373,46 @@ abstract class Encode[A: Genotype] extends Serializable {
     }.getOrElse(Encode.VT(DummySM, DummyVars))
   }
 
+  def getCoding: Coding = {
+    (config.`type`, config.maf.getBoolean("fixed")) match {
+      case (MethodType.snv, _) =>
+        getCommon() match {case Some(c) => c; case None => Empty}
+      case (MethodType.meta, _) =>
+        (getCommon(), getRare()) match {
+          case (Some(c), Some(r)) => Mixed(r, c)
+          case (Some(c), None) => c
+          case (None, Some(r)) => r
+          case _ => Empty
+        }
+      case (MethodType.cmc|MethodType.brv, true) =>
+        if (isDefined && informative()) getFixed else Empty
+      case (MethodType.cmc|MethodType.brv, false) =>
+        if (isDefined && informative()) getVT else Empty
+      case (MethodType.skat|MethodType.skato, _) =>
+        getRare() match {
+          case Some(r) => r
+          case None => Empty
+        }
+      case _ => Empty
+    }
+  }
+
   def isDefined: Boolean
   def getCommon(cutoff: Double = fixedCutoff): Option[Common] = {
-    if (maf.forall(_.isRare(cutoff))) {
-      None
-    } else {
-      val res = DenseVector.horzcat(vars.zip(maf).filter(v =>
-        v._2 >= cutoff && v._2 <= (1 - cutoff)).map {
-        case (v, m) => DenseVector(v.toIndexedSeq.map(genotype.toBRV(_, m)): _*)
-      }: _*)
-      val info = vars.zip(mafCount)
-        .filter(v => v._2.ratio >= cutoff && v._2.ratio <= (1 - cutoff)).map{
-        case (v, m) =>
-          v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
+    definedIndices(_.isCommon(cutoff)).map{indices =>
+      val dvs = for (i <- indices) yield {
+        vars(i).toCounter(genotype.toBRV(_, maf(i)), 0.0) match {
+          case SparseCounter(m, _, s) =>
+            SparseVector(s)(m.toIndexedSeq:_*).toDenseVector
+          case DenseCounter(iseq, d) =>
+            DenseVector(iseq.toIndexedSeq:_*)
+        }
       }
-      Some(Common(res, info))
+      val info = for (i <- indices) yield {
+        val mc = mafCount(i)
+        vars(i).toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${mc._1.toInt},${mc._2.toInt}")
+      }
+      Common(DenseVector.horzcat(dvs: _*), info)
     }
   }
   def definedIndices(p: Double => Boolean): Option[Array[Int]] = {
@@ -397,19 +425,24 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
 
   def getRare(cutoff: Double = fixedCutoff): Option[Encode.Rare] = {
-    if (maf.exists(_.isRare(cutoff))) {
-      val builder = new CSCMatrix.Builder[Double](sampleSize, maf.count(m => m < cutoff || m > (1 - cutoff)))
-      val cnt = vars.zip(maf).filter(v => v._2 < cutoff || v._2 > (1 - cutoff)).map{ v =>
-        v._1.toCounter(genotype.toBRV(_, v._2), 0.0).toMap}
-      cnt.zipWithIndex.foreach{ case (elems, col) =>
-          elems.foreach{case (row, v) => builder.add(row, col, v)}}
-      val info = vars.zip(mafCount).filter(v => v._2.ratio < cutoff || v._2.ratio > (1 -cutoff)).map{
-        case (v, m) =>
-          v.toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${m._1},${m._2}")
+    val scale = config.`type` match {
+      case MethodType.skat | MethodType.skato => weight
+      case _ => DenseVector.fill(vars.length)(1.0)
+    }
+    definedIndices(_.isRare(cutoff)).map{indices =>
+      val svs = for (i <- indices) yield {
+        vars(i).toCounter(genotype.toBRV(_, maf(i)), 0.0) match {
+          case SparseCounter(m, d, s) =>
+            SparseVector(s)(m.toIndexedSeq:_*) * scale(i)
+          case DenseCounter(iseq, _) =>
+            SparseVector(iseq.toIndexedSeq:_*) * scale(i)
+        }
       }
-      Some(Rare(builder.result, info))
-    } else {
-      None
+      val info = for (i <- indices) yield {
+        val mc = mafCount(i)
+        vars(i).toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${mc._1.toInt},${mc._2.toInt}")
+      }
+      Rare(SparseVector.horzcat(svs:_*), info)
     }
   }
 }

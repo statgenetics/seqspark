@@ -3,10 +3,10 @@ package org.dizhang.seqspark.ds
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
+import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType}
 import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.language.implicitConversions
 
 /**
@@ -28,6 +28,19 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
   }
   def toDummy: RDD[Variant[A]] = {
     self.map(v => v.toDummy)
+  }
+
+  def groupByVarNum: RDD[(String, Iterable[Variant[A]])] = {
+    val sampleSize = self.first().length
+    val varNum = if (sampleSize == 0) 1000 else 1000000/sampleSize //the matrix should only have 1000000 elements
+    val binSize = self.mapPartitions(i => Array(i.size).toIterator).max/varNum + 1
+    val pars = self.partitions.length
+    self.zipWithUniqueId().map{
+      case (v, idx) =>
+        val k = idx%pars
+        val i = idx/pars/varNum
+        (k * binSize + i).toString -> v
+    }.groupByKey()
   }
 
   def variants(cond: LogicalParser.LogExpr)(ssc: SingleStudyContext): RDD[Variant[A]] = {

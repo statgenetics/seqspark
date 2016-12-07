@@ -13,15 +13,21 @@ import scala.language.existentials
 @SerialVersionUID(7727280001L)
 trait Burden extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode[_]
+  def x: Encode.Fixed
   def result: AssocMethod.Result
 }
 
 object Burden {
 
   def apply(nullModel: NullModel,
-            x: Encode[_]): Burden = {
-    AnalyticTest(nullModel, x)
+            x: Encode.Coding): AnalyticTest = {
+    AnalyticTest(nullModel, x.asInstanceOf[Encode.Fixed])
+  }
+
+  def apply(ref: Double, min: Int, max: Int,
+            nullModel: NullModel,
+            x: Encode.Coding): ResamplingTest = {
+    ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.Fixed])
   }
 
   def getStatistic(st: ScoreTest): Double = {
@@ -30,9 +36,9 @@ object Burden {
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode[_]) extends Burden with AssocMethod.AnalyticTest {
-    val geno = x.getFixed
-    val scoreTest = ScoreTest(nullModel, geno.coding)
+                                x: Encode.Fixed) extends Burden with AssocMethod.AnalyticTest {
+    def geno = x.coding
+    val scoreTest = ScoreTest(nullModel, geno)
     val statistic = getStatistic(scoreTest)
     val pValue = {
       val dis = new Gaussian(0.0, 1.0)
@@ -40,7 +46,7 @@ object Burden {
     }
 
     def result: AssocMethod.AnalyticResult = {
-      AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
+      AssocMethod.AnalyticResult(x.vars, statistic, pValue)
     }
   }
 
@@ -49,10 +55,10 @@ object Burden {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode[_]) extends Burden with AssocMethod.ResamplingTest {
-    def pCount = Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
+                                  x: Encode.Fixed) extends Burden with AssocMethod.ResamplingTest {
+    def pCount = Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
     def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(x.getFixed.vars, refStatistic, pCount)
+      AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
     }
   }
 }

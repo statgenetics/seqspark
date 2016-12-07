@@ -26,6 +26,45 @@ object Resampling {
 
 
   /**
+    * This Simple class is for models that do not involve re-encoding genotype
+    * */
+  @SerialVersionUID(7778770301L)
+  final case class Simple(refStatistic: Double, min: Int, max: Int,
+                          nullModel: NullModel, coding: Encode.Coding,
+                          transformer: ScoreTest => Double) extends Resampling {
+    def makeNewStatistic(newNullModel: NullModel): Double = {
+      val st: ScoreTest =
+        coding match {
+          case Encode.Fixed(c, _) =>
+            ScoreTest(newNullModel, c)
+          case Encode.VT(c, _) =>
+            ScoreTest(newNullModel, c)
+          case Encode.Common(c, _) =>
+            ScoreTest(newNullModel, c)
+          case Encode.Mixed(r, c) =>
+            ScoreTest(newNullModel, c.coding, r.coding)
+          case Encode.Rare(c, _) =>
+            ScoreTest(newNullModel, c)
+          case _ =>
+            ScoreTest.Dummy
+        }
+      transformer(st)
+    }
+    def pCount: PairInt = {
+      var res = (0, 0)
+      for (i <- 0 to max) {
+        if (res._1 >= min)
+          return res
+        else {
+          val newNullModel = makeNewNullModel
+          val statistic = makeNewStatistic(newNullModel)
+          res = PairInt.op(res, if (statistic > refStatistic) (1, 1) else (0, 1))
+        }
+      }
+      res
+    }
+  }
+  /**
     * the test class is for Burden test and VT test
     * the transformer is a function transforms the
     * result of variant level score test to a statistic

@@ -24,11 +24,11 @@ object SKATO {
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 0.999)
 
   def apply(nullModel: NullModel,
-            x: Encode[_],
+            x: Encode.Coding,
             method: String): SKATO = {
     method match {
-      case "davies" => Davies(nullModel, x, method)
-      case _ => LiuModified(nullModel, x, method)
+      case "davies" => Davies(nullModel, x.asInstanceOf[Encode.Rare], method)
+      case _ => LiuModified(nullModel, x.asInstanceOf[Encode.Rare], method)
     }
   }
 
@@ -197,7 +197,7 @@ object SKATO {
 
   @SerialVersionUID(7727760101L)
   case class Davies(nullModel: NullModel,
-                    x: Encode[_],
+                    x: Encode.Rare,
                     method: String) extends SKATO with AsymptoticKur {
     lazy val term2 = new ChiSquared(1.0)
 
@@ -311,7 +311,7 @@ object SKATO {
 
   @SerialVersionUID(7727760301L)
   case class LiuModified(nullModel: NullModel,
-                         x: Encode[_],
+                         x: Encode.Rare,
                          method: String) extends LiuPValue with AsymptoticKur
 
   {
@@ -321,7 +321,7 @@ object SKATO {
   }
 
   case class SmallSampleAdjust(nullModel: LogisticModel,
-                               x: Encode[_],
+                               x: Encode.Rare,
                                resampled: DM[Double],
                                method: String) extends LiuPValue {
 
@@ -352,12 +352,10 @@ object SKATO {
 @SerialVersionUID(7727760001L)
 trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
-  def x: Encode[_]
-  lazy val geno: CM[Double] = x.getRare().get.coding
-  lazy val weight = DV(x.weight.toArray.zip(x.maf)
-    .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
-    .map(_._1))
-  def numVars: Int = weight.length
+  def x: Encode.Rare
+  def geno: CM[Double] = x.coding
+
+  def numVars: Int = x.vars.length
   //lazy val misc = x.config.misc
   def method: String
   lazy val rhos: Array[Double] = {
@@ -373,7 +371,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     *
     *  */
   lazy val P0SqrtZ: DM[Double] = {
-    val z: CM[Double] = rowMultiply(geno, weight)
+    val z: CM[Double] = geno
     nullModel match {
       case lm: LinearModel =>
         (- lm.xsInfoInv * (lm.xs.t * z) + z)/lm.sigma
@@ -397,7 +395,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val kernels: Array[DM[Double]] = {
     val i = DM.eye[Double](numVars)
     val o = DM.ones[Double](numVars, numVars)
-    rhos.map(r => diag(weight) * ((1 - r) * i + r * o) * diag(weight))
+    rhos.map(r => (1 - r) * i + r * o)
   }
 
   lazy val qScores: Array[Double] = kernels.map(k => score.t * k * score)
@@ -424,7 +422,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def pValue: Option[Double]
 
   def result = {
-    val vs = x.getRare().get.vars
+    val vs = x.vars
     (paramOpt, lambdaUsOpt) match {
       case (Some(_), (Some(_), Some(_))) => AssocMethod.AnalyticResult(vs, pMin, pValue)
       case _ => AssocMethod.AnalyticResult(vs, -1.0, None)

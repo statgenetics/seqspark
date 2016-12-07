@@ -19,21 +19,21 @@ import scala.util.{Success, Try}
 object SKAT {
 
   def apply(nullModel: NullModel,
-            x: Encode[_],
+            x: Encode.Coding,
+            method: String,
             rho: Double): SKAT = {
-    val method = x.config.misc.method
     method match {
-      case "liu.mod" => LiuModified(nullModel, x, rho)
-      case "liu" => Liu(nullModel, x, rho)
-      case _ => Davies(nullModel, x, rho)
+      case "liu.mod" => LiuModified(nullModel, x.asInstanceOf[Encode.Rare], rho)
+      case "liu" => Liu(nullModel, x.asInstanceOf[Encode.Rare], rho)
+      case _ => Davies(nullModel, x.asInstanceOf[Encode.Rare], rho)
     }
   }
 
   def apply(nullModel: LogisticModel,
-            x: Encode[_],
+            x: Encode.Coding,
             resampled: DM[Double],
             rho: Double): SKAT = {
-    SmallSampleAdjust(nullModel, x, resampled, rho)
+    SmallSampleAdjust(nullModel, x.asInstanceOf[Encode.Rare], resampled, rho)
   }
 
   def makeResampled(nullModel: LogisticModel)(implicit sc: SparkContext): DM[Double] = {
@@ -72,7 +72,7 @@ object SKAT {
 
   @SerialVersionUID(7727750101L)
   final case class Davies(nullModel: NullModel,
-                          x: Encode[_],
+                          x: Encode.Rare,
                           rho: Double = 0.0) extends SKAT {
 
     def pValue: Option[Double] = {
@@ -81,7 +81,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750201L)
   final case class Liu(nullModel: NullModel,
-                       x: Encode[_],
+                       x: Encode.Rare,
                        rho: Double = 0.0) extends SKAT {
 
     def pValue: Option[Double] = {
@@ -90,7 +90,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750301L)
   final case class LiuModified(nullModel: NullModel,
-                               x: Encode[_],
+                               x: Encode.Rare,
                                rho: Double = 0.0) extends SKAT {
 
     def pValue: Option[Double] = {
@@ -108,7 +108,7 @@ object SKAT {
   }
   @SerialVersionUID(7727750401L)
   final case class SmallSampleAdjust(nullModel: LogisticModel,
-                                     x: Encode[_],
+                                     x: Encode.Rare,
                                      resampled: DM[Double],
                                      rho: Double = 0.0) extends SKAT {
     /** resampled is a 10000 x n matrix, storing re-sampled residuals */
@@ -134,20 +134,18 @@ object SKAT {
 @SerialVersionUID(7727750001L)
 trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   def nullModel: NullModel
-  def x: Encode[_]
-  def isDefined: Boolean = x.isDefined
+  def x: Encode.Rare
   def rho: Double
-  lazy val weight = DV(x.weight.toArray.zip(x.maf)
-    .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
-    .map(_._1))
+
   /**
     * we trust the size is not very large here
     * otherwise, we could not store the matrix in memory
+    *
+    * Moved the weight to the encode module
     * */
   lazy val kernel: DM[Double] = {
-    val size = weight.length
-    val r = (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
-    diag(weight) * r * diag(weight)
+    val size = x.vars.length
+    (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
   }
   lazy val resVar: Double = {
     nullModel match {
@@ -155,7 +153,7 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
       case _ => 1.0
     }
   }
-  lazy val geno = x.getRare().get.coding
+  def geno = x.coding
   lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
 
   def qScore: Double = {
@@ -165,5 +163,5 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val vc = scoreSigma * kernel * scoreSigma
   lazy val (lambda, u) = getLambdaU(vc)
   def pValue: Option[Double]
-  def result = AssocMethod.AnalyticResult(x.getRare().get.vars, qScore, pValue)
+  def result = AssocMethod.AnalyticResult(x.vars, qScore, pValue)
 }

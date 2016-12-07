@@ -14,11 +14,22 @@ import scala.util.{Success, Try}
 @SerialVersionUID(7727880001L)
 trait VT extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode[_]
+  def x: Encode.VT
   def result: AssocMethod.Result
 }
 
 object VT {
+
+  def apply(nullModel: NullModel,
+            x: Encode.Coding): AnalyticTest = {
+    AnalyticTest(nullModel, x.asInstanceOf[Encode.VT])
+  }
+
+  def apply(ref: Double, min: Int, max: Int,
+            nullModel: NullModel,
+            x: Encode.Coding): ResamplingTest = {
+    ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.VT])
+  }
 
   def getStatistic(st: ScoreTest): Double = {
     //println(s"scores: ${st.score.toArray.mkString(",")}")
@@ -29,13 +40,12 @@ object VT {
 
   @SerialVersionUID(7727880101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode[_]) extends VT with AssocMethod.AnalyticTest {
-    val geno = x.getVT
+                                x: Encode.VT) extends VT with AssocMethod.AnalyticTest {
     val scoreTest = {
-      val cnt = geno.coding.activeSize
+      val cnt = x.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
       //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
-      ScoreTest(nullModel, geno.coding)
+      ScoreTest(nullModel, x.coding)
     }
     val statistic = getStatistic(scoreTest)
     val pValue = {
@@ -49,7 +59,7 @@ object VT {
         case _ => None
       }
     }
-    def result = AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
+    def result = AssocMethod.AnalyticResult(x.vars, statistic, pValue)
   }
 
   @SerialVersionUID(7727880201L)
@@ -57,11 +67,11 @@ object VT {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode[_]) extends VT with AssocMethod.ResamplingTest {
+                                  x: Encode.VT) extends VT with AssocMethod.ResamplingTest {
     def pCount = {
-      Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
+      Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
     }
-    def result = AssocMethod.ResamplingResult(x.getVT.vars, refStatistic, pCount)
+    def result = AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
   }
 
 }

@@ -1,5 +1,6 @@
 package org.dizhang.seqspark.assoc
 
+import breeze.numerics.abs
 import breeze.stats.distributions.Gaussian
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
 import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
@@ -12,33 +13,38 @@ import scala.language.existentials
   */
 trait SNV extends AssocMethod {
   def nullModel: NullModel
-  def x: Encode[_]
+  def x: Encode.Common
   def result: AssocMethod.Result
 }
 
 object SNV {
   def apply(nullModel: NullModel,
-            x: Encode[_]): Burden = {
-    AnalyticTest(nullModel, x)
+            x: Encode.Coding): AnalyticTest = {
+    AnalyticTest(nullModel, x.asInstanceOf[Encode.Common])
+  }
+
+  def apply(ref: Double, min: Int, max: Int,
+            nullModel: NullModel,
+            x: Encode.Coding): ResamplingTest = {
+    ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.Common])
   }
 
   def getStatistic(st: ScoreTest): Double = {
-    st.score(0)/st.variance(0,0).sqrt
+    abs(st.score(0))/st.variance(0,0).sqrt
   }
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode[_]) extends Burden with AssocMethod.AnalyticTest {
-    val geno = x.getCommon().get
-    val scoreTest = ScoreTest(nullModel, geno.coding)
+                                x: Encode.Common) extends SNV with AssocMethod.AnalyticTest {
+    val scoreTest = ScoreTest(nullModel, x.coding)
     val statistic = getStatistic(scoreTest)
     val pValue = {
       val dis = new Gaussian(0.0, 1.0)
-      Some(1.0 - dis.cdf(statistic))
+      Some((1.0 - dis.cdf(statistic)) * 2)
     }
 
     def result: AssocMethod.AnalyticResult = {
-      AssocMethod.AnalyticResult(geno.vars, statistic, pValue)
+      AssocMethod.AnalyticResult(x.vars, statistic, pValue)
     }
   }
 
@@ -47,11 +53,10 @@ object SNV {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode[_]) extends Burden with AssocMethod.ResamplingTest {
-    val geno = x.getCommon().get
-    def pCount = Resampling.Test(refStatistic, min, max, nullModel, x, getStatistic).pCount
+                                  x: Encode.Common) extends SNV with AssocMethod.ResamplingTest {
+    def pCount = Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
     def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(geno.vars, refStatistic, pCount)
+      AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
     }
   }
 }

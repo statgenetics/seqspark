@@ -89,7 +89,10 @@ object AssocMaster {
     if (target == cur)
       data
     else
-      data.flatMap(x => Array.fill(math.ceil(target/cur).toInt)(x)).repartition(jobs)
+      data.flatMap(x =>
+        for (i <- 1 to math.ceil(target/cur).toInt)
+          yield x._1 -> x._2.copy
+      ).repartition(jobs)
   }
 
   def permutationTest(codings: RDD[(String, Encode.Coding)],

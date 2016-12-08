@@ -143,24 +143,33 @@ object Encode {
       }
     }
     def informative: Boolean
+    def copy: Coding
   }
   case object Empty extends Coding {
     def informative = false
+    def copy = Empty
   }
   case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
     def informative = true
+    def copy = {
+      Rare(coding.copy, vars.map(v => v.copy()))
+    }
   }
   case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
     def informative = true
+    def copy = Common(coding.copy, vars.map(v => v.copy()))
   }
   case class Mixed(rare: Rare, common: Common) extends Coding {
     def informative = true
+    def copy = Mixed(rare.copy, common.copy)
   }
   case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding {
     def informative = sum(coding) >= 3.0
+    def copy = Fixed(coding.copy, vars.map(v => v.copy()))
   }
   case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
     def informative = coding.cols > 1
+    def copy = VT(coding.copy, vars.map(v => v.copy()))
   }
 
   sealed trait Raw[A] extends Encode[A] {

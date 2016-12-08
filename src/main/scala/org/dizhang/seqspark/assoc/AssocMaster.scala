@@ -3,7 +3,7 @@ package org.dizhang.seqspark.assoc
 import java.io.{File, PrintWriter}
 
 import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
-import org.apache.spark.SparkContext
+import org.apache.spark.{Partitioner, SparkContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -85,6 +85,13 @@ object AssocMaster {
       thisLoopLimit
   }
 
+  class Balancer(val numPartitions: Int) extends Partitioner {
+    override def getPartition(key: Any): Int = {
+      val k = key.asInstanceOf[Long]
+      (k%numPartitions).toInt
+    }
+  }
+
   def expand(data: RDD[(String, Encode.Coding)], cur: Int, target: Int, jobs: Int): RDD[(String, Encode.Coding)] = {
     if (target == cur)
       data
@@ -92,7 +99,7 @@ object AssocMaster {
       data.flatMap(x =>
         for (i <- 1 to math.ceil(target/cur).toInt)
           yield x._1 -> x._2.copy
-      ).repartition(jobs)
+      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
   }
 
   def permutationTest(codings: RDD[(String, Encode.Coding)],
@@ -134,8 +141,8 @@ object AssocMaster {
       curEncode.cache()
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
       if (conf.debug) {
-        val parSpace = curEncode.mapPartitions(p => Array(p.size).toIterator).collect()
-        logger.info(s"max par: ${parSpace.max} min par: ${parSpace.min}")
+        val parSpace = curEncode.mapPartitions(p => Array(p.size).toIterator).collect().sorted
+        logger.info(s"partition space max: ${parSpace.max} min: ${parSpace.min}, median: ${parSpace(jobs/2)}")
       }
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)

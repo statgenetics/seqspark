@@ -87,11 +87,11 @@ object AssocMaster {
       thisLoopLimit
   }
 
-  def expand(data: RDD[(String, Encode.Coding)], cur: Int, target: Int): RDD[(String, Encode.Coding)] = {
+  def expand(data: RDD[(String, Encode.Coding)], cur: Int, target: Int, jobs: Int): RDD[(String, Encode.Coding)] = {
     if (target == cur)
       data
     else
-      data.flatMap(x => Array.fill(math.ceil(target/cur).toInt)(x))
+      data.flatMap(x => Array.fill(math.ceil(target/cur).toInt)(x)).repartition(jobs)
   }
 
   def permutationTest(codings: RDD[(String, Encode.Coding)],
@@ -99,11 +99,13 @@ object AssocMaster {
                       cov: Broadcast[Option[DenseMatrix[Double]]],
                       binaryTrait: Boolean,
                       controls: Broadcast[Array[Boolean]],
-                      config: MethodConfig)(implicit sc: SparkContext): Map[String, AssocMethod.ResamplingResult] = {
+                      config: MethodConfig)
+                     (implicit sc: SparkContext, conf: RootConfig): Map[String, AssocMethod.ResamplingResult] = {
     logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     val nm = ScoreTest.NullModel(reg)
     logger.info("get the reference statistics first")
+    val jobs = conf.jobs
     val asymptoticRes = asymptoticTest(codings, y, cov, binaryTrait, config).collect().toMap
     val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
     val sites = codings.count().toInt
@@ -118,7 +120,7 @@ object AssocMaster {
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups before expand")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
-      curEncode = expand(curEncode, lastMax, curMax)
+      curEncode = expand(curEncode, lastMax, curMax, jobs)
       curEncode.cache()
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
@@ -152,7 +154,7 @@ object AssocMaster {
                      cov: Broadcast[Option[DenseMatrix[Double]]],
                      binaryTrait: Boolean,
                      config: MethodConfig)
-                    (implicit sc: SparkContext): RDD[(String, AssocMethod.AnalyticResult)] = {
+                    (implicit sc: SparkContext, conf: RootConfig): RDD[(String, AssocMethod.AnalyticResult)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
     //logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
@@ -299,10 +301,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (permutation) {
-      val res = permutationTest(codings, currentTrait._2, cov, binary, controls, methodConfig)(sc).toArray
+      val res = permutationTest(codings, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
       writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
-      val res = asymptoticTest(codings, currentTrait._2, cov, binary, methodConfig)(sc).collect()
+      val res = asymptoticTest(codings, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }

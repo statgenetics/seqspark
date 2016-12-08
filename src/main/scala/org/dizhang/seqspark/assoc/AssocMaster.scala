@@ -19,8 +19,6 @@ import org.dizhang.seqspark.util.{Constant, LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
-
 /**
   * asymptotic test
   */

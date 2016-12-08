@@ -28,6 +28,19 @@ class VTSpec extends FlatSpec {
     val sm = method.config.root().render()
     Encode(vars, sm)
   }
+  val ec2 = {
+    val conf = ConfigFactory.load().getConfig("seqspark.association.method.vt")
+    val method = MethodConfig(conf)
+    val gt = Array("0/0", "0/1", "1/1", "./.")
+    val meta = Array("1", "2", ".", "A", "C", ".", ".", ".")
+    val vs = Array(
+      Variant.fromIndexedSeq(meta, Array(1,0,0).map(g => Genotype.Raw.toSimpleGenotype(gt(g))), 16.toByte),
+      Variant.fromIndexedSeq(meta, Array(0,0,1).map(g => Genotype.Raw.toSimpleGenotype(gt(g))), 16.toByte),
+      Variant.fromIndexedSeq(meta, Array(0,2,0).map(g => Genotype.Raw.toSimpleGenotype(gt(g))), 16.toByte)
+    )
+    val sm = method.config.root().render()
+    Encode(vs, sm)
+  }
   val nullModel = {
     val rand = Gaussian(2, 0.25)(randBasis)
     val dat = (0 to 3).map{i =>
@@ -39,9 +52,14 @@ class VTSpec extends FlatSpec {
     ScoreTest.NullModel(reg)
   }
   "A VT" should "be fine" in {
-
-    println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
-    val vt = VT(nullModel, encode.getVT)
+    val c = ec2.getVT.coding.toDense
+    for (i <- 0 until c.cols) {
+      println(s"TH$i ${c(::,i).toArray.mkString(",")}")
+    }
+    val f = ec2.getFixed
+    println(s"${f.coding.toArray.mkString(",")}")
+    //println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
+    //val vt = VT(nullModel, encode.getVT)
     //println(s"S: ${vt.statistic} P: ${vt.pValue}")
   }
 }

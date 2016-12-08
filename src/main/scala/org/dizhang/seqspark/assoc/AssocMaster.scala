@@ -106,7 +106,13 @@ object AssocMaster {
     val jobs = conf.jobs
     val asymptoticRes = asymptoticTest(codings, y, cov, binaryTrait, config).collect().toMap
     val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
-    val sites = codings.count().toInt
+    val intR = """(\d+)""".r
+    val sites = conf.association.sites match {
+      case intR(n) => n.toInt
+      case "exome" => 25000
+      case "genome" => 1000000
+      case _ => codings.count().toInt
+    }
     val max = Permu.max(sites)
     val min = Permu.min(sites)
     val base = Permu.base
@@ -114,7 +120,10 @@ object AssocMaster {
     val loops = math.round(math.log(sites)/math.log(base)).toInt
     var curEncode = codings
     var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
-    for (i <- 0 to loops) {
+    for {
+      i <- 0 to loops
+      if curEncode.count() > 0
+    } {
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups before expand")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)

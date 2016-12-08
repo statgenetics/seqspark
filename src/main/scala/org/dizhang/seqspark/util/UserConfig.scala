@@ -150,7 +150,8 @@ object UserConfig {
     def methodList = config.getStringList("method.list").asScala.toArray
     def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
     def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
-    def filters = config.getStringList("filters").asScala.toArray
+    def sites: String = config.getString("method.sites")
+
   }
 
   case class MiscConfig(config: Config) extends UserConfig {

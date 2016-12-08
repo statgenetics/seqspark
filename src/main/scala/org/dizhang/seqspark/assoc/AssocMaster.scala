@@ -133,6 +133,10 @@ object AssocMaster {
       curEncode = expand(curEncode, lastMax, curMax, jobs)
       curEncode.cache()
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
+      if (conf.debug) {
+        val parSpace = curEncode.mapPartitions(p => Array(p.size).toIterator).collect()
+        logger.info(s"max par: ${parSpace.max} min par: ${parSpace.min}")
+      }
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
         val model =

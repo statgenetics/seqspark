@@ -78,6 +78,7 @@ object UserConfig {
     val pipeline = config.getStringList("pipeline").asScala.toList
     val jobs = config.getInt("jobs")
     val benchmark = config.getBoolean("benchmark")
+    val debug = config.getBoolean("debug")
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 

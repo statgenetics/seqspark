@@ -102,11 +102,13 @@ object AssocMaster {
     val sorted = data.sortBy(p => p._2.size, ascending = false)
     if (target == cur)
       sorted.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest)).map(_._2)
-    else
+    else {
+      val times = math.ceil(target/cur).toInt
       sorted.flatMap(x =>
-        for (i <- 1 to math.ceil(target/cur).toInt)
+        for (i <- 1 to times)
           yield x._1 -> x._2.copy
-      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest)).map(_._2)
+      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest * times)).map(_._2)
+    }
   }
 
   def permutationTest(codings: RDD[(String, Encode.Coding)],

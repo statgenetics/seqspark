@@ -1,8 +1,9 @@
 package org.dizhang.seqspark.stat
 
-import breeze.stats.distributions.{ThreadLocalRandomGenerator, RandBasis}
+import breeze.linalg.DenseVector
+import breeze.stats.distributions._
 import org.apache.commons.math3.random.MersenneTwister
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.{FlatSpec, Matchers}
 
 /**
   * Test for logistic regression implementation
@@ -16,5 +17,10 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
   */
   "A LogisticRegression" should "do nothing" in {
     //println("Do not do anything here")
+    val rb = new Binomial(1, 0.5)
+    val y = DenseVector(rb.sample(2000).map(_.toDouble):_*)
+    val cov = DenseVector(rb.sample(2000).map(_.toDouble):_*).toDenseMatrix.t
+    val model = LogisticRegression(y, cov)
+    println(s"Logistic regression using SGD: ${model.coefficients}")
   }
 }

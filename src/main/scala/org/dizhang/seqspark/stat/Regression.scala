@@ -2,7 +2,7 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg._
 import breeze.numerics._
-import breeze.optimize.{DiffFunction, LBFGS}
+import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, StochasticDiffFunction, StochasticGradientDescent}
 
 /**
   * linear and logistic regression
@@ -71,8 +71,8 @@ case class LogisticRegression(responses: DenseVector[Double],
   /** beta contains p elements (variable numbers plus 1 intercept)
     * g [n]: probability of n samples
     * */
-  val cost = new DiffFunction[Vector[Double]] {
-    def calculate(beta: Vector[Double]) = {
+  val cost = new DiffFunction[DenseVector[Double]] {
+    def calculate(beta: DenseVector[Double]) = {
       val num = ones.length
       val g = sigmoid(xs * beta)
 
@@ -81,13 +81,13 @@ case class LogisticRegression(responses: DenseVector[Double],
 
       /** gradient on beta: -2 * sum(x * (y - g)) */
       //val gradient: Vector[Double] = -2.0 * (xs.t * (response.:*(ones - g) - g.:*(ones - response)))
-      val gradient: Vector[Double] = -2.0 * (xs.t * (responses - g))
+      val gradient: DenseVector[Double] = -2.0 * (xs.t * (responses - g))
 
       (value, gradient)
     }
   }
 
-  val model = new LBFGS[Vector[Double]]
+  val model = new LBFGSB(DenseVector.fill(xs.cols)(-1.0), DenseVector.fill(xs.cols)(1.0))
 
   /** the estimated betas */
   val coefficients = model.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.01)).toDenseVector
@@ -103,5 +103,4 @@ case class LogisticRegression(responses: DenseVector[Double],
     /** this is essentially (xs.t * diag(residualsVariance) * xs) */
     xsRotated.t * (xsRotated(::, *) :* residualsVariance)
   }
-
 }

@@ -18,7 +18,7 @@ object Constant {
       case x if x <= 5 => 120
       case _ => 121
     }
-    val base = 10
+    val base = 2
 
   }
 

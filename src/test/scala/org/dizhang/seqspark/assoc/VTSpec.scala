@@ -51,15 +51,9 @@ class VTSpec extends FlatSpec {
     val reg = LinearRegression(y, dm.t)
     ScoreTest.NullModel(reg)
   }
-  "A VT" should "be fine" in {
-    val c = ec2.getVT.coding.toDense
-    for (i <- 0 until c.cols) {
-      println(s"TH$i ${c(::,i).toArray.mkString(",")}")
-    }
-    val f = ec2.getFixed
-    println(s"${f.coding.toArray.mkString(",")}")
+  //"A VT" should "be fine" in {
     //println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
     //val vt = VT(nullModel, encode.getVT)
     //println(s"S: ${vt.statistic} P: ${vt.pValue}")
-  }
+  //}
 }

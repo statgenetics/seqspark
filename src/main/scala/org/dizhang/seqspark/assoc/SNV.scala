@@ -29,15 +29,16 @@ object SNV {
     ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.Common])
   }
 
-  def getStatistic(st: ScoreTest): Double = {
-    abs(st.score(0))/st.variance(0,0).sqrt
+  def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
+    val st = ScoreTest(nm, x.asInstanceOf[Encode.Common].coding)
+    st.score(0)/st.variance(0,0).sqrt
   }
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode.Common) extends SNV with AssocMethod.AnalyticTest {
-    val scoreTest = ScoreTest(nullModel, x.coding)
-    val statistic = getStatistic(scoreTest)
+    //val scoreTest = ScoreTest(nullModel, x.coding)
+    val statistic = getStatistic(nullModel, x)
     val pValue = {
       val dis = new Gaussian(0.0, 1.0)
       Some((1.0 - dis.cdf(statistic)) * 2)

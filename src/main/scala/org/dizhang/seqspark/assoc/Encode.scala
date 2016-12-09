@@ -29,7 +29,7 @@ object Encode {
   val DummyDV = DenseVector.fill(1)(0.0)
   val DummyVars = Array.empty[Variation]
   val DummyFixed = Fixed(DummySV, DummyVars)
-  val DummyVT = VT(DummySM, DummyVars)
+  val DummyVT = VT(Array(DummySV), DummyVars)
 
   implicit class AF(val f: Double) extends AnyVal {
     def isRare(cutoff: Double): Boolean = f < cutoff || f > (1 - cutoff)
@@ -144,32 +144,39 @@ object Encode {
     }
     def informative: Boolean
     def copy: Coding
+    def size: Int
   }
   case object Empty extends Coding {
     def informative = false
     def copy = Empty
+    def size = 0
   }
   case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
     def informative = true
     def copy = {
       Rare(coding.copy, vars.map(v => v.copy()))
     }
+    def size = vars.length
   }
   case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
     def informative = true
     def copy = Common(coding.copy, vars.map(v => v.copy()))
+    def size = vars.length
   }
   case class Mixed(rare: Rare, common: Common) extends Coding {
     def informative = true
     def copy = Mixed(rare.copy, common.copy)
+    def size = rare.size + common.size
   }
   case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding {
     def informative = sum(coding) >= 3.0
     def copy = Fixed(coding.copy, vars.map(v => v.copy()))
+    def size = 1
   }
-  case class VT(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
-    def informative = coding.cols > 1
-    def copy = VT(coding.copy, vars.map(v => v.copy()))
+  case class VT(coding: Array[SparseVector[Double]], vars: Array[Variation]) extends Coding {
+    def informative = coding.length > 1
+    def copy = VT(coding.map(sv => sv.copy), vars.map(v => v.copy()))
+    def size = coding.length
   }
 
   sealed trait Raw[A] extends Encode[A] {
@@ -386,19 +393,19 @@ abstract class Encode[A: Genotype] extends Serializable {
   lazy val getVT: Encode.VT = {
     val tol = 4.0/(9 * sampleSize)
     thresholds.map{th =>
-      val cm = SparseVector.horzcat(th.map{c =>
+      val cm = th.map{c =>
         val sv = this.getFixedBy(c + tol).coding
         //println(s"threashold: $c sv size: ${sv.length} activeSize: ${sv.activeSize} " +
         //  s"values: ${sv.activeValuesIterator.take(5).mkString(",")}")
         sv
-      }: _*)
+      }
       //println(s"cscmat(1, ::): ${cm.toDense(1, ::)}")
       val variations = vars.map(_.toVariation()).zip(mafCount).filter(p => p._2.ratio <= th.max).map{
         case (v, mc) =>
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
       }
       Encode.VT(cm, variations)
-    }.getOrElse(Encode.VT(DummySM, DummyVars))
+    }.getOrElse(Encode.VT(Array(DummySV), DummyVars))
   }
 
   def getCoding: Coding = {

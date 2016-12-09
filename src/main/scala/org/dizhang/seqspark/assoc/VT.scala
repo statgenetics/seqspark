@@ -31,10 +31,15 @@ object VT {
     ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.VT])
   }
 
-  def getStatistic(st: ScoreTest): Double = {
+  def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
     //println(s"scores: ${st.score.toArray.mkString(",")}")
     //println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
-    val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
+    val m = x.asInstanceOf[Encode.VT].coding
+    val ts = m.map{sv =>
+      val st = ScoreTest(nm, sv)
+      st.score(0)/st.variance(0, 0)
+    }
+    //val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
     max(ts)
   }
 
@@ -45,9 +50,10 @@ object VT {
       //val cnt = x.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
       //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
-      ScoreTest(nullModel, x.coding)
+      val m = SparseVector.horzcat(x.coding:_*)
+      ScoreTest(nullModel, m)
     }
-    val statistic = getStatistic(scoreTest)
+    val statistic = getStatistic(nullModel, x)
     val pValue = {
       val ss = diag(scoreTest.variance).map(_.sqrt)
       val ts = scoreTest.score :/ ss

@@ -31,8 +31,9 @@ object Resampling {
   @SerialVersionUID(7778770301L)
   final case class Simple(refStatistic: Double, min: Int, max: Int,
                           nullModel: NullModel, coding: Encode.Coding,
-                          transformer: ScoreTest => Double) extends Resampling {
+                          transformer: (NullModel, Encode.Coding) => Double) extends Resampling {
     def makeNewStatistic(newNullModel: NullModel): Double = {
+      /**
       val st: ScoreTest =
         coding match {
           case Encode.Fixed(c, _) =>
@@ -48,7 +49,8 @@ object Resampling {
           case _ =>
             ScoreTest.Dummy
         }
-      transformer(st)
+        */
+      transformer(newNullModel, coding)
     }
     def pCount: PairInt = {
       var res = (0, 0)
@@ -86,7 +88,7 @@ object Resampling {
         val st = ScoreTest(newNullModel, newX.getFixed.coding)
         transformer(st)
       } else {
-        val st = ScoreTest(newNullModel, newX.getVT.coding)
+        val st = ScoreTest.Dummy
         transformer(st)
       }
     }

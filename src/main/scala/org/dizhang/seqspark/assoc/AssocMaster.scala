@@ -85,25 +85,28 @@ object AssocMaster {
       thisLoopLimit
   }
 
-  class Balancer(val numPartitions: Int) extends Partitioner {
+  class Balancer(val numPartitions: Int, val rest: Long) extends Partitioner {
     override def getPartition(key: Any): Int = {
       val k = key.asInstanceOf[Long]
-      (k%numPartitions).toInt
+      val space = if (rest%numPartitions == 0) rest/numPartitions else rest/numPartitions + 1
+      (k/space).toInt
     }
   }
 
-  def expand(data: RDD[(String, Encode.Coding)], cur: Int, target: Int, jobs: Int): RDD[(String, Encode.Coding)] = {
+  def expand(data: RDD[(String, Encode.Coding)],
+             cur: Int, target: Int, rest: Long, jobs: Int): RDD[(String, Encode.Coding)] = {
     /**
       * since the data size is usually small here,
       * we don't worry about shuffling, always re-balance the partitions
       * */
+    val sorted = data.sortBy(p => p._2.size, ascending = false)
     if (target == cur)
-      data.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
+      sorted.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest)).map(_._2)
     else
-      data.flatMap(x =>
+      sorted.flatMap(x =>
         for (i <- 1 to math.ceil(target/cur).toInt)
           yield x._1 -> x._2.copy
-      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
+      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest)).map(_._2)
   }
 
   def permutationTest(codings: RDD[(String, Encode.Coding)],
@@ -138,10 +141,11 @@ object AssocMaster {
       i <- 0 to loops
       if curEncode.count() > 0
     } {
-      logger.info(s"round $i of permutation test, ${curEncode.count()} groups before expand")
+      val rest = curEncode.count()
+      logger.info(s"round $i of permutation test, $rest groups before expand")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
-      curEncode = expand(curEncode, lastMax, curMax, jobs)
+      curEncode = expand(curEncode, lastMax, curMax, rest, jobs)
       curEncode.cache()
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
       if (conf.debug) {
@@ -320,7 +324,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     if (method == "vt") {
       val summary = codings.map{case (g, e) =>
         val vt = e.asInstanceOf[Encode.VT]
-        s"$g variants: ${vt.vars.length} thresholds: ${vt.coding.cols}"}.collect()
+        s"$g variants: ${vt.vars.length} thresholds: ${vt.coding.length}"}.collect()
       val pw = new PrintWriter(new File(s"output/encode_${method}_summary.txt"))
       for (s <- summary) {
         pw.write(s"$s\n")

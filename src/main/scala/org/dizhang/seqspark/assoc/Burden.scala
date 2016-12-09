@@ -30,7 +30,8 @@ object Burden {
     ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.Fixed])
   }
 
-  def getStatistic(st: ScoreTest): Double = {
+  def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
+    val st = ScoreTest(nm, x.asInstanceOf[Encode.Fixed].coding)
     st.score(0)/st.variance(0,0).sqrt
   }
 
@@ -38,8 +39,8 @@ object Burden {
   final case class AnalyticTest(nullModel: NullModel,
                                 x: Encode.Fixed) extends Burden with AssocMethod.AnalyticTest {
     def geno = x.coding
-    val scoreTest = ScoreTest(nullModel, geno)
-    val statistic = getStatistic(scoreTest)
+    //val scoreTest = ScoreTest(nullModel, geno)
+    val statistic = getStatistic(nullModel, x)
     val pValue = {
       val dis = new Gaussian(0.0, 1.0)
       Some(1.0 - dis.cdf(statistic))

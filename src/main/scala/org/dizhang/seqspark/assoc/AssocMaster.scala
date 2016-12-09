@@ -89,29 +89,28 @@ object AssocMaster {
       thisLoopLimit
   }
 
-  class Balancer(val numPartitions: Int, val rest: Long) extends Partitioner {
+  class Balancer(val numPartitions: Int) extends Partitioner {
     override def getPartition(key: Any): Int = {
       val k = key.asInstanceOf[Long]
-      val space = if (rest%numPartitions == 0) rest/numPartitions else rest/numPartitions + 1
-      (k/space).toInt
+      (k%numPartitions).toInt
     }
   }
 
   def expand(data: RDD[(String, Encode.Coding)],
-             cur: Int, target: Int, rest: Long, jobs: Int): RDD[(String, Encode.Coding)] = {
+             cur: Int, target: Int, jobs: Int): RDD[(String, Encode.Coding)] = {
     /**
       * since the data size is usually small here,
       * we don't worry about shuffling, always re-balance the partitions
       * */
     val sorted = data.sortBy(p => p._2.size, ascending = false)
     if (target == cur)
-      sorted.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest)).map(_._2)
+      sorted.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
     else {
       val times = math.ceil(target/cur).toInt
       sorted.flatMap(x =>
         for (i <- 1 to times)
           yield x._1 -> x._2.copy
-      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs, rest * times)).map(_._2)
+      ).zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
     }
   }
 
@@ -151,7 +150,7 @@ object AssocMaster {
       logger.info(s"round $i of permutation test, $rest groups before expand")
       val lastMax = if (i == 0) batchSize else math.pow(base, i - 1).toInt * batchSize
       val curMax = maxThisLoop(base, i, max, batchSize)
-      curEncode = expand(curEncode, lastMax, curMax, rest, jobs)
+      curEncode = expand(curEncode, lastMax, curMax, jobs)
       curEncode.cache()
       logger.info(s"round $i of permutation test, ${curEncode.count()} groups after expand")
       if (conf.debug) {
@@ -308,15 +307,20 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
-
-    codings.cache()
-    val cnt = codings.count()
-    if (cnf.benchmark) {
-      logger.info(s"encoding completed $cnt groups")
-    }
-
     val sorted = codings.sortBy(p => p._2.size, ascending = false)
-      .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs, cnt)).map(_._2)
+      .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs)).map(_._2)
+
+    sorted.cache()
+
+    val large = sorted.filter(p => p._2.numVars > 500).map(_._1).collect()
+
+    logger.info(s"${large.mkString(",")} have too many variants (> 500), skipped")
+
+    val clean = sorted.filter(p => p._2.numVars <= 500)
+
+    if (cnf.benchmark) {
+      logger.info(s"encoding completed ${clean.count()} groups")
+    }
 
     if (method == "vt") {
       val summary = codings.map{case (g, e) =>
@@ -334,10 +338,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (permutation) {
-      val res = permutationTest(sorted, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
+      val res = permutationTest(clean, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
       writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
-      val res = asymptoticTest(sorted, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
+      val res = asymptoticTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }

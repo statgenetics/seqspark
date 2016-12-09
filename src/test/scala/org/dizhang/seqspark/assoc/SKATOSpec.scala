@@ -20,12 +20,12 @@ import org.scalatest.{FlatSpec, Matchers}
 class SKATOSpec extends FlatSpec with Matchers {
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
 
-  val encode: Encode[Byte] = {
+  def encode(num: Int): Encode[Byte] = {
     val conf = ConfigFactory.load().getConfig("seqspark.association.method.skato")
     val method = MethodConfig(conf)
     val randg = Binomial(3, 0.005)(randBasis)
     val gt = Array("0/0", "0/1", "1/1", "./.")
-    val vars = (0 to 10).map{i =>
+    val vars = (0 until num).map{i =>
       val meta = Array("1", i.toString, ".", "A", "C", ".", ".", ".")
       val geno = randg.sample(2000).map(g => Genotype.Raw.toSimpleGenotype(gt(g)))
       Variant.fromIndexedSeq(meta, geno, 16.toByte)
@@ -53,7 +53,12 @@ class SKATOSpec extends FlatSpec with Matchers {
 
   "A SKATO" should "be fine" in {
 
-
+    for (i <- List(10)) {
+      val cd = encode(i).getCoding
+      for (j <- 0 to 2) {
+        time {println(SKATO(nullModel, cd, "liu.mod").pValue)}(s"SKATO for $i variants: $j")
+      }
+    }
 
     /**
     val pw = new PrintWriter(new File("skat.data"))

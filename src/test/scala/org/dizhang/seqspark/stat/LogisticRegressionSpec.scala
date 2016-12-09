@@ -21,6 +21,6 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
     val y = DenseVector(rb.sample(2000).map(_.toDouble):_*)
     val cov = DenseVector(rb.sample(2000).map(_.toDouble):_*).toDenseMatrix.t
     val model = LogisticRegression(y, cov)
-    println(s"Logistic regression using SGD: ${model.coefficients}")
+    println(s"Logistic regression using LBFGS: ${model.coefficients}")
   }
 }

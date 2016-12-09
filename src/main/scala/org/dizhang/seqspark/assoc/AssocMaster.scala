@@ -64,6 +64,8 @@ object AssocMaster {
     annotated.map(p =>
       (p._1, Encode(p._2, Option(controls.value), Option(y.value), cov.value, sm))
     ).map(x => x._1 -> x._2.getCoding).filter(p => p._2.isDefined && p._2.informative)
+
+
   }
 
   def adjustForCov(binaryTrait: Boolean,
@@ -132,8 +134,8 @@ object AssocMaster {
       case "genome" => 1000000
       case _ => codings.count().toInt
     }
-    val max = Permu.max(sites)
-    val min = Permu.min(sites)
+    val max = Permu.max2(sites)
+    val min = Permu.min2(sites)
     val base = Permu.base
     val batchSize = min * base
     val loops = math.round(math.log(sites)/math.log(base)).toInt
@@ -318,10 +320,13 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
 
 
     codings.cache()
+    val cnt = codings.count()
     if (cnf.benchmark) {
-      codings.foreach(_ => Unit)
-      logger.info("encoding completed")
+      logger.info(s"encoding completed $cnt groups")
     }
+
+    val sorted = codings.sortBy(p => p._2.size, ascending = false)
+      .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs, cnt)).map(_._2)
 
     if (method == "vt") {
       val summary = codings.map{case (g, e) =>
@@ -339,10 +344,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (permutation) {
-      val res = permutationTest(codings, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
+      val res = permutationTest(sorted, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
       writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
-      val res = asymptoticTest(codings, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
+      val res = asymptoticTest(sorted, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
   }

@@ -10,6 +10,8 @@ import org.dizhang.seqspark.ds.Region
 object Constant {
   object Permutation {
     val alpha = 0.05
+    def max2(sites: Int) =  500 * sites - 25
+    def min2(sites: Int) = if (sites == 1) 34 else 36
     def max(sites: Int) = 2000 * sites - 100
     def min(sites: Int) = sites match {
       case x if x == 1 => 115

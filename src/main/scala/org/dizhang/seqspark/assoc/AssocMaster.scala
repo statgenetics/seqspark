@@ -93,8 +93,12 @@ object AssocMaster {
   }
 
   def expand(data: RDD[(String, Encode.Coding)], cur: Int, target: Int, jobs: Int): RDD[(String, Encode.Coding)] = {
+    /**
+      * since the data size is usually small here,
+      * we don't worry about shuffling, always re-balance the partitions
+      * */
     if (target == cur)
-      data
+      data.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
     else
       data.flatMap(x =>
         for (i <- 1 to math.ceil(target/cur).toInt)
@@ -146,13 +150,20 @@ object AssocMaster {
       }
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
+        val minTests = {
+          if (i == 0) {
+            min
+          } else {
+            math.max(2 * (min - pCount.value(x._1)._1)/(curMax/batchSize), 1)
+          }
+        }
         val model =
           if (config.`type` == MethodType.snv) {
-            SNV(ref, min - pCount.value(x._1)._1, batchSize, nm, x._2)
+            SNV(ref, minTests, batchSize, nm, x._2)
           } else if (config.maf.getBoolean("fixed")) {
-            Burden(ref, min - pCount.value(x._1)._1, batchSize, nm, x._2)
+            Burden(ref, minTests, batchSize, nm, x._2)
           } else {
-            VT(ref, min - pCount.value(x._1)._1, batchSize, nm, x._2)
+            VT(ref, minTests, batchSize, nm, x._2)
           }
         x._1 -> model.pCount
       }.reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap

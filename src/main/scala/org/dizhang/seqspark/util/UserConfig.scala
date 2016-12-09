@@ -156,6 +156,12 @@ object UserConfig {
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
+    val varLimit: Int = {
+      if (config.hasPath("varLimit"))
+        config.getInt("varLimit")
+      else
+        500
+    }
     val groupBy: List[String] = {
       if (config.hasPath("groupBy"))
         config.getStringList("groupBy").asScala.toList

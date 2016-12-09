@@ -432,7 +432,7 @@ abstract class Encode[A: Genotype] extends Serializable {
         if (isDefined && informative()) getVT else Empty
       case (MethodType.skat|MethodType.skato, _) =>
         getRare() match {
-          case Some(r) => if (r.vars.length > 1) r else Empty
+          case Some(r) => if (r.numVars > 1 && r.numVars < config.misc.varLimit) r else Empty
           case None => Empty
         }
       case _ => Empty

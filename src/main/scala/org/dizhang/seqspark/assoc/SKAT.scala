@@ -154,7 +154,12 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
     }
   }
   def geno = x.coding
-  lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
+  lazy val scoreTest: ScoreTest =
+    if (geno.activeSize > 0.25 * geno.rows * geno.cols) {
+      ScoreTest(nullModel, geno.toDense)
+    } else {
+      ScoreTest(nullModel, geno)
+    }
 
   def qScore: Double = {
     scoreTest.score.t * kernel * scoreTest.score

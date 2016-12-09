@@ -101,8 +101,9 @@ object AssocMaster {
     /**
       * since the data size is usually small here,
       * we don't worry about shuffling, always re-balance the partitions
+      * assume the data is already sorted by the size of each group
       * */
-    val sorted = data.sortBy(p => p._2.size, ascending = false)
+    val sorted = data //.sortBy(p => p._2.size, ascending = false)
     if (target == cur)
       sorted.zipWithIndex().map(_.swap).partitionBy(new Balancer(jobs)).map(_._2)
     else {
@@ -301,6 +302,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
                          cov: Option[DenseMatrix[Double]],
                          controls: Array[Boolean],
                          method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
+    logger.info(s"prepare data for association tests for ${currentTrait._1} with method $method")
     val config = cnf.association
     val methodConfig = config.method(method)
     val cond = LogicalParser.parse(methodConfig.misc.variants)
@@ -312,11 +314,11 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
 
     sorted.cache()
 
-    val large = sorted.filter(p => p._2.numVars > 500).map(_._1).collect()
+    //val large = sorted.filter(p => p._2.numVars > 500).map(_._1).collect()
 
-    logger.info(s"${large.mkString(",")} have too many variants (> 500), skipped")
+    //logger.info(s"${large.mkString(",")} have too many variants (> 500), skipped")
 
-    val clean = sorted.filter(p => p._2.numVars <= 500)
+    val clean = sorted
 
     if (cnf.benchmark) {
       logger.info(s"encoding completed ${clean.count()} groups")
@@ -344,5 +346,6 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
       val res = asymptoticTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
       writeResults(res, s"output/assoc_${currentTrait._1}_$method")
     }
+    logger.info(s"finished association tests for ${currentTrait._1} using $method")
   }
 }

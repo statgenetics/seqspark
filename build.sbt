@@ -38,4 +38,4 @@ assemblyMergeStrategy in assembly := {
 }
 
 assemblyJarName in assembly := "SeqSpark.jar"
-
+test in assembly := {}

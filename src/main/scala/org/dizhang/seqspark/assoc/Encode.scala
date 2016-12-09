@@ -136,24 +136,21 @@ object Encode {
   }
 
   sealed trait Coding {
-    def isDefined: Boolean = {
-      this match {
-        case Empty => false
-        case _ => true
-      }
-    }
+    def isDefined: Boolean
     def informative: Boolean
     def copy: Coding
     def size: Int
     def numVars: Int
   }
   case object Empty extends Coding {
+    def isDefined = false
     def informative = false
     def copy = Empty
     def size = 0
     def numVars = 0
   }
   case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
+    def isDefined = vars.length > 0
     def informative = true
     def copy = {
       Rare(coding.copy, vars.map(v => v.copy()))
@@ -162,24 +159,28 @@ object Encode {
     def numVars = vars.length
   }
   case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
+    def isDefined = vars.length > 0
     def informative = true
     def copy = Common(coding.copy, vars.map(v => v.copy()))
     def size = vars.length
     def numVars = vars.length
   }
   case class Mixed(rare: Rare, common: Common) extends Coding {
+    def isDefined = rare.isDefined && common.isDefined
     def informative = true
     def copy = Mixed(rare.copy, common.copy)
     def size = rare.size + common.size
     def numVars = rare.numVars + common.numVars
   }
   case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding {
+    def isDefined = vars.length > 0
     def informative = sum(coding) >= 3.0
     def copy = Fixed(coding.copy, vars.map(v => v.copy()))
     def size = 1
     def numVars = vars.length
   }
   case class VT(coding: Array[SparseVector[Double]], vars: Array[Variation]) extends Coding {
+    def isDefined = vars.length > 0
     def informative = coding.length > 1
     def copy = VT(coding.map(sv => sv.copy), vars.map(v => v.copy()))
     def size = coding.length
@@ -416,27 +417,27 @@ abstract class Encode[A: Genotype] extends Serializable {
   }
 
   def getCoding: Coding = {
-    (config.`type`, config.maf.getBoolean("fixed")) match {
-      case (MethodType.snv, _) =>
-        getCommon() match {case Some(c) => c; case None => Empty}
-      case (MethodType.meta, _) =>
-        (getCommon(), getRare()) match {
-          case (Some(c), Some(r)) => Mixed(r, c)
-          case (Some(c), None) => c
-          case (None, Some(r)) => r
-          case _ => Empty
-        }
-      case (MethodType.cmc|MethodType.brv, true) =>
-        if (isDefined && informative()) getFixed else Empty
-      case (MethodType.cmc|MethodType.brv, false) =>
-        if (isDefined && informative()) getVT else Empty
-      case (MethodType.skat|MethodType.skato, _) =>
-        getRare() match {
-          case Some(r) => if (r.numVars > 1 && r.numVars < config.misc.varLimit) r else Empty
-          case None => Empty
-        }
-      case _ => Empty
-    }
+    val res =
+      (config.`type`, config.maf.getBoolean("fixed")) match {
+        case (MethodType.snv, _) =>
+          getCommon() match {case Some(c) => c; case None => Empty}
+        case (MethodType.meta, _) =>
+          (getCommon(), getRare()) match {
+            case (Some(c), Some(r)) => Mixed(r, c)
+            case (Some(c), None) => c
+            case (None, Some(r)) => r
+            case _ => Empty
+          }
+        case (MethodType.cmc|MethodType.brv, true) => getFixed
+        case (MethodType.cmc|MethodType.brv, false) => getVT
+        case (MethodType.skat|MethodType.skato, _) =>
+          getRare() match {
+            case Some(r) => if (r.numVars > 1) r else Empty
+            case None => Empty
+          }
+        case _ => Empty
+      }
+    if (res.numVars < config.misc.varLimit) res else Empty
   }
 
   def isDefined: Boolean

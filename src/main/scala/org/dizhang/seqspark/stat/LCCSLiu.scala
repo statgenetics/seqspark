@@ -35,6 +35,20 @@ object LCCSLiu {
   case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old
   @SerialVersionUID(7778550201L)
   case class Modified(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with New
+  case class SimpleMoments(cs: IndexedSeq[Double]) extends LCCSLiu with CentralOneDF with Old {
+    def lambda = DV.zeros[Double](0)
+    override val c1 = cs(0)
+    override val c2 = cs(1)
+    override val c3 = cs(2)
+    override val c4 = cs(3)
+  }
+  case class ModifiedMoments(cs: IndexedSeq[Double]) extends LCCSLiu with CentralOneDF with New {
+    def lambda = DV.zeros[Double](0)
+    override val c1 = cs(0)
+    override val c2 = cs(1)
+    override val c3 = cs(2)
+    override val c4 = cs(3)
+  }
 }
 @SerialVersionUID(7778550001L)
 trait LCCSLiu extends LinearCombinationChiSquare {

@@ -86,6 +86,14 @@ case class Variation(chr: Byte, start: Int, end: Int,
     }
     this
   }
+  def parseInfo: Map[String, String] = info match {
+    case None => Map[String, String]()
+    case Some(s) =>
+      s.split(";").map{x =>
+        val is = x.split("=")
+        is(0) -> is(1)
+      }.toMap
+  }
 }
 
 object Variation {

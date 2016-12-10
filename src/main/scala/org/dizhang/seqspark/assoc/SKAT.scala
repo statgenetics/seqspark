@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{*, diag, eigSym, DenseMatrix => DM, DenseVector => DV}
+import breeze.linalg.{*, cholesky, diag, eigSym, sum, DenseMatrix => DM, DenseVector => DV}
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.SKAT._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
@@ -44,9 +44,27 @@ object SKAT {
     ).reduce((m1, m2) => DM.vertcat(m1, m2))
   }
 
+  def getMoments(dm: DM[Double]): IndexedSeq[Double] = {
+    val dm2 = dm * dm
+    val c1 = sum(diag(dm))
+    val c2 = sum(diag(dm2))
+    val c3 = sum(dm * dm2.t)
+    val c4 = sum(dm2 * dm2.t)
+    Vector(c1, c2, c3, c4)
+  }
+
+  def getLambda(dm: DM[Double]): Option[DV[Double]] = {
+    val egTry = Try(eigSym.justEigenvalues(dm))
+    egTry match {
+      case Success(ev) =>
+        val lambda = DV(ev.toArray.filter(v => v > 1e-6):_*)
+        Some(lambda)
+      case _ => None
+    }
+  }
+
   def getLambdaU(sm: DM[Double]): (Option[DV[Double]], Option[DM[Double]]) = {
     val egTry = Try(eigSym(sm))
-
     egTry match {
       case Success(eg) =>
         val vals = eg.eigenvalues
@@ -74,8 +92,9 @@ object SKAT {
   final case class Davies(nullModel: NullModel,
                           x: Encode.Rare,
                           rho: Double = 0.0) extends SKAT {
-
+    def pValue2 = None
     def pValue: Option[Double] = {
+      val lambda = getLambda(vc)
       lambda.map(l => 1.0 - LCCSDavies.Simple(l).cdf(qScore).pvalue)
     }
   }
@@ -84,25 +103,36 @@ object SKAT {
                        x: Encode.Rare,
                        rho: Double = 0.0) extends SKAT {
 
+    def pValue2: Option[Double] = {
+      val lambda = getLambda(vc)
+      lambda.map{l =>
+        1.0 - LCCSLiu.Simple(l).cdf(qScore).pvalue
+      }
+    }
     def pValue: Option[Double] = {
-      lambda.map(l => 1.0 - LCCSLiu.Simple(l).cdf(qScore).pvalue)
+      val cs = getMoments(vc)
+      LCCSLiu.SimpleMoments(cs).cdf(qScore) match {
+        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(p) else None
+        case _ => None
+      }
     }
   }
   @SerialVersionUID(7727750301L)
   final case class LiuModified(nullModel: NullModel,
                                x: Encode.Rare,
                                rho: Double = 0.0) extends SKAT {
+    def pValue2: Option[Double] = {
+      val lambda = getLambda(vc)
+      lambda.map{l =>
+        1.0 - LCCSLiu.Modified(l).cdf(qScore).pvalue
+      }
+    }
 
     def pValue: Option[Double] = {
-
-      lambda match {
-        case None => None
-        case Some(l) =>
-          val cdf = LCCSLiu.Modified(l).cdf(qScore)
-          if (cdf.ifault != 0.0)
-            None
-          else
-            Some(1.0 - cdf.pvalue)
+      val cs = getMoments(vc)
+      LCCSLiu.ModifiedMoments(cs).cdf(qScore) match {
+        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(p) else None
+        case _ => None
       }
     }
   }
@@ -114,8 +144,9 @@ object SKAT {
     /** resampled is a 10000 x n matrix, storing re-sampled residuals */
     val simScores = resampled * geno
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
-
+    def pValue2 = None
     def pValue: Option[Double] = {
+      val (lambda, u) = getLambdaU(vc)
       (lambda, u) match {
         case (Some(l), Some(u1)) =>
           val dis = new LCCSResampling(l, u1, nullModel.residualsVariance, simQs)
@@ -153,20 +184,21 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
       case _ => 1.0
     }
   }
-  def geno = x.coding
-  lazy val scoreTest: ScoreTest =
-    if (geno.activeSize > 0.25 * geno.rows * geno.cols) {
+  def geno = x.coding * cholesky(kernel).t
+  lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
+    /**
+    if (geno.activeSize > 0.05 * geno.rows * geno.cols) {
       ScoreTest(nullModel, geno.toDense)
     } else {
       ScoreTest(nullModel, geno)
     }
-
+    */
   def qScore: Double = {
-    scoreTest.score.t * kernel * scoreTest.score
+    scoreTest.score.t * scoreTest.score
   }
-  lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
-  lazy val vc = scoreSigma * kernel * scoreSigma
-  lazy val (lambda, u) = getLambdaU(vc)
+  //lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
+  lazy val vc = scoreTest.variance //scoreSigma * kernel * scoreSigma
+  def pValue2: Option[Double]
   def pValue: Option[Double]
   def result = AssocMethod.AnalyticResult(x.vars, qScore, pValue)
 }

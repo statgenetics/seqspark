@@ -309,16 +309,12 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val chosenVars = currentGenotype.variants(cond)(ssc)
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
-    val sorted = codings.sortBy(p => p._2.size, ascending = false)
+    codings.cache()
+
+    val clean = codings.sortBy(p => p._2.size, ascending = false)
       .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs)).map(_._2)
 
-    sorted.cache()
-
-    //val large = sorted.filter(p => p._2.numVars > 500).map(_._1).collect()
-
-    //logger.info(s"${large.mkString(",")} have too many variants (> 500), skipped")
-
-    val clean = sorted
+    clean.cache()
 
     if (cnf.benchmark) {
       logger.info(s"encoding completed ${clean.count()} groups")

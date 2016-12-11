@@ -257,7 +257,14 @@ object SKATO {
       (pow(x, -0.5) :* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
     }
     def dfcdf(x: DV[Double]): DV[Double] = {
-      gammp(df/2, x/2.0)
+      try{
+        gammp(df/2, x/2.0)
+      } catch {
+        case e: Exception =>
+          println(s"error: df: $df x: ${x.toArray.mkString(",")}")
+          DV[Double](s"df$df".toDouble)
+      }
+
     }
 
     def integralFunc2(x: DV[Double]): DV[Double] = {

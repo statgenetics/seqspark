@@ -310,9 +310,13 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
     codings.cache()
-
-    val clean = codings.sortBy(p => p._2.size, ascending = false)
-      .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs)).map(_._2)
+    val permutation = methodConfig.resampling
+    val clean = if (permutation) {
+      codings.sortBy(p => p._2.size, ascending = false)
+        .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs)).map(_._2)
+    } else {
+      codings
+    }
 
     clean.cache()
 
@@ -331,7 +335,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
       pw.close()
     }
 
-    val permutation = methodConfig.resampling
+
     val test = methodConfig.test
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")

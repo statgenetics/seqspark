@@ -393,17 +393,9 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def df = param.df
 
-  lazy val scoreTest: ScoreTest =
-    if (geno.activeSize > 0.25 * geno.rows * geno.cols) {
-      ScoreTest(nullModel.STNullModel, geno.toDense)
-    } else {
-      ScoreTest(nullModel.STNullModel, geno)
-    }
-
+  lazy val scoreTest: ScoreTest = ScoreTest(nullModel.STNullModel, geno)
 
   lazy val score = scoreTest.score
-
-  lazy val scoreSigma = symMatrixSqrt(scoreTest.variance)
 
   lazy val kernels: Array[DM[Double]] = {
     val i = DM.eye[Double](numVars)

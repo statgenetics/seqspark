@@ -1,6 +1,7 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.linalg.{*, cholesky, diag, eigSym, sum, DenseMatrix => DM, DenseVector => DV}
+import breeze.linalg.{*, CSCMatrix, cholesky, diag, eigSym, sum, DenseMatrix => DM, DenseVector => DV}
+import breeze.stats.mean
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.SKAT._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
@@ -17,6 +18,14 @@ import scala.util.{Success, Try}
   */
 
 object SKAT {
+
+  def apply(nullModel: NullModel,
+            x: CSCMatrix[Double],
+            method: String,
+            rho: Double): SKAT = {
+    val cd = Encode.Rare(x, Array())
+    apply(nullModel, cd, method, rho)
+  }
 
   def apply(nullModel: NullModel,
             x: Encode.Coding,
@@ -48,8 +57,8 @@ object SKAT {
     val dm2 = dm * dm
     val c1 = sum(diag(dm))
     val c2 = sum(diag(dm2))
-    val c3 = sum(dm * dm2.t)
-    val c4 = sum(dm2 * dm2.t)
+    val c3 = sum(dm :* dm2.t)
+    val c4 = sum(dm2 :* dm2.t)
     Vector(c1, c2, c3, c4)
   }
 
@@ -57,32 +66,33 @@ object SKAT {
     val egTry = Try(eigSym.justEigenvalues(dm))
     egTry match {
       case Success(ev) =>
-        val lambda = DV(ev.toArray.filter(v => v > 1e-6):_*)
+        val cutoff = mean(ev) * 1e-6
+        val lambda = DV(ev.toArray.filter(v => v > cutoff):_*)
         Some(lambda)
       case _ => None
     }
   }
 
-  def getLambdaU(sm: DM[Double]): (Option[DV[Double]], Option[DM[Double]]) = {
+  def getLambdaU(sm: DM[Double]): Option[(DV[Double],DM[Double])] = {
     val egTry = Try(eigSym(sm))
     egTry match {
       case Success(eg) =>
         val vals = eg.eigenvalues
         val vecs = eg.eigenvectors
-        val lambda = DV(vals.toArray.filter(v => v > 1e-6): _*)
+        val cutoff = mean(vals) * 1e-6
+        val lambda = DV(vals.toArray.filter(v => v > cutoff): _*)
         if (lambda.length == 0) {
-          (None, None)
+          None
         } else {
           val u = DV.horzcat(
             (for {
               i <- 0 until vals.length
               if vals(i) > 1e-6
             } yield vecs(::, i)): _*)
-          (Some(lambda), Some(u))
-
+          Some((lambda, u))
         }
       case _ =>
-        (None, None)
+        None
     }
 
 
@@ -106,13 +116,14 @@ object SKAT {
     def pValue2: Option[Double] = {
       val lambda = getLambda(vc)
       lambda.map{l =>
+        println("lambdas: " + lambda.mkString(","))
         1.0 - LCCSLiu.Simple(l).cdf(qScore).pvalue
       }
     }
     def pValue: Option[Double] = {
       val cs = getMoments(vc)
       LCCSLiu.SimpleMoments(cs).cdf(qScore) match {
-        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(p) else None
+        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(1-p) else None
         case _ => None
       }
     }
@@ -130,8 +141,9 @@ object SKAT {
 
     def pValue: Option[Double] = {
       val cs = getMoments(vc)
+      println("moments: " + cs.mkString(","))
       LCCSLiu.ModifiedMoments(cs).cdf(qScore) match {
-        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(p) else None
+        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(1-p) else None
         case _ => None
       }
     }
@@ -146,13 +158,10 @@ object SKAT {
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
     def pValue2 = None
     def pValue: Option[Double] = {
-      val (lambda, u) = getLambdaU(vc)
-      (lambda, u) match {
-        case (Some(l), Some(u1)) =>
-          val dis = new LCCSResampling(l, u1, nullModel.residualsVariance, simQs)
-          Some(1.0 - dis.cdf(qScore).pvalue)
-        case (_, _) =>
-          None
+      getLambdaU(vc).map{
+        case (l, u) =>
+          val dis = new LCCSResampling(l, u, nullModel.residualsVariance, simQs)
+          1.0 - dis.cdf(qScore).pvalue
       }
     }
   }
@@ -175,15 +184,10 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
     * Moved the weight to the encode module
     * */
   lazy val kernel: DM[Double] = {
-    val size = x.vars.length
+    val size = x.coding.cols
     (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
   }
-  lazy val resVar: Double = {
-    nullModel match {
-      case lm: LinearModel => lm.residualsVariance
-      case _ => 1.0
-    }
-  }
+
   def geno = x.coding * cholesky(kernel).t
   lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
     /**

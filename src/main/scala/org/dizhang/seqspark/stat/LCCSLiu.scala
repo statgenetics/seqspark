@@ -32,9 +32,19 @@ object LCCSLiu {
     def df = if (squareOfS1LargerThanS2) a.square - 2 * delta else 1.0/s2
   }
   @SerialVersionUID(7778550101L)
-  case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old
+  case class Simple(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with Old {
+    val c1 = ck(1)
+    val c2 = ck(2)
+    val c3 = ck(3)
+    val c4 = ck(4)
+  }
   @SerialVersionUID(7778550201L)
-  case class Modified(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with New
+  case class Modified(lambda: DV[Double]) extends LCCSLiu with CentralOneDF with New {
+    val c1 = ck(1)
+    val c2 = ck(2)
+    val c3 = ck(3)
+    val c4 = ck(4)
+  }
   case class SimpleMoments(cs: IndexedSeq[Double]) extends LCCSLiu with CentralOneDF with Old {
     def lambda = DV.zeros[Double](0)
     override val c1 = cs(0)
@@ -57,10 +67,10 @@ trait LCCSLiu extends LinearCombinationChiSquare {
     val lbk = pow(lambda, k)
     (lbk dot degreeOfFreedom) + k * (lbk dot nonCentrality)
   }
-  def c1:Double = ck(1)
-  def c2:Double = ck(2)
-  def c3:Double = ck(3)
-  def c4:Double = ck(4)
+  def c1:Double
+  def c2:Double
+  def c3:Double
+  def c4:Double
   def s1:Double = c3/c2.cube.sqrt
   def s2:Double = c4/c2.square
   def muQ:Double = c1

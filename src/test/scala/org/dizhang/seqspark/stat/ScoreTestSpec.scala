@@ -1,6 +1,6 @@
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{DenseMatrix, DenseVector, diag}
+import breeze.linalg._
 import org.scalatest.{FlatSpec, Matchers}
 import breeze.stats.distributions._
 
@@ -9,15 +9,16 @@ import breeze.stats.distributions._
   */
 class ScoreTestSpec extends FlatSpec with Matchers {
     val rg = new Gaussian(10.0, 3.0)
-    val bg = new Binomial(1, 0.6)
+    val bg = Binomial(1, 0.6)
+    val bg2 = Binomial(3, 0.005)
     val sampleSize = 2000
 
-    def rbinom2(n: Int, m: Int): DenseMatrix[Double] = {
-      DenseVector.horzcat((1 to m).map(i => rbinom(n)): _*)
+    def rbinom2(n: Int, m: Int, r: Binomial): DenseMatrix[Double] = {
+      DenseVector.horzcat((1 to m).map(i => rbinom(n, r)): _*)
     }
 
-    def rbinom(n: Int): DenseVector[Double] = {
-      DenseVector(bg.sample(n).map(_.toDouble): _*)
+    def rbinom(n: Int, r: Binomial): DenseVector[Double] = {
+      DenseVector(r.sample(n).map(_.toDouble): _*)
     }
     def rnorm1(n: Int): DenseVector[Double] = {
       DenseVector(rg.sample(n): _*)
@@ -28,7 +29,7 @@ class ScoreTestSpec extends FlatSpec with Matchers {
     }
 
     val lr = LinearRegression(rnorm1(sampleSize), rnorm2(sampleSize, 5))
-    val lgr = LogisticRegression(rbinom(sampleSize), rnorm2(sampleSize, 5))
+    val lgr = LogisticRegression(rbinom(sampleSize, bg), rnorm2(sampleSize, 5))
     val nm = ScoreTest.NullModel(lr)
     val nm2 = ScoreTest.NullModel(lgr)
 
@@ -41,19 +42,17 @@ class ScoreTestSpec extends FlatSpec with Matchers {
   }
 
     "A ScoreTest" should "be fine" in {
-      val x = rbinom2(sampleSize, 1000)
-
+      val size = 500
+      val xx = rbinom2(sampleSize, size, bg2)
       time {
-        val st = ScoreTest(nm2, x)
-        println(s"${st.score(0)} ${st.variance(0,0)}")
+        val kernel: DenseMatrix[Double] = {
+          val rho = 0.3
+          (1.0 - rho) * DenseMatrix.eye[Double](size) + DenseMatrix.fill[Double](size, size)(rho)
+        }
+        val x = xx * cholesky(kernel).t
+        val st = ScoreTest(nm, x)
+        println(s"${st.variance(0,0)}")
       }{"all"}
-      time {
-        val res = for {
-          i <- 0 to 99
-          st = ScoreTest(nm2, x(::, i))
-        } yield (st.score(0), st.variance(0,0))
-        println(res(0))
-      }("sep")
 
     }
 

@@ -54,14 +54,14 @@ class SKATOSpec extends FlatSpec with Matchers {
   "A SKATO" should "be fine" in {
 
 
-    /**
-    for (i <- List(10)) {
+
+    for (i <- List(10, 100, 200, 300, 500, 1000)) {
       val cd = encode(i).getCoding
       for (j <- 0 to 2) {
         time {println(SKATO(nullModel, cd, "liu.mod").pValue)}(s"SKATO for $i variants: $j")
       }
     }
-    */
+
     /**
     val pw = new PrintWriter(new File("skat.data"))
     val geno = so.geno.toDense

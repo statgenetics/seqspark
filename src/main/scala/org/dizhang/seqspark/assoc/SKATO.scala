@@ -4,13 +4,11 @@ import breeze.numerics._
 import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
 import breeze.numerics.{lgamma, pow}
 import breeze.stats.distributions.ChiSquared
-import org.apache.spark.ml.linalg.DenseVector
 import org.dizhang.seqspark.assoc.SKATO._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 
-import scala.collection.JavaConverters._
 import scala.language.existentials
 /**
   * optimal SKAT test
@@ -52,31 +50,32 @@ object SKATO {
     val w3 = iterm2.t * iterm2
 
     val varZeta = sum((iterm1.t * iterm1) :* w3) * 4
-
-    val (lambda, u) = SKAT.getLambdaU(w3)
-
-    (lambda, u) match {
-      case (Some(l), Some(u1)) =>
-        val muQ = sum(l)
-        val (varQ, kurQ) = resampled match {
-          case None =>
+    val moments: Option[(Double, Double, Double, DV[Double])] =
+      if (resampled.isEmpty) {
+        SKAT.getLambda(w3).map{l =>
+            val m = sum(l)
             val v = 2 * sum(pow(l, 2)) + varZeta
             val k = sum(pow(l, 4))/sum(pow(l, 2)).square * 12
-            (v, k)
-          case Some(res) =>
-            val qTmp = pow(res * iterm2, 2)
-            val qs = sum(qTmp(*, ::))
-            val dis = new LCCSResampling(l, u1, pi.get, qs)
-            (dis.varQ + varZeta, dis.kurQ)
+            (m,v,k, l)
         }
+      } else {
+        SKAT.getLambdaU(w3).map{
+          case (l, u) =>
+            val m = sum(l)
+            val qTmp = pow(resampled.get * iterm2, 2)
+            val qs = sum(qTmp(*, ::))
+            val dis = new LCCSResampling(l, u, pi.get, qs)
+            (m, dis.varQ + varZeta, dis.kurQ, l)
+        }
+      }
+    moments.map{
+      case (m, v, k, l) =>
         val sumCof2 = sum(pow(cof1, 2))
         val meanZ2 = sum(pow(meanZ, 2))
         lazy val taus = rs.map{r =>
           meanZ2 * (numVars.toDouble.square * r + (1 - r) * sumCof2)}
-        Some(Parameters(muQ, varQ, kurQ, l, varZeta, taus))
-      case (_, _) => None
+        Parameters(m, v, k, l, varZeta, taus)
     }
-
   }
 
   /**
@@ -163,7 +162,20 @@ object SKATO {
 
   trait AsymptoticKur extends SKATO {
 
-    def paramOpt = getParameters(P0SqrtZ, rhos)
+    lazy val paramOpt = getParameters(P0SqrtZ, rhos)
+
+    lazy val lambdasOpt: Option[Array[DV[Double]]] = {
+      val res = vcs.map(vc => SKAT.getLambda(vc))
+      if (res.exists(_.isEmpty)) {
+        None
+      } else {
+        Some(res.map(_.get))
+      }
+    }
+
+    def isDefined = paramOpt.isDefined && lambdasOpt.isDefined
+
+    def lambdas = lambdasOpt.get
 
     def pValues = {
 
@@ -216,12 +228,11 @@ object SKATO {
     }
     def pValue: Option[Double] = {
 
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
-          re.map(1.0 - _)
+      if (isDefined) {
+        val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
+        re.map(1.0 - _)
+      } else {
+        None
       }
     }
   }
@@ -257,56 +268,36 @@ object SKATO {
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
     }
-    def pValue3: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadratureN(integralFunc2, 1e-6, 40.0 + 1e-6, 320)
-          re.map(1.0 - _)
-      }
-    }
 
     /** adaptive pvalue
       * integration is a little bit heavy here
       * */
     def pValue: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          var continue: Boolean = true
-          var i: Int = 0
-          var last: Option[Double] = None
-          var cur: Option[Double] = None
-          while (continue) {
-            //println(s"here we go: $i")
-            cur = quadratureScan(integralFunc2, 1e-6, 40.0 + 1e-6, 320, (i + 1) * 1000, 1e-5 * pow(10, -i * 2))
-            continue =
-              cur match {
-                case None =>
-                  cur = last
-                  false //if no pvalue,
-                case Some(v) =>
-                  last = cur
-                  (1.0 - v) < 1e-4 * pow(10, -i * 2)
-              }
-            i += 1
-          }
-          cur.map(1.0 - _)
+      if (isDefined) {
+        var continue: Boolean = true
+        var i: Int = 0
+        var last: Option[Double] = None
+        var cur: Option[Double] = None
+        while (continue) {
+          //println(s"here we go: $i")
+          cur = quadratureScan(integralFunc2, 1e-6, 40.0 + 1e-6, 320, (i + 1) * 1000, 1e-5 * pow(10, -i * 2))
+          continue =
+            cur match {
+              case None =>
+                cur = last
+                false //if no pvalue,
+              case Some(v) =>
+                last = cur
+                (1.0 - v) < 1e-4 * pow(10, -i * 2)
+            }
+          i += 1
+        }
+        cur.map(1.0 - _)
+      } else {
+        None
       }
     }
 
-
-    def pValue2: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadrature(integralFunc, 1e-6, 40.0 + 1e-6)
-          re.map(1.0 - _)
-      }
-    }
   }
 
   @SerialVersionUID(7727760301L)
@@ -326,6 +317,22 @@ object SKATO {
                                method: String) extends LiuPValue {
 
     lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
+
+    lazy val lambdasUsOpt = {
+      val res = vcs.map { vc => SKAT.getLambdaU(vc) }
+      if (res.exists(_.isEmpty)) {
+        None
+      } else {
+        Some((res.map(_.get._1), res.map(_.get._2)))
+      }
+    }
+
+    def isDefined = paramOpt.isDefined && lambdasUsOpt.isDefined
+
+    lazy val lambdas = lambdasUsOpt.get._1
+    lazy val us = lambdasUsOpt.get._2
+
+
 
     lazy val simScores = resampled * geno
 
@@ -404,20 +411,14 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     rhos.map(r => (1 - r) * i + r * o)
   }
 
+  lazy val LTs: Array[DM[Double]] = kernels.map(cholesky(_).t)
+
+
   lazy val qScores: Array[Double] = kernels.map(k => score.t * k * score)
 
-  lazy val vcs = kernels.map(k => scoreSigma * k * scoreSigma)
+  lazy val vcs = LTs.map(lt => lt.t * P0SqrtZ.t * P0SqrtZ * lt)
 
-  lazy val lambdaUsOpt: (Option[Array[DV[Double]]], Option[Array[DM[Double]]]) = {
-    val res = vcs.map(v => SKAT.getLambdaU(v))
-    if (res.exists(_._1.isEmpty)) {
-      (None, None)
-    } else {
-      (Some(res.map(_._1.get)), Some(res.map(_._2.get)))
-    }
-  }
-
-  lazy val (lambdas, us) = (lambdaUsOpt._1.get, lambdaUsOpt._2.get)
+  def isDefined: Boolean
 
   def pValues: Array[Double]
 
@@ -429,11 +430,11 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def result = {
     val vs = x.vars
-    (paramOpt, lambdaUsOpt) match {
-      case (Some(_), (Some(_), Some(_))) => AssocMethod.AnalyticResult(vs, pMin, pValue)
-      case _ => AssocMethod.AnalyticResult(vs, -1.0, None)
+    if (isDefined) {
+      AssocMethod.AnalyticResult(vs, pMin, pValue)
+    } else {
+      AssocMethod.AnalyticResult(vs, -1.0, None)
     }
-
   }
 
 }

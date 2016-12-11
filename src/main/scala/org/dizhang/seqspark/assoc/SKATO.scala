@@ -159,7 +159,6 @@ object SKATO {
 
   final case class Moments(muQ: Double, varQ: Double, df: Double)
 
-
   trait AsymptoticKur extends SKATO {
 
     lazy val paramOpt = getParameters(P0SqrtZ, rhos)

@@ -68,7 +68,7 @@ object SKAT {
       case Success(ev) =>
         val cutoff = mean(ev) * 1e-6
         val lambda = DV(ev.toArray.filter(v => v > cutoff):_*)
-        Some(lambda)
+        if (lambda.length == 0) None else Some(lambda)
       case _ => None
     }
   }
@@ -78,12 +78,12 @@ object SKAT {
     egTry match {
       case Success(eg) =>
         val vals = eg.eigenvalues
-        val vecs = eg.eigenvectors
         val cutoff = mean(vals) * 1e-6
         val lambda = DV(vals.toArray.filter(v => v > cutoff): _*)
         if (lambda.length == 0) {
           None
         } else {
+          val vecs = eg.eigenvectors
           val u = DV.horzcat(
             (for {
               i <- 0 until vals.length

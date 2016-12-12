@@ -28,18 +28,33 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
   "A LogisticRegression" should "do nothing" in {
     //println("Do not do anything here")
     val rb = Binomial(1, 0.5)
-    val y = DenseVector(rb.sample(2000).map(_.toDouble):_*)
-    val bmi = DenseVector(new Gaussian(25.0, 2.0).sample(2000):_*)
-    val age = DenseVector(new Gaussian(45, 5).sample(2000):_*)
-    val sex = DenseVector(rb.sample(2000).map(_.toDouble):_*)
-    val cov = DenseVector.horzcat(sex, (bmi - mean(bmi))/stddev(bmi), (age - mean(age))/stddev(age))
+    val sampleSize = 2000
+    val y = DenseVector(rb.sample(sampleSize).map(_.toDouble):_*)
+    val bmi = DenseVector(new Gaussian(25.0, 2.0).sample(sampleSize):_*)
+    val age = DenseVector(new Gaussian(45, 5).sample(sampleSize):_*)
+    val sex = DenseVector(rb.sample(sampleSize).map(_.toDouble):_*)
+    val cov = DenseVector.horzcat((sex - mean(sex))/stddev(sex), (bmi - mean(bmi))/stddev(bmi), (age - mean(age))/stddev(age))
 
+    //val cov = DenseVector.horzcat(sex)
+
+    //println(s"y = c(${y.toArray.mkString(",")})")
+    //println(s"x = c(${cov.toDenseVector.toArray.mkString(",")})")
     val model = LogisticRegression(y, cov)
+    //println(s"coef: ${model.coefficients}")
+
+    println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.99)).toString}")
+    println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.5)).toString}")
+    println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.25)).toString}")
+    println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(-0.5)).toString}")
+    println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(-0.25)).toString}")
+
     time {
-      LogisticRegression(y, cov)
-      val lm = LinearRegression(y, cov)
-      println(s"O Logistic regression using LBFGS: ${model.coefficients}")
-      println(s"O linear regression using LBFGS: ${lm.coefficients}")
+      for (i <- 0 to 999) {
+        LogisticRegression(y, cov)
+        val lm = LinearRegression(y, cov)
+      }
+      //println(s"O Logistic regression using LBFGS: ${model.coefficients}")
+      //println(s"O linear regression using LBFGS: ${lm.coefficients}")
     }("O")
     val newY = model.estimates.map(e => if (new Bernoulli(e).draw()) 1.0 else 0.0)
     time {
@@ -52,5 +67,6 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
       println(s"N Logistic regression using LBFGS: ${model2.coefficients}")
       println(s"N Linear regression using LBFGS: ${lm2.coefficients}")
     }("N")
+
   }
 }

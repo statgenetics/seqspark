@@ -2,7 +2,7 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg._
 import breeze.numerics._
-import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, TruncatedNewtonMinimizer}
+import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, GradientTester}
 
 /**
   * linear and logistic regression
@@ -76,12 +76,11 @@ case class LogisticRegression(responses: DenseVector[Double],
       val num = ones.length
       val g = sigmoid(xs * beta)
 
-      /** deviance: -2 * sum(y*log(g) + (1 - y)*log(1 - g)) */
-      val value: Double = -2.0 * (responses.t * log(g) + (ones - responses).t * log(ones - g))
+      /** deviance: -(1/m) * sum(y*log(g) + (1 - y)*log(1 - g)) */
+      val value: Double = -1.0/xs.rows * (responses.t * log(g) + (ones - responses).t * log(ones - g))
 
-      /** gradient on beta: -2 * sum(x * (y - g)) */
-      //val gradient: Vector[Double] = -2.0 * (xs.t * (response.:*(ones - g) - g.:*(ones - response)))
-      val gradient: DenseVector[Double] = -2.0 * (xs.t * (responses - g))
+      /** gradient on beta: -(1/m) * sum(x * (y - g)) */
+      val gradient: DenseVector[Double] = -1.0/xs.rows * (xs.t * (responses - g))
 
       (value, gradient)
     }
@@ -89,13 +88,14 @@ case class LogisticRegression(responses: DenseVector[Double],
 
   //val model3 = new TruncatedNewtonMinimizer[DenseVector[Double], ]()
 
-  val model2 = new LBFGS[DenseVector[Double]]()
+  val model2 = new LBFGS[DenseVector[Double]](maxIter = 100, tolerance = 1e-6)
 
   val model = new LBFGSB(DenseVector.fill(xs.cols)(-1.0), DenseVector.fill(xs.cols)(1.0))
 
+  def test(p: DenseVector[Double]) = GradientTester.test[Int, DenseVector[Double]](cost, p)
 
   /** the estimated betas */
-  val coefficients = model.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.001))
+  val coefficients = model2.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.001))
 
   /** the estimated probabilities of responses equal to 1 */
   val estimates = sigmoid(xs * coefficients)

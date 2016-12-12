@@ -261,8 +261,9 @@ object SKATO {
         gammp(df/2, x/2.0)
       } catch {
         case e: Exception =>
-          println(s"error: df: $df x: ${x.toArray.mkString(",")}")
-          DV[Double](s"df$df".toDouble)
+          val xs = x.toArray.mkString(",")
+          println(s"error: df: $df x: ${xs}")
+          DV[Double](s"df$df,xs:$xs".toDouble)
       }
 
     }

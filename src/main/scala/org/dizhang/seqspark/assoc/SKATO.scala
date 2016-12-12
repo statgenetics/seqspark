@@ -454,9 +454,13 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def result = {
     val vs = x.vars
     if (isDefined) {
-      AssocMethod.AnalyticResult(vs, pMin, pValue)
+      if (pMin > 0.0) {
+        AssocMethod.AnalyticResult(vs, pMin, pValue)
+      } else {
+        AssocMethod.AnalyticResult(vs, 0.0, None)
+      }
     } else {
-      AssocMethod.AnalyticResult(vs, -1.0, None)
+      AssocMethod.AnalyticResult(vs, 0.0, None)
     }
   }
 

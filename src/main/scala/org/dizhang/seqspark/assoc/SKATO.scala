@@ -275,6 +275,8 @@ object SKATO {
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       if (tmpQ.exists(_.isInfinity)) {
         (s"x:${x.toArray.mkString(",")}" +
+          s"qscores: ${qScores.mkString(",")}" +
+          s"pvalues: ${pValues.mkString(",")}" +
           s"pmqDV: ${pmqDV.toArray.mkString(",")}" +
           s"rDV: ${rDV.toArray.mkString(",")}" +
           s"tauDV: ${tauDV.toArray.mkString(",")}" +

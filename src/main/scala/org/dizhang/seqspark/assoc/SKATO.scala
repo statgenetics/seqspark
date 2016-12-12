@@ -262,8 +262,8 @@ object SKATO {
       } catch {
         case e: Exception =>
           val xs = x.toArray.mkString(",")
-          println(s"error: df: $df x: ${xs}")
-          DV[Double](s"df$df,xs:$xs".toDouble)
+          println(s"error: param: ${param.toString}")
+          DV[Double](s"param: ${param.toString}".toDouble)
       }
 
     }

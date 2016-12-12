@@ -274,15 +274,16 @@ object SKATO {
       val tmpMin: DV[Double] = min(tmp(::, *)).t
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       if (tmpQ.exists(_.isInfinity)) {
-        (s"x:${x.toArray.mkString(",")}" +
-          s"qscores: ${qScores.mkString(",")}" +
-          s"pvalues: ${pValues.mkString(",")}" +
-          s"pmqDV: ${pmqDV.toArray.mkString(",")}" +
-          s"rDV: ${rDV.toArray.mkString(",")}" +
-          s"tauDV: ${tauDV.toArray.mkString(",")}" +
-          s"tmpMin: ${tmpMin.toArray.mkString(",")}" +
-          s"param: ${param.toString}" +
-          s"tmpQ: ${tmpQ.toArray.mkString(",")}").toDouble
+        (s"x:${x.toArray.mkString(",")}\n" +
+          s"lambdas: ${lambdas.map(_.toArray.mkString(",")).mkString("\n")}\n" +
+          s"qscores: ${qScores.mkString(",")}\n" +
+          s"pvalues: ${pValues.mkString(",")}\n" +
+          s"pmqDV: ${pmqDV.toArray.mkString(",")}\n" +
+          s"rDV: ${rDV.toArray.mkString(",")}\n" +
+          s"tauDV: ${tauDV.toArray.mkString(",")}\n" +
+          s"tmpMin: ${tmpMin.toArray.mkString(",")}\n" +
+          s"param: ${param.toString}\n" +
+          s"tmpQ: ${tmpQ.toArray.mkString(",")}\n").toDouble
       }
       (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
     }
@@ -433,6 +434,8 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def pValues: Array[Double]
 
   def pMin = min(pValues)
+
+  def lambdas: Array[DV[Double]]
 
   def pMinQuantiles: Array[Double]
 

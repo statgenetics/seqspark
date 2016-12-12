@@ -14,6 +14,7 @@ class LCCSLiuSpec extends FlatSpec with Matchers {
     val dis = LCCSLiu.Modified(DenseVector(3771.8800871369217,3827.6802635442027,3990.8395006717205,
       4068.5838736790965,4138.261764764718,4172.109564262479,4197.06479805482,
       4364.667266210289,4614.401733626494,1924088.423425927))
+    val failed = LCCSLiu.Modified(DenseVector(0.1539470967605115,0.15419711406142722,0.3972968268233756,1.142205556802913))
   }
 
   "A LiuModified" should "work fine" in new Data {
@@ -23,6 +24,7 @@ class LCCSLiuSpec extends FlatSpec with Matchers {
     val cutoff = 1025077.779555519
     val norm =  (cutoff - dis.muQ)/dis.sigmaQ
     val norm1 = norm * dis.sigmaX + dis.muX
+    println(s"Failed Liu Modified ${failed.cdf(182.97812844066553).toString}")
     //println(s"df: ${dis.df} delta: ${dis.delta} norm1: ${norm1} pvalue: ${dis.cdf(cutoff).pvalue}")
     //println(s"muQ:${dis.muQ} sigmaQ:${dis.sigmaQ} muX: ${dis.muX} sigmaX: ${dis.sigmaX}")
   }

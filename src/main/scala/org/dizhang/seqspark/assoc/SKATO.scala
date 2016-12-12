@@ -276,6 +276,7 @@ object SKATO {
       if (tmpQ.exists(_.isInfinity)) {
         (s"x:${x.toArray.mkString(",")}\n" +
           s"lambdas: ${lambdas.map(_.toArray.mkString(",")).mkString("\n")}\n" +
+          s"lambdas2: ${lambdas2.map(_.toArray.mkString(",")).mkString("\n")}\n" +
           s"qscores: ${qScores.mkString(",")}\n" +
           s"pvalues: ${pValues.mkString(",")}\n" +
           s"pmqDV: ${pmqDV.toArray.mkString(",")}\n" +
@@ -427,7 +428,16 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   lazy val qScores: Array[Double] = kernels.map(k => score.t * k * score)
 
-  lazy val vcs = LTs.map(lt => lt.t * P0SqrtZ.t * P0SqrtZ * lt)
+  lazy val P0Z = P0SqrtZ.t * P0SqrtZ
+
+  lazy val vcs = LTs.map(lt => lt.t * P0Z * lt)
+  lazy val vcs2 = kernels.map{k =>
+    ScoreTest(nullModel.STNullModel, geno * cholesky(k).t).variance
+  }
+
+  lazy val lambdas2 = vcs2.map(vc =>
+    eigSym.justEigenvalues(vc)
+  )
 
   def isDefined: Boolean
 

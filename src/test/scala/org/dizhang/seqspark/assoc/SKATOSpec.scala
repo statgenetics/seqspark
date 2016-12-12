@@ -56,10 +56,10 @@ class SKATOSpec extends FlatSpec with Matchers {
 
 
     for (i <- List(2, 5, 10)) {
-      val cd = encode(i).getCoding
+      //val cd = encode(i).getCoding
       for (j <- 0 to 2) {
-        time {println(SKATO(nullModel, cd, "liu.mod").lambdas.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l1 for $i variants: $j")
-        time {println(SKATO(nullModel, cd, "liu.mod").lambdas2.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l2 for $i variants: $j")
+        //time {println(SKATO(nullModel, cd, "liu.mod").lambdas.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l1 for $i variants: $j")
+        //time {println(SKATO(nullModel, cd, "liu.mod").lambdas2.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l2 for $i variants: $j")
       }
     }
 

@@ -124,7 +124,7 @@ object AssocMaster {
                      (implicit sc: SparkContext, conf: RootConfig): Map[String, AssocMethod.ResamplingResult] = {
     logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y, cov.get)
-    val nm = ScoreTest.NullModel(reg)
+    val nm = sc.broadcast(ScoreTest.NullModel(reg))
     logger.info("get the reference statistics first")
     val jobs = conf.jobs
     val asymptoticRes = asymptoticTest(codings, y, cov, binaryTrait, config).collect().toMap
@@ -169,11 +169,11 @@ object AssocMaster {
         }
         val model =
           if (config.`type` == MethodType.snv) {
-            SNV(ref, minTests, batchSize, nm, x._2)
+            SNV(ref, minTests, batchSize, nm.value, x._2)
           } else if (config.maf.getBoolean("fixed")) {
-            Burden(ref, minTests, batchSize, nm, x._2)
+            Burden(ref, minTests, batchSize, nm.value, x._2)
           } else {
-            VT(ref, minTests, batchSize, nm, x._2)
+            VT(ref, minTests, batchSize, nm.value, x._2)
           }
         x._1 -> model.pCount
       }.reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap

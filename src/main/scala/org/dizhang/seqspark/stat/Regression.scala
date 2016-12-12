@@ -2,7 +2,7 @@ package org.dizhang.seqspark.stat
 
 import breeze.linalg._
 import breeze.numerics._
-import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, StochasticDiffFunction, StochasticGradientDescent}
+import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, TruncatedNewtonMinimizer}
 
 /**
   * linear and logistic regression
@@ -87,10 +87,15 @@ case class LogisticRegression(responses: DenseVector[Double],
     }
   }
 
+  //val model3 = new TruncatedNewtonMinimizer[DenseVector[Double], ]()
+
+  val model2 = new LBFGS[DenseVector[Double]]()
+
   val model = new LBFGSB(DenseVector.fill(xs.cols)(-1.0), DenseVector.fill(xs.cols)(1.0))
 
+
   /** the estimated betas */
-  val coefficients = model.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.01)).toDenseVector
+  val coefficients = model.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.001))
 
   /** the estimated probabilities of responses equal to 1 */
   val estimates = sigmoid(xs * coefficients)

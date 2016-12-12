@@ -1,6 +1,7 @@
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
+import breeze.stats.{mean, stddev}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.dizhang.seqspark.ds.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
@@ -146,7 +147,11 @@ trait Phenotype {
           winsorize(raw, limit)
       }
       if (res.forall(_.isDefined)) {
-        Right(DV.horzcat(res.map(x => DV(x.get)): _*))
+        val scaled = DV.horzcat(res.map{x =>
+          val u = DV(x.get)
+          (u - mean(u))/stddev(u)
+        }: _*)
+        Right(scaled)
       } else {
         val msg = cov.zip(res).filter(p => p._2.isEmpty).map(p => s"invalid value in covariate ${p._1}")
         Left(msg.mkString(";"))

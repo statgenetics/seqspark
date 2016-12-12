@@ -113,6 +113,15 @@ object Resampling {
 @SerialVersionUID(7778770001L)
 sealed trait Resampling extends HypoTest {
   def nullModel: NullModel
+
+  lazy val makeNewY: () => DenseVector[Double] = {
+    nullModel match {
+      case LinearModel(y, e, c, i) =>
+        () => e + shuffle(nullModel.residuals)
+      case LogisticModel(y, e, c, i) =>
+        () => e.map(p => if (new Bernoulli(p).draw()) 1.0 else 0.0)
+    }
+  }
   /** new null model is made based on newY,
     * which could be from permutated residuals (linear),
     * or from bootstrap (logistic)

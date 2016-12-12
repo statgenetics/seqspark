@@ -53,8 +53,8 @@ class SKATSpec extends FlatSpec {
     SKAT(nullModel, encode(10).getCoding, "liu.mod", 0.0).pValue
 
     for (i <- List(10, 20, 50, 100, 200, 300, 500, 1000)) {
-      val cd = encode(i).getCoding
-      val sm = cd.asInstanceOf[Encode.Rare].coding
+      //val cd = encode(i).getCoding
+      //val sm = cd.asInstanceOf[Encode.Rare].coding
       for (j <- 0 to 4) {
         /**
         time {

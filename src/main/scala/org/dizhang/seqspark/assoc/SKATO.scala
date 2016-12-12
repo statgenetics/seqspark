@@ -273,6 +273,12 @@ object SKATO {
       val tmp: DM[Double] = (tile(pmqDV, 1, x.length) - tmp1) :/ tile(rDV, 1, x.length)
       val tmpMin: DV[Double] = min(tmp(::, *)).t
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      if (tmpQ.exists(_.isInfinity)) {
+        (s"x:${x.toArray.mkString(",")}" +
+          s"tmpMin: ${tmpMin.toArray.mkString(",")}" +
+          s"param: ${param.toString}" +
+          s"tmpQ: ${tmpQ.toArray.mkString(",")}").toDouble
+      }
       (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
     }
 

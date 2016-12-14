@@ -42,6 +42,7 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
     val model = LogisticRegression(y, cov)
     //println(s"coef: ${model.coefficients}")
 
+    /**
     println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.99)).toString}")
     println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.5)).toString}")
     println(s"test: ${model.test(DenseVector.fill(cov.cols + 1)(0.25)).toString}")
@@ -67,6 +68,6 @@ class LogisticRegressionSpec extends FlatSpec with Matchers {
       println(s"N Logistic regression using LBFGS: ${model2.coefficients}")
       println(s"N Linear regression using LBFGS: ${lm2.coefficients}")
     }("N")
-
+    */
   }
 }

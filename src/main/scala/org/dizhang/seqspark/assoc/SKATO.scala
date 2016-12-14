@@ -8,7 +8,7 @@ import org.dizhang.seqspark.assoc.SKATO._
 import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
-
+import org.dizhang.seqspark.numerics.Integrate
 import scala.language.existentials
 /**
   * optimal SKAT test
@@ -273,6 +273,7 @@ object SKATO {
       val tmp: DM[Double] = (tile(pmqDV, 1, x.length) - tmp1) :/ tile(rDV, 1, x.length)
       val tmpMin: DV[Double] = min(tmp(::, *)).t
       val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      /**
       if (tmpQ.exists(_.isInfinity)) {
         (s"x:${x.toArray.mkString(",")}\n" +
           s"lambdas: ${lambdas.map(_.toArray.mkString(",")).mkString("\n")}\n" +
@@ -286,33 +287,21 @@ object SKATO {
           s"param: ${param.toString}\n" +
           s"tmpQ: ${tmpQ.toArray.mkString(",")}\n").toDouble
       }
+        */
       (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
     }
 
     /** adaptive pvalue
-      * integration is a little bit heavy here
+      * use the quadpack QAGS now
       * */
     def pValue: Option[Double] = {
       if (isDefined) {
-        var continue: Boolean = true
-        var i: Int = 0
-        var last: Option[Double] = None
-        var cur: Option[Double] = None
-        while (continue) {
-          //println(s"here we go: $i")
-          cur = quadratureScan(integralFunc2, 1e-6, 40.0 + 1e-6, 320, (i + 1) * 1000, 1e-5 * pow(10, -i * 2))
-          continue =
-            cur match {
-              case None =>
-                cur = last
-                false //if no pvalue,
-              case Some(v) =>
-                last = cur
-                (1.0 - v) < 1e-4 * pow(10, -i * 2)
-            }
-          i += 1
+        val res = Integrate(integralFunc2, 0.0, 40.0, 1e-25, 1e-6, 200)
+        if (res.iEr == 0) {
+          Some(1.0 - res.value)
+        } else {
+          None
         }
-        cur.map(1.0 - _)
       } else {
         None
       }

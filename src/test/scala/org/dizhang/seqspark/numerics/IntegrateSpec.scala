@@ -31,13 +31,13 @@ class IntegrateSpec extends FlatSpec with Matchers {
 
   "A Integrate" should "be well" in {
     time{
-      val res1 = Integrate(f1, 0.0, 40.0)
-      println(s"chisq df=1 pdf|0,1: $res1")
+      //val res1 = Integrate(f1, 0.0, 40.0)
+      //println(s"chisq df=1 pdf|0,1: $res1")
     }("Chisq")
 
-    val res2 = Integrate(sinx, 0.0, 1.0)
-    val res3 = Integrate(x2, 0.0, 1.0)
-    println(s"sin(x)|0,1: $res2")
-    println(s"x^2|0,1: $res3")
+    //val res2 = Integrate(sinx, 0.0, 1.0)
+    //val res3 = Integrate(x2, 0.0, 1.0)
+    //println(s"sin(x)|0,1: $res2")
+    //println(s"x^2|0,1: $res3")
   }
 }

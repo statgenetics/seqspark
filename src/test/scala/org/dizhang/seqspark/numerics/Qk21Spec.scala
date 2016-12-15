@@ -17,7 +17,7 @@ class Qk21Spec extends FlatSpec with Matchers {
   }
 
   "A Qk21" should "behave well" in {
-    val res = Qk21(f, 0.0, 1.0)
-    println(res)
+    //val res = Qk21(f, 0.0, 1.0)
+    //println(res)
   }
 }

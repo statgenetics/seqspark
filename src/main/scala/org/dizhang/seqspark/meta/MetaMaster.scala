@@ -44,12 +44,12 @@ object MetaMaster {
 
     val path = s"$study/${`trait`}/rmw"
     if (traitConfig.binary) {
-      val stats = sc.objectFile[RareMetalWorker.DefaultResult](path)
-        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultResult])
+      val stats = sc.objectFile[RareMetalWorker.DefaultRMWResult](path)
+        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultRMWResult])
       SummaryStatistic.DefaultStatistics(`trait`, stats)
     } else {
-      val stats = sc.objectFile[RareMetalWorker.DefaultResult](path)
-        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultResult])
+      val stats = sc.objectFile[RareMetalWorker.DefaultRMWResult](path)
+        .map(r => r.conditional(conditionals).asInstanceOf[RareMetalWorker.DefaultRMWResult])
       SummaryStatistic.DefaultStatistics(`trait`, stats)
     }
   }

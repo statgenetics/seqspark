@@ -12,6 +12,11 @@ import org.slf4j.{Logger, LoggerFactory}
   * The code is quite old, containing a lot of
   * global variables and side effects
   * Be careful!
+  *
+  * This is NOT a full implementation of the original method
+  * in some functions, non-centralities == 0 is assumed.
+  * Maybe I will solve this later.
+  *
   */
 object LCCSDavies {
   val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -332,6 +337,9 @@ trait LCCSDavies extends LCCS {
       () => {fail = b; b}
     }
     implicit val setTrue = toggler(true)
+
+    /** re-init sigsq */
+    sigsq = sigma.square
 
     val trace: Array[Double] = Array.fill(7)(0.0)
     var ifault: Int = 0

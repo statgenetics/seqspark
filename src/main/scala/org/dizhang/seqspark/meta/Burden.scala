@@ -7,7 +7,7 @@ import org.dizhang.seqspark.assoc.RareMetalWorker
   */
 trait Burden {
 
-  def worker: RareMetalWorker.Result
+  def worker: RareMetalWorker.RMWResult
 
 
 }

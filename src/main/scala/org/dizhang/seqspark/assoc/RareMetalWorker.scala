@@ -30,16 +30,16 @@ sealed trait RareMetalWorker extends AssocMethod {
   def model: ScoreTest
   def score: DV[Double]
   def variance: DM[Double]
-  def result: RareMetalWorker.Result = {
+  def result: RareMetalWorker.RMWResult = {
     nullModel match {
       case nm: ScoreTest.LinearModel =>
-        RareMetalWorker.DefaultResult(binary = false, Array(sampleSize),
+        RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
           commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
       case nm: ScoreTest.LogisticModel =>
-        RareMetalWorker.DefaultResult(binary = true, Array(sampleSize),
+        RareMetalWorker.DefaultRMWResult(binary = true, Array(sampleSize),
           commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
       case _ =>
-        RareMetalWorker.DefaultResult(binary = false, Array(sampleSize),
+        RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
           commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
     }
   }
@@ -61,7 +61,7 @@ object RareMetalWorker {
   }
 
   @SerialVersionUID(7727790201L)
-  trait Result extends AssocMethod.Result {
+  trait RMWResult extends AssocMethod.Result {
     def segment: Region = {
       val some = vars.head
       val start = some.start/SegmentSize * SegmentSize
@@ -75,7 +75,7 @@ object RareMetalWorker {
     def vars: Array[Variation]
     def score: DV[Double]
     def variance: DM[Double]
-    def ++(that: Result): Result = {
+    def ++(that: RMWResult): RMWResult = {
       val vm1 = this.vars.zipWithIndex.toMap
       val vm2 = that.vars.zipWithIndex.toMap
       val allVars = mergeVars(this.vars, that.vars)
@@ -87,12 +87,12 @@ object RareMetalWorker {
       val v1 = rearrange(index1, this.variance)
       val v2 = rearrange(index2, that.variance)
       this.binary match {
-        case false => DefaultResult(binary = false, sizes, allVars, s1 + s2, v1 + v2)
-        case true => DefaultResult(binary = true, sizes, allVars, s1 + s2, v1 + v2)
+        case false => DefaultRMWResult(binary = false, sizes, allVars, s1 + s2, v1 + v2)
+        case true => DefaultRMWResult(binary = true, sizes, allVars, s1 + s2, v1 + v2)
       }
     }
 
-    def conditional(known: Array[Variation]): Result = {
+    def conditional(known: Array[Variation]): RMWResult = {
       lazy val local = known.toSet.intersect(vars.toSet)
 
       if (known.isEmpty || local.isEmpty) {
@@ -117,22 +117,25 @@ object RareMetalWorker {
             val aa = 1.0 - u1.t * v11Inv * u1 / numSample
             val newScore = (u2 - v21 * v11Inv * u1)/aa
             val newVariance = (v22 - v21 * v11Inv * v12)/aa
-            DefaultResult(binary = false, this.sampleSizes, newVars, newScore, newVariance)
+            DefaultRMWResult(binary = false, this.sampleSizes, newVars, newScore, newVariance)
           case true =>
             val newScore = u2 - v21 * v11Inv * u1
             val newVariance = v22 - v21 * v11Inv * v12
-            DefaultResult(binary = true, this.sampleSizes, newVars, newScore, newVariance)
+            DefaultRMWResult(binary = true, this.sampleSizes, newVars, newScore, newVariance)
         }
       }
     }
   }
 
-  case class DefaultResult(binary: Boolean,
-                           sampleSizes: Array[Int],
-                           vars: Array[Variation],
-                           score: DV[Double],
-                           variance: DM[Double]) extends Result {
+  case class DefaultRMWResult(binary: Boolean,
+                              sampleSizes: Array[Int],
+                              vars: Array[Variation],
+                              score: DV[Double],
+                              variance: DM[Double]) extends RMWResult {
+    def header = ""
     def pValue: Option[Double] = Some(1.0)
+    def statistic: Double = 0.0
+    def self: DefaultRMWResult = this
   }
 
 

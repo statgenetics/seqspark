@@ -45,7 +45,9 @@ object VT {
 
   @SerialVersionUID(7727880101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode.VT) extends VT with AssocMethod.AnalyticTest {
+                                x: Encode.VT)
+    extends VT with AssocMethod.AnalyticTest
+  {
     val scoreTest = {
       //val cnt = x.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
@@ -65,7 +67,8 @@ object VT {
         case _ => None
       }
     }
-    def result = AssocMethod.AnalyticResult(x.vars, statistic, pValue)
+    def result: AssocMethod.VTAnalytic =
+      AssocMethod.VTAnalytic(x.vars, x.size, statistic, pValue)
   }
 
   @SerialVersionUID(7727880201L)
@@ -73,11 +76,14 @@ object VT {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode.VT) extends VT with AssocMethod.ResamplingTest {
+                                  x: Encode.VT)
+    extends VT with AssocMethod.ResamplingTest
+  {
     def pCount = {
       Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
     }
-    def result = AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
+    def result: AssocMethod.VTResampling =
+      AssocMethod.VTResampling(x.vars, x.size, refStatistic, pCount)
   }
 
 }

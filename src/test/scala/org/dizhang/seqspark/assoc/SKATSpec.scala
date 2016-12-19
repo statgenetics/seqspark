@@ -50,27 +50,29 @@ class SKATSpec extends FlatSpec {
 
 
   "A SKAT" should "be fine" in {
-    SKAT(nullModel, encode(10).getCoding, "liu.mod", 0.0).pValue
+    //SKAT(nullModel, encode(10).getCoding, "davies", 0.0).pValue
 
     for (i <- List(10, 20, 50, 100, 200, 300, 500, 1000)) {
       //val cd = encode(i).getCoding
       //val sm = cd.asInstanceOf[Encode.Rare].coding
-      for (j <- 0 to 4) {
+      for (j <- 0 to 0) {
         /**
         time {
-          val sk = SKAT(nullModel, cd, "liu.mod", 0.3)
+          val sk = SKAT(nullModel, cd, "davies", 0.0)
           //val cs = SKAT.getMoments(sk.vc)
           //val lm = LCCSLiu.ModifiedMoments(cs)
           //println(s"cs: ${lm.cs.mkString(",")}\ns1: ${lm.s1} s2: ${lm.s2}")
           println(sk.pValue)
-        }(s"SKAT Coding for $i variants: $j")
+        }(s"SKAT Davies for $i variants: $j")
+
         time {
-          val sk = SKAT(nullModel, cd, "liu.mod", 0.3)
+          val sk = SKAT(nullModel, cd, "liu.mod", 0.0)
           println(sk.pValue2)
           //val lb = SKAT.getLambda(sk.vc)
           //val lm = LCCSLiu.Modified(lb.get)
           //println(s"cs: ${lm.c1},${lm.c2},${lm.c3},${lm.c4} s1: ${lm.s1} s2: ${lm.s2}")
-        } (s"SKAT P2 for $i variants: $j")
+        } (s"SKAT LiuMod for $i variants: $j")
+
         time {
           val size = sm.cols
           val kernel: DenseMatrix[Double] = {

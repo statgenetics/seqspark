@@ -19,6 +19,7 @@ import scala.util.{Success, Try}
 
 object SKAT {
 
+  /**
   def apply(nullModel: NullModel,
             x: CSCMatrix[Double],
             method: String,
@@ -26,6 +27,7 @@ object SKAT {
     val cd = Encode.Rare(x, Array())
     apply(nullModel, cd, method, rho)
   }
+  */
 
   def apply(nullModel: NullModel,
             x: Encode.Coding,
@@ -102,50 +104,46 @@ object SKAT {
   final case class Davies(nullModel: NullModel,
                           x: Encode.Rare,
                           rho: Double = 0.0) extends SKAT {
-    def pValue2 = None
-    def pValue: Option[Double] = {
-      val lambda = getLambda(vc)
-      lambda.map(l => 1.0 - LCCSDavies.Simple(l).cdf(qScore).pvalue)
+
+    def result: AssocMethod.SKATResult = {
+      getLambda(vc) match {
+        case None =>
+          AssocMethod.SKATResult(x.vars, qScore, None, """method=Davies;failed to compute eigen values""")
+        case Some(l) =>
+          val cdf = LCCSDavies.Simple(l).cdf(qScore)
+          val info = s"method=Davies;ifault=${cdf.ifault};trace=${cdf.trace.map(_.toInt).mkString(",")}"
+          AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - cdf.pvalue), info)
+      }
     }
+
   }
   @SerialVersionUID(7727750201L)
   final case class Liu(nullModel: NullModel,
                        x: Encode.Rare,
                        rho: Double = 0.0) extends SKAT {
 
-    def pValue2: Option[Double] = {
-      val lambda = getLambda(vc)
-      lambda.map{l =>
-        println("lambdas: " + lambda.mkString(","))
-        1.0 - LCCSLiu.Simple(l).cdf(qScore).pvalue
-      }
-    }
-    def pValue: Option[Double] = {
+    def result: AssocMethod.SKATResult = {
       val cs = getMoments(vc)
-      LCCSLiu.SimpleMoments(cs).cdf(qScore) match {
-        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(1-p) else None
-        case _ => None
-      }
+      val cdf = LCCSLiu.SimpleMoments(cs).cdf(qScore)
+      if (cdf.ifault == 0)
+        AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "method=Liu;success")
+      else
+        AssocMethod.SKATResult(x.vars, qScore, None, "method=Liu;fail to get p value")
     }
+
   }
   @SerialVersionUID(7727750301L)
   final case class LiuModified(nullModel: NullModel,
                                x: Encode.Rare,
                                rho: Double = 0.0) extends SKAT {
-    def pValue2: Option[Double] = {
-      val lambda = getLambda(vc)
-      lambda.map{l =>
-        1.0 - LCCSLiu.Modified(l).cdf(qScore).pvalue
-      }
-    }
 
-    def pValue: Option[Double] = {
+    def result: AssocMethod.SKATResult = {
       val cs = getMoments(vc)
-      println("moments: " + cs.mkString(","))
-      LCCSLiu.ModifiedMoments(cs).cdf(qScore) match {
-        case LCCSLiu.CDFLiu(p, f) => if (f == 0) Some(1-p) else None
-        case _ => None
-      }
+      val cdf = LCCSLiu.ModifiedMoments(cs).cdf(qScore)
+      if (cdf.ifault == 0)
+        AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "method=Liu.mod;success")
+      else
+        AssocMethod.SKATResult(x.vars, qScore, None, "method=Liu.mod;fail to get p value")
     }
   }
   @SerialVersionUID(7727750401L)
@@ -156,12 +154,17 @@ object SKAT {
     /** resampled is a 10000 x n matrix, storing re-sampled residuals */
     val simScores = resampled * geno
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
-    def pValue2 = None
-    def pValue: Option[Double] = {
-      getLambdaU(vc).map{
-        case (l, u) =>
-          val dis = new LCCSResampling(l, u, nullModel.residualsVariance, simQs)
-          1.0 - dis.cdf(qScore).pvalue
+
+    def result: AssocMethod.SKATResult = {
+      getLambdaU(vc) match {
+        case Some((l, u)) =>
+          val cdf = new LCCSResampling(l, u, nullModel.residualsVariance, simQs).cdf(qScore)
+          if (cdf.ifault == 0)
+            AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "Method=SmallSampleAdjust;success")
+          else
+            AssocMethod.SKATResult(x.vars, qScore, None, "Method=SmallSampleAdjust;fail to get p value")
+        case None =>
+          AssocMethod.SKATResult(x.vars, qScore, None, "Method=SmallSampleAdjust;fail to get eigen values and vectors")
       }
     }
   }
@@ -202,7 +205,6 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   }
   //lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
   lazy val vc = scoreTest.variance //scoreSigma * kernel * scoreSigma
-  def pValue2: Option[Double]
-  def pValue: Option[Double]
-  def result = AssocMethod.AnalyticResult(x.vars, qScore, pValue)
+
+  def result: AssocMethod.SKATResult
 }

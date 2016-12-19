@@ -121,7 +121,8 @@ object AssocMaster {
                       binaryTrait: Boolean,
                       controls: Array[Boolean],
                       config: MethodConfig)
-                     (implicit sc: SparkContext, conf: RootConfig): Map[String, AssocMethod.ResamplingResult] = {
+                     (implicit sc: SparkContext,
+                      conf: RootConfig): Map[String, AssocMethod.Result] = {
     logger.info("start permutation test")
     val reg = adjustForCov(binaryTrait, y, cov.get)
     val nm = sc.broadcast(ScoreTest.NullModel(reg))
@@ -184,10 +185,12 @@ object AssocMaster {
       //curEncode.persist(StorageLevel.MEMORY_AND_DISK)
     }
     pCount.value.map{x =>
-      val asymp = asymptoticRes(x._1)
-      val vars = asymp.vars
-      val ref = asymp.statistic
-      (x._1, AssocMethod.ResamplingResult(vars, ref, x._2))
+      asymptoticRes(x._1) match {
+        case AssocMethod.BurdenAnalytic(v, s, _) =>
+          (x._1, AssocMethod.BurdenResampling(v, s, x._2))
+        case AssocMethod.VTAnalytic(v, n, s, _) =>
+          (x._1, AssocMethod.VTResampling(v, n, s, x._2))
+      }
     }
   }
 
@@ -196,12 +199,13 @@ object AssocMaster {
                      cov: Option[DenseMatrix[Double]],
                      binaryTrait: Boolean,
                      config: MethodConfig)
-                    (implicit sc: SparkContext, conf: RootConfig): RDD[(String, AssocMethod.AnalyticResult)] = {
+                    (implicit sc: SparkContext,
+                     conf: RootConfig): RDD[(String, AssocMethod.Result)] = {
     logger.info("start asymptotic test")
     val reg = adjustForCov(binaryTrait, y, cov.get)
     //logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
     //logger.info(s"covariates design matrix rank: ${rank(reg.xs)}")
-    config.`type` match {
+    val res: RDD[(String, AssocMethod.Result)] = config.`type` match {
       case MethodType.snv =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))
         codings.map(p => (p._1, SNV.AnalyticTest(nm.value, p._2.asInstanceOf[Encode.Common]).result))
@@ -220,6 +224,7 @@ object AssocMaster {
         else
           codings.map(p => (p._1, VT(nm.value, p._2).result))
     }
+    res
   }
 /**
   def rareMetalWorker(encode: RDD[(String, Encode.Coding)],
@@ -233,13 +238,14 @@ object AssocMaster {
   }
 */
   def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: String): Unit = {
+    //val header = implicitly[AssocMethod.Header[A]]
+
     val pw = new PrintWriter(new java.io.File(outFile))
-    res match {
-      case _: AssocMethod.AnalyticResult => pw.write("name\tvars\tstatistic\tp-value\n")
-      case _: AssocMethod.ResamplingResult => pw.write("name\tvars\tstatistic\tp-count\tp-value\n")
-      case _ => pw.write("name\tvars\tstatistic\tp-value\n")
-    }
-    res.sortBy(p => p._2.pValue match {case None => 2.0; case Some(x) => x}).foreach{p =>
+    pw.write(s"${res.head._2.header}\n")
+    res.sortBy(p =>
+      p._2.pValue match {
+        case None => 2.0
+        case Some(x) => x}).foreach{p =>
       pw.write("%s\t%s\n".format(p._1, p._2.toString))
     }
     pw.close()
@@ -341,10 +347,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (permutation) {
       val res = permutationTest(clean, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
-      writeResults(res, s"output/assoc_${currentTrait._1}_${method}_perm")
+      writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
       val res = asymptoticTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
-      writeResults(res, s"output/assoc_${currentTrait._1}_$method")
+      writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_$method")
     }
     logger.info(s"finished association tests for ${currentTrait._1} using $method")
   }

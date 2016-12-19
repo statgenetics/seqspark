@@ -17,7 +17,7 @@ trait RareMetal {
 
   def config: MetaConfig
 
-  def sum: RMW.Result
+  def sum: RMW.RMWResult
 
   def annotate(refGene: RefGene): Map[String, Array[(String, Variation)]] = {
     sum.vars.flatMap{ v =>

@@ -37,7 +37,9 @@ object Burden {
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode.Fixed) extends Burden with AssocMethod.AnalyticTest {
+                                x: Encode.Fixed)
+    extends Burden with AssocMethod.AnalyticTest
+  {
     def geno = x.coding
     //val scoreTest = ScoreTest(nullModel, geno)
     val statistic = getStatistic(nullModel, x)
@@ -46,9 +48,10 @@ object Burden {
       Some(1.0 - dis.cdf(statistic))
     }
 
-    def result: AssocMethod.AnalyticResult = {
-      AssocMethod.AnalyticResult(x.vars, statistic, pValue)
+    def result: AssocMethod.BurdenAnalytic = {
+      AssocMethod.BurdenAnalytic(x.vars, statistic, pValue)
     }
+
   }
 
   @SerialVersionUID(7727280201L)
@@ -56,10 +59,12 @@ object Burden {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode.Fixed) extends Burden with AssocMethod.ResamplingTest {
+                                  x: Encode.Fixed)
+    extends Burden with AssocMethod.ResamplingTest
+  {
     def pCount = Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
-    def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
+    def result: AssocMethod.BurdenResampling = {
+      AssocMethod.BurdenResampling(x.vars, refStatistic, pCount)
     }
   }
 }

@@ -1,6 +1,5 @@
 package org.dizhang.seqspark.assoc
 
-import breeze.numerics.abs
 import breeze.stats.distributions.Gaussian
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
 import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
@@ -31,12 +30,14 @@ object SNV {
 
   def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
     val st = ScoreTest(nm, x.asInstanceOf[Encode.Common].coding)
-    st.score(0)/st.variance(0,0).sqrt
+    math.abs(st.score(0)/st.variance(0,0).sqrt)
   }
 
   @SerialVersionUID(7727280101L)
   final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode.Common) extends SNV with AssocMethod.AnalyticTest {
+                                x: Encode.Common)
+    extends SNV with AssocMethod.AnalyticTest
+  {
     //val scoreTest = ScoreTest(nullModel, x.coding)
     val statistic = getStatistic(nullModel, x)
     val pValue = {
@@ -44,8 +45,8 @@ object SNV {
       Some((1.0 - dis.cdf(statistic)) * 2)
     }
 
-    def result: AssocMethod.AnalyticResult = {
-      AssocMethod.AnalyticResult(x.vars, statistic, pValue)
+    def result: AssocMethod.BurdenAnalytic = {
+      AssocMethod.BurdenAnalytic(x.vars, statistic, pValue)
     }
   }
 
@@ -54,10 +55,12 @@ object SNV {
                                   min: Int,
                                   max: Int,
                                   nullModel: NullModel,
-                                  x: Encode.Common) extends SNV with AssocMethod.ResamplingTest {
+                                  x: Encode.Common)
+    extends SNV with AssocMethod.ResamplingTest
+  {
     def pCount = Resampling.Simple(refStatistic, min, max, nullModel, x, getStatistic).pCount
-    def result: AssocMethod.ResamplingResult = {
-      AssocMethod.ResamplingResult(x.vars, refStatistic, pCount)
+    def result: AssocMethod.BurdenResampling = {
+      AssocMethod.BurdenResampling(x.vars, refStatistic, pCount)
     }
   }
 }

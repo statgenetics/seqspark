@@ -60,11 +60,11 @@ object Genotypes {
       self
     } else {
       val first = self.first()
-      val fm = first.parseFormat.toList
       val phased = Genotype.Raw.isPhased(first(0))
       val fs = LogicalParser.names(cond)
 
       self.map { v =>
+        val fm = v.parseFormat.toList
         v.map { g =>
           val mis = if (phased) {
             Raw.diploidPhasedMis

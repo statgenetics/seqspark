@@ -180,9 +180,15 @@ object UserConfig {
       else
         "liu.mod"
     }
-    val rCorr: Array[Double] = {
-      if (config.hasPath("rCorr"))
-        config.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
+    val rho: Double = {
+      if (config.hasPath("rho"))
+        config.getDouble("rho")
+      else
+        0.0
+    }
+    val rhos: Array[Double] = {
+      if (config.hasPath("rhos"))
+        config.getDoubleList("rhos").asScala.toArray.map(_.toDouble)
       else
         Array[Double]()
     }

@@ -49,11 +49,15 @@ object Variants {
       (1 until v.alleleNum).toArray.map{i =>
         val newV = v.map{g =>
           val s = g.split(":")
-          val gt = s(0).split("[|/]")
-          if (gt.length == 1) {
-            if (gt(0) == "0") "0" else "1"
+          if (s(0).contains(".")) {
+            s(0)
           } else {
-            gt.map(j => if (j.toInt == i) "1" else "0").mkString(s(0).substring(1,2))
+            val gt = s(0).split("[|/]")
+            if (gt.length == 1) {
+              if (gt(0) == "0") "0" else "1"
+            } else {
+              gt.map(j => if (j.toInt == i) "1" else "0").mkString(s(0).substring(1,2))
+            }
           }
         }
         newV.meta(4) = alleles(i)

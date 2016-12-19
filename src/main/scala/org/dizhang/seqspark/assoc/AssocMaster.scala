@@ -212,7 +212,8 @@ object AssocMaster {
       case MethodType.skat =>
         val nm = sc.broadcast(ScoreTest.NullModel(reg))
         val method = config.misc.method
-        codings.map(p => (p._1, SKAT(nm.value, p._2, method, 0.0).result))
+        val rho = config.misc.rho
+        codings.map(p => (p._1, SKAT(nm.value, p._2, method, rho).result))
       case MethodType.skato =>
         val snm = sc.broadcast(SKATO.NullModel(reg))
         val method = config.misc.method

@@ -80,7 +80,7 @@ object AssocMethod {
     def header = Header.SKATH.value
     override def toString: String = {
       s"${vars.length}\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}" +
-      s"$info"
+      s"\t$info"
     }
     def self = this
   }
@@ -92,7 +92,7 @@ object AssocMethod {
     def statistic = 0.0 //hack
     override def toString: String = {
       s"${vars.length}\t${pmin.map(_.toString).getOrElse("NA")}\t${pValue.map(_.toString).getOrElse("NA")}" +
-        s"$info"
+        s"\t$info"
     }
     def self = this
   }

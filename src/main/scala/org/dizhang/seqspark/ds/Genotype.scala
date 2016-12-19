@@ -203,8 +203,11 @@ object Genotype {
       val s = g.split(":")
       if (s.length == 1)
         Map(format.head -> s(0))
-      else
-        format.zip(s).toMap
+      else {
+        /** format can be longer than s, discard the rest */
+        s.zip(format).map(_.swap).toMap
+      }
+
     }
 
     def qc(g: String, cond: LogicalParser.LogExpr, format: List[String], mis: String): String = {

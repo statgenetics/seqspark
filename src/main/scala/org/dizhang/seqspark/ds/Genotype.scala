@@ -213,7 +213,6 @@ object Genotype {
         varMap("GT")
       else
         mis
-
     }
 
     def callRate(g: String): (Double, Double) = {

@@ -36,13 +36,15 @@ object Genotypes {
     }
     //logger.info("still all right?")
     val first = self.first()
-    val fm = first.format.split(":").toList
+
     val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
     //val counter = Counter.CounterElementSemiGroup.Longs(400)
     /** this function works on raw data, so limit to a subset can greatly enhance the performance */
-    val all = self.sample(withReplacement = false, frac).map(v =>
+    val all = self.sample(withReplacement = false, frac).map{v =>
+      /** some VCF do have variant specific format */
+      val fm = v.format.split(":").toList
       v.toCounter(makeGdGq(_, fm), Map.empty[Int, Long])
-        .reduceByKey(keyFunc))
+        .reduceByKey(keyFunc)}
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")

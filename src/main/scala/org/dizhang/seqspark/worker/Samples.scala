@@ -103,7 +103,7 @@ object Samples {
                    (ssc: SingleStudyContext): Unit = {
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    val fid = pheno.select("fid").map(_.get)
+    val fid = pheno.select("fid").map(_.getOrElse("NA"))
     //logger.info(s"fid ${fid.length}")
     val iid = pheno.select("iid").map(_.get)
     //logger.info(s"fid ${iid.length}")

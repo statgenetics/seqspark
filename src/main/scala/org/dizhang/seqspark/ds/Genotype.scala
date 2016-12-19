@@ -204,8 +204,8 @@ object Genotype {
       if (s.length == 1)
         Map(format.head -> s(0))
       else {
-        /** format can be longer than s, discard the rest */
-        s.zip(format).map(_.swap).toMap
+        /** remove the missing values */
+        format.zip(s).filter(_._2 != ".").toMap
       }
 
     }

@@ -54,11 +54,17 @@ object SingleStudy {
   def readConf(file: String): RootConfig = {
     val userConfFile = new File(file)
     require(userConfFile.exists())
+
+    ConfigFactory.invalidateCaches()
+    System.setProperty("config.file", file)
+    val userConf = ConfigFactory.load().getConfig("seqspark")
+
+    /**
     val userConf = ConfigFactory
       .parseFile(userConfFile)
       .withFallback(ConfigFactory.load().getConfig("seqspark"))
       .resolve()
-
+    */
     val show = userConf.root().render()
 
     logger.debug("Conf detail:\n" + show)

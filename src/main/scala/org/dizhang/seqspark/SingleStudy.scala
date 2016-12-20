@@ -106,7 +106,7 @@ object SingleStudy {
 
     implicit val ssc = SingleStudyContext(cnf, sc, ss)
 
-
+    /**
     if (cnf.pipeline.isEmpty) {
       logger.error("no pipeline specified, exit")
     } else if (cnf.pipeline.length > 2) {
@@ -116,7 +116,7 @@ object SingleStudy {
 
       }
     }
-
+    */
 
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
@@ -184,7 +184,7 @@ object SingleStudy {
 */
   def runAssoc[A: Genotype](input: worker.Data[A])
                            (implicit ssc: SingleStudyContext): Unit = {
-    if (ssc.userConfig.pipeline.length > 1) {
+    if (ssc.userConfig.pipeline.length == 2 || ssc.userConfig.pipeline.head == "association") {
       val assocConf = ssc.userConfig.association
       val methods = assocConf.methodList
       val annotated = if (methods.exists(m =>

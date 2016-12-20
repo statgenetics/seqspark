@@ -67,8 +67,12 @@ object SingleStudy {
     */
     val show = userConf.root().render()
 
-    logger.debug("Conf detail:\n" + show)
     val rootConfig = RootConfig(userConf)
+
+    if (rootConfig.debug) {
+      logger.info("Conf detail:\n" + show)
+    }
+
     rootConfig
   }
 

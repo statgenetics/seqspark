@@ -2,7 +2,6 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
 
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
 import org.dizhang.seqspark.util.Constant.Genotype.Raw

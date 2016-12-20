@@ -10,9 +10,48 @@ import org.slf4j.LoggerFactory
 /**
   * Created by zhangdi on 8/13/16.
   */
+sealed trait Import[A <: Import.Source, B] {
+  def load(ssc: SingleStudyContext): Data[B]
+}
+
 object Import {
 
+  sealed trait Source
+  case object PlainVCF extends Source
+  case object CacheVCF extends Source
+  case object Impute2 extends Source
+  case object CachedImpute2 extends Source
+
+
   val logger = LoggerFactory.getLogger(getClass)
+
+  type Imp = (Double, Double, Double)
+
+  implicit object RawVCF extends Import[PlainVCF.type , String] {
+    def load(ssc: SingleStudyContext): Data[String] = {
+      fromVCF(ssc)
+    }
+  }
+
+  implicit object CachedVCF extends Import[CacheVCF.type , Byte] {
+    def load(ssc: SingleStudyContext): Data[Byte] = {
+      val path = ssc.userConfig.input.genotype.path + ".cache"
+      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Byte]]
+    }
+  }
+
+  implicit object Imputed extends Import[Impute2.type , Imp] {
+    def load(ssc: SingleStudyContext): Data[Imp] = {
+      fromImpute2(ssc)
+    }
+  }
+
+  implicit object CachedImputed extends Import[CachedImpute2.type , Imp] {
+    def load(ssc: SingleStudyContext): Data[Imp] = {
+      val path = ssc.userConfig.input.genotype.path + ".cache"
+      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Imp]]
+    }
+  }
 
   def fromVCF(ssc: SingleStudyContext): Data[String] = {
 

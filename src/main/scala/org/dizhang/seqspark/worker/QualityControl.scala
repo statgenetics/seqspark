@@ -11,9 +11,28 @@ import org.slf4j.{LoggerFactory, Logger}
 /**
   * Created by zhangdi on 9/25/16.
   */
+
+sealed trait QualityControl[A, B] {
+  def clean(input: Data[A])(implicit ssc: SingleStudyContext): Data[B]
+}
+
 object QualityControl {
 
   val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  type Imp = (Double, Double, Double)
+
+  implicit object VCF extends QualityControl[String, Byte] {
+    def clean(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
+      cleanVCF(input)
+    }
+  }
+
+  implicit object Imputed extends QualityControl[Imp, Imp] {
+    def clean(input: Data[Imp])(implicit ssc: SingleStudyContext): Data[Imp] = {
+      cleanImputed(input)
+    }
+  }
 
   def cleanVCF(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
     logger.info("start quality control")
@@ -66,9 +85,14 @@ object QualityControl {
     }
 
     /** Variant QC */
-    simpleVCF.variants(conf.qualityControl.variants)(ssc)
+    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
     //annotated.unpersist()
     //simpleVCF.unpersist()
+    if (conf.qualityControl.save) {
+      res.cache()
+      res.saveAsObjectFile(conf.input.genotype.path + ".cache")
+    }
+    res
   }
 
   def cleanImputed(input: Data[(Double, Double, Double)])(implicit ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
@@ -90,6 +114,11 @@ object QualityControl {
     }
 
     /** Variant QC */
-    annotated.variants(conf.qualityControl.variants)(ssc)
+    val res = annotated.variants(conf.qualityControl.variants)(ssc)
+    if (conf.qualityControl.save) {
+      res.cache()
+      res.saveAsObjectFile(conf.input.genotype.path + ".cache")
+    }
+    res
   }
 }

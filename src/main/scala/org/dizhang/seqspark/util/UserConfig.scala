@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-
 import scala.collection.JavaConverters._
 import scala.io.Source
 
@@ -24,8 +23,9 @@ object UserConfig {
 
   object ImportGenotypeType extends Enumeration {
     val vcf = Value("vcf")
-    val imputed = Value("imputed")
-    val cache = Value("cache")
+    val imputed = Value("impute2")
+    val cachevcf = Value("cachedVcf")
+    val cacheimputed = Value("cachedImpute2")
   }
 
   object Samples extends Enumeration {
@@ -96,7 +96,6 @@ object UserConfig {
 
     val format = ImportGenotypeType.withName(config.getString("format"))
 
-
     val path = config.getString("path")
 
 
@@ -134,6 +133,7 @@ object UserConfig {
     val genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
     val variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
     val summaries = config.getStringList("summaries").asScala.toList
+    val save = config.getBoolean("save")
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {

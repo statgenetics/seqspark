@@ -85,6 +85,9 @@ object SingleStudy {
 
 
   def run(cnf: RootConfig) {
+
+
+
     val project = cnf.project
 
     /** Spark configuration */
@@ -101,11 +104,26 @@ object SingleStudy {
 
     Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
 
-    implicit val ssc = SingleStudyContext(cnf, sc, ss )
+    implicit val ssc = SingleStudyContext(cnf, sc, ss)
+
+
+    if (cnf.pipeline.isEmpty) {
+      logger.error("no pipeline specified, exit")
+    } else if (cnf.pipeline.length > 2) {
+      logger.error("too many tasks")
+    } else if (cnf.pipeline.length == 1) {
+      if (cnf.pipeline.head == "qualityControl") {
+
+      }
+    }
+
+
 
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {
-        val res = sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+        val cachePath = cnf.input.genotype.path + ".cache"
+        val res = sc.objectFile(cachePath).asInstanceOf[worker.Data[Byte]]
+        res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res
       } catch {
@@ -119,7 +137,9 @@ object SingleStudy {
       runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
       val clean = try {
-        val res =sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        val cachePath = cnf.input.genotype.path + ".cache"
+        val res =sc.objectFile(cachePath).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res
       } catch {
@@ -153,6 +173,15 @@ object SingleStudy {
     //PropertyConfigurator.configure("log4j.properties")
   }
 
+  /**
+  def runImport[A, B](src: A, ssc: SingleStudyContext)(implicit imp: Import[A, B]): worker.Data[B] = {
+    imp.load(ssc)
+  }
+
+  def runQC[A, B](input: worker.Data[A])(implicit qc: QualityControl[A, B], ssc: SingleStudyContext): worker.Data[B] = {
+    qc.clean(input)
+  }
+*/
   def runAssoc[A: Genotype](input: worker.Data[A])
                            (implicit ssc: SingleStudyContext): Unit = {
     if (ssc.userConfig.pipeline.length > 1) {

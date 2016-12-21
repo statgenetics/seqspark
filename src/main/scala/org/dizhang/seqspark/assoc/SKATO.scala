@@ -200,7 +200,12 @@ object SKATO {
     def pValues = {
       lambdas.zip(qScores).map{
         case (l, q) =>
-          1.0 - LCCSDavies.Simple(l).cdf(q).pvalue
+          val cdf = LCCSDavies.Simple(l).cdf(q)
+          if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
+            1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+          } else {
+            1.0 - cdf.pvalue
+          }
       }
     }
 

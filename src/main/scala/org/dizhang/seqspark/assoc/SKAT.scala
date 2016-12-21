@@ -70,7 +70,11 @@ object SKAT {
       case Success(ev) =>
         val cutoff = mean(ev) * 1e-6
         val lambda = DV(ev.toArray.filter(v => v > cutoff):_*)
-        if (lambda.length == 0) None else Some(lambda)
+        if (lambda.length == 0)
+          None
+        else {
+          Some(lambda)
+        }
       case _ => None
     }
   }
@@ -111,8 +115,14 @@ object SKAT {
           AssocMethod.SKATResult(x.vars, qScore, None, """method=Davies;failed to compute eigen values""")
         case Some(l) =>
           val cdf = LCCSDavies.Simple(l).cdf(qScore)
-          val info = s"method=Davies;ifault=${cdf.ifault};trace=${cdf.trace.map(_.toInt).mkString(",")}"
-          AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - cdf.pvalue), info)
+          if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
+            val liucdf = LCCSLiu.Modified(l).cdf(qScore)
+            val info = s"method=Liu.mod;DaviesPvalue=${1.0 - cdf.pvalue}"
+            AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - liucdf.pvalue), info)
+          } else {
+            val info = s"method=Davies;ifault=${cdf.ifault};trace=${cdf.trace.map(_.toInt).mkString(",")}"
+            AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - cdf.pvalue), info)
+          }
       }
     }
 

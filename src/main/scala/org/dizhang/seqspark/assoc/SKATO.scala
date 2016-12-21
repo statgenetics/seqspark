@@ -417,9 +417,15 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def result: AssocMethod.SKATOResult = {
     if (isDefined) {
-      val res = Integrate(integrand, 0.0, 40.0, 1e-25, 1e-6, 200)
-      val info = s"abserr=${res.abserr};ier=${res.iEr};nsub=${res.nSub};neval=${res.nEval}"
-      AssocMethod.SKATOResult(x.vars, Some(pMin), Some(1 - res.value), info)
+      try {
+        val res = Integrate(integrand, 0.0, 40.0, 1e-25, 1e-4, 200)
+        val info = s"abserr=${res.abserr};ier=${res.iEr};nsub=${res.nSub};neval=${res.nEval}"
+        AssocMethod.SKATOResult(x.vars, Some(pMin), Some(1 - res.value), info)
+      } catch {
+        case e: Exception =>
+          val info = s"InegrationError;pMin=$pMin"
+          AssocMethod.SKATOResult(x.vars, Some(pMin), None, info)
+      }
     } else {
       AssocMethod.SKATOResult(x.vars, None, None, "failed to get the p values")
     }

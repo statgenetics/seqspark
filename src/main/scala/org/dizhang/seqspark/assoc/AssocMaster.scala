@@ -330,6 +330,17 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     if (cnf.benchmark) {
       logger.info(s"encoding completed ${clean.count()} groups")
     }
+    if (cnf.debug) {
+      val path = cnf.input.genotype.path + s".${currentTrait._1}.$method"
+      try {
+        codings.map{
+          case (g, c) =>
+            s"$g," + c.toString
+        }.saveAsTextFile(path)
+      } catch {
+        case e: Exception => logger.warn(s"$path exists")
+      }
+    }
 
     if (method == "vt") {
       val summary = codings.map{case (g, e) =>

@@ -157,6 +157,12 @@ object Encode {
     }
     def size = vars.length
     def numVars = vars.length
+
+    override def toString: String = {
+      size.toString + "," + coding.activeIterator.map{
+        case ((i,j), v) => s"$i,$j,$v"
+      }.mkString(",")
+    }
   }
   case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
     def isDefined = vars.length > 0
@@ -178,6 +184,10 @@ object Encode {
     def copy = Fixed(coding.copy, vars.map(v => v.copy()))
     def size = 1
     def numVars = vars.length
+
+    override def toString: String = {
+      coding.activeIterator.map(p => s"${p._1},${p._2}").mkString(",")
+    }
   }
   case class VT(coding: Array[SparseVector[Double]], vars: Array[Variation]) extends Coding {
     def isDefined = vars.length > 0
@@ -185,6 +195,14 @@ object Encode {
     def copy = VT(coding.map(sv => sv.copy), vars.map(v => v.copy()))
     def size = coding.length
     def numVars = vars.length
+
+    override def toString: String = {
+      size.toString + "," + coding.zipWithIndex.map{
+        case (sv, j) => sv.activeIterator.map{
+          case (i, v) => s"$i,$j,$v"
+        }.mkString(",")
+      }.mkString(",")
+    }
   }
 
   sealed trait Raw[A] extends Encode[A] {

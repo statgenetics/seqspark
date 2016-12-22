@@ -13,12 +13,14 @@ import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.General._
 import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 11/23/16.
   */
 class SKATOSpec extends FlatSpec with Matchers {
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
+  val logger = LoggerFactory.getLogger(getClass)
 
   def encode(num: Int): Encode[Byte] = {
     val conf = ConfigFactory.load().getConfig("seqspark.association.method.skato")
@@ -47,7 +49,7 @@ class SKATOSpec extends FlatSpec with Matchers {
     val t0 = System.nanoTime()
     val result = block    // call-by-name
     val t1 = System.nanoTime()
-    println(s"$tag Elapsed time: " + (t1 - t0)/1e6 + "ms")
+    logger.info(s"$tag Elapsed time: " + (t1 - t0)/1e6 + "ms")
     result
   }
 
@@ -56,13 +58,18 @@ class SKATOSpec extends FlatSpec with Matchers {
 
 
     for (i <- List(2, 5, 10, 100, 200, 300, 500, 1000)) {
-      //val cd = encode(i).getCoding
-      for (j <- 0 to 2) {
-        //time {println(SKATO(nullModel, cd, "liu.mod").lambdas.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l1 for $i variants: $j")
-        //time {println(SKATO(nullModel, cd, "liu.mod").lambdas2.map(l => l.toArray.mkString(",")).mkString("\n"))}(s"SKATO l2 for $i variants: $j")
+      val cd = encode(i).getCoding
+      for (j <- 0 to 3) {
         time {
-          //SKATO(nullModel, cd, "liu.mod").pValue.map(p => println(s"p: $p"))
-        }(s"$i variants ${j}th test")
+          val so = SKATO(nullModel, cd, "liu.mod")
+          val res = so.result
+          logger.info(s"${res.toString}")
+        }(s"$i variants ${j}th test liu")
+        time {
+          val so = SKATO(nullModel, cd, "davies")
+          val res = so.result
+          logger.info(s"${res.toString}")
+        }(s"$i variants ${j}th test davies")
       }
     }
 

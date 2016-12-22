@@ -199,7 +199,7 @@ object Qags {
         last_e_i = e_i
 
         errSum += error12 - e_i
-        logger.debug(s"current errsum: $errSum error12: $error12 e_i: $e_i")
+        //logger.debug(s"current errsum: $errSum error12: $error12 e_i: $e_i")
         area += area12 - r_i
 
         tolerance = max(epsAbs, epsRel * abs(area))
@@ -232,23 +232,23 @@ object Qags {
         memory.update(a1, b1, area1, error1, a2, b2, area2, error2)
 
         if (errSum <= tolerance) {
-          logger.debug("accurary achieved, go compute result")
+          logger.trace("accurary achieved, go compute result")
           goto_compute = true
           break()
         }
         if (error_type != 0) {
-          logger.debug(s"error_type $error_type, break")
+          logger.trace(s"error_type $error_type, break")
           break()
         }
 
         if (iteration >= limit - 1) {
-          logger.debug("max iterations, break")
+          logger.trace("max iterations, break")
           error_type = 1
           break()
         }
 
         if (iteration == 2) {
-          logger.debug("set up variables on first iteration")
+          logger.trace("set up variables on first iteration")
           error_over_large_intervals = errSum
           ertest = tolerance
           table.append(area)
@@ -301,7 +301,7 @@ object Qags {
             correc = error_over_large_intervals
             ertest = max(epsAbs, epsRel * abs(reseps))
             if (errExt <= ertest) {
-              logger.debug(s"errExt: $errExt ertest: $ertest abseps: $abseps , break")
+              logger.trace(s"errExt: $errExt ertest: $ertest abseps: $abseps , break")
               break()
             }
           }
@@ -310,7 +310,7 @@ object Qags {
             disallow_extrapolation = true
           }
           if (error_type == 5) {
-            logger.debug("raw error_type 5, break")
+            logger.trace("raw error_type 5, break")
             break()
           }
           memory.reset_nrmax()
@@ -322,7 +322,7 @@ object Qags {
 
     breakable{
       if (goto_return_error || goto_compute) {
-        logger.debug("force goto compute or return error")
+        logger.trace("force goto compute or return error")
         break()
       }
       result.value = resExt

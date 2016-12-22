@@ -9,6 +9,8 @@ import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticMod
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.numerics.Integrate
+import org.slf4j.LoggerFactory
+
 import scala.language.existentials
 
 /**
@@ -18,6 +20,7 @@ import scala.language.existentials
   */
 
 object SKATO {
+  val logger = LoggerFactory.getLogger(getClass)
   val RhosOld = (0 to 9).map(x => x * 1.0/10.0).toArray :+ 0.999
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 0.999)
   /** the GK integration size */
@@ -211,7 +214,7 @@ object SKATO {
 
     def integrand(x: DV[Double]): DV[Double] = {
       require(x.length == GKSize)
-      val tmp = (pmqDM - (tauDM(::,*) :* x)) :/ rhoDM
+      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
       val kappa = min(tmp(::, *)).t
       val F = kappa.map{k =>
         if (k > sum(param.lambda) * 1e4) {
@@ -221,24 +224,9 @@ object SKATO {
           LCCSDavies.Simple(param.lambda).cdf(cutoff).pvalue
         }
       }
+      //logger.info(s"F: $F")
       F :* df1pdf(x)
     }
-
-    /**
-    def integralFunc(x: Double): Double = {
-      val tmp1 = DV(param.taus: _*) * x
-      val tmp = (DV(pMinQuantiles: _*) - tmp1) :/ DV(rhos.map(1.0 - _): _*)
-      val kappa = min(tmp)
-      val term1 =
-        if (kappa > sum(param.lambda) * 1e4) {
-          1.0
-        } else {
-          val tmpQ = (kappa - param.muQ) * (param.varQ - param.varZeta).sqrt / param.varQ.sqrt + param.muQ
-          LCCSDavies.Simple(param.lambda).cdf(tmpQ).pvalue
-        }
-      term1 * term2.pdf(x)
-    }
-    */
 
   }
 
@@ -257,10 +245,14 @@ object SKATO {
 
 
     def integrand(x: DV[Double]): DV[Double] = {
-      val tmp1: DM[Double] = tauDM * diag(x)
-      val tmp: DM[Double] = (pmqDM - tmp1) :/ rhoDM
-      val tmpMin: DV[Double] = min(tmp(::, *)).t
-      val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      require(x.length == GKSize)
+      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
+      val kappa = min(tmp(::, *)).t
+      //val cutoff = (kappa - param.muQ) * (param.varQ - param.varZeta).sqrt/param.varQ.sqrt + param.muQ
+      val cutoff = (kappa - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      //logger.debug(s"x: $x")
+      //logger.debug(s"tmpMin: $tmpMin")
+      //logger.debug(s"tmpQ: $tmpQ")
       /**
       if (tmpQ.exists(_.isInfinity)) {
         (s"x:${x.toArray.mkString(",")}\n" +
@@ -276,7 +268,9 @@ object SKATO {
           s"tmpQ: ${tmpQ.toArray.mkString(",")}\n").toDouble
       }
         */
-      dfcdf(tmpQ) :* df1pdf(x)
+      val res = dfcdf(cutoff.map(q => if (q < 0) 0.0 else q)) :* df1pdf(x)
+      //logger.debug(s"res: $res")
+      res
     }
 
 
@@ -397,6 +391,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val P0Z = P0SqrtZ.t * P0SqrtZ
 
   lazy val vcs = LTs.map(lt => lt.t * P0Z * lt)
+  /**
   lazy val vcs2 = kernels.map{k =>
     ScoreTest(nullModel.STNullModel, geno * cholesky(k).t).variance
   }
@@ -404,7 +399,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val lambdas2 = vcs2.map(vc =>
     eigSym.justEigenvalues(vc)
   )
-
+  */
   def isDefined: Boolean
 
   def pValues: Array[Double]
@@ -436,11 +431,11 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     * basically
     *
     * */
-  lazy val term1 = new ChiSquared(df)
-  lazy val term2 = new ChiSquared(1)
-  lazy val tauDV = DV(param.taus)
-  lazy val pmqDV = DV(pMinQuantiles)
-  lazy val rDV = DV(rhos.map(1.0 - _))
+  //lazy val term1 = new ChiSquared(df)
+  //lazy val term2 = new ChiSquared(1)
+  //lazy val tauDV = DV(param.taus)
+  //lazy val pmqDV = DV(pMinQuantiles)
+  //lazy val rDV = DV(rhos.map(1.0 - _))
   lazy val tauDM = tile(DV(param.taus), 1, GKSize)
   lazy val pmqDM = tile(DV(pMinQuantiles), 1, GKSize)
   lazy val rhoDM = tile(DV(rhos.map(1.0 - _)), 1, GKSize)

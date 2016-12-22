@@ -31,7 +31,7 @@ object Qk21 {
     var errAbs = abs(err)
     if (resultAsc != 0.0 && errAbs != 0.0) {
       val scale = pow(200 * errAbs / resultAsc, 1.5)
-      logger.debug(s"scale err: $scale")
+      //logger.debug(s"scale err: $scale")
       if (scale < 1) {
         errAbs = resultAsc * scale
       } else {
@@ -107,7 +107,7 @@ object Qk21 {
     val fMean = 0.5 * resK
     val resAsc = sum(wgk.zip(fVals.toArray).map(p => (p._1 * abs(p._2 - fMean)).toDouble))
     val absErr = Qk21.adjustErr((resK - resG) * halfLen, resAbs * absHalfLen, resAsc * absHalfLen)
-    logger.debug(s"resG: ${resG * halfLen}, resK: ${resK * halfLen}, abserr: $absErr")
+    //logger.debug(s"resG: ${resG * halfLen}, resK: ${resK * halfLen}, abserr: $absErr")
     (resK * halfLen, absErr, resAbs * absHalfLen, resAsc * absHalfLen)
   }
 }

@@ -52,7 +52,7 @@ object VT {
       //val cnt = x.coding.activeSize
       //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
       //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
-      val m = SparseVector.horzcat(x.coding:_*)
+      val m = DenseVector.horzcat(x.coding:_*)
       ScoreTest(nullModel, m)
     }
     val statistic = getStatistic(nullModel, x)

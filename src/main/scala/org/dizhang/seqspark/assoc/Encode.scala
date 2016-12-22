@@ -28,8 +28,8 @@ object Encode {
   val DummySM = CSCMatrix.fill(1,1)(0.0)
   val DummyDV = DenseVector.fill(1)(0.0)
   val DummyVars = Array.empty[Variation]
-  val DummyFixed = Fixed(DummySV, DummyVars)
-  val DummyVT = VT(Array(DummySV), DummyVars)
+  val DummyFixed = Fixed(DummyDV, DummyVars)
+  val DummyVT = VT(Array(DummyDV), DummyVars)
 
   implicit class AF(val f: Double) extends AnyVal {
     def isRare(cutoff: Double): Boolean = f < cutoff || f > (1 - cutoff)
@@ -178,7 +178,7 @@ object Encode {
     def size = rare.size + common.size
     def numVars = rare.numVars + common.numVars
   }
-  case class Fixed(coding: SparseVector[Double], vars: Array[Variation]) extends Coding {
+  case class Fixed(coding: DenseVector[Double], vars: Array[Variation]) extends Coding {
     def isDefined = vars.length > 0
     def informative = sum(coding) >= 3.0
     def copy = Fixed(coding.copy, vars.map(v => v.copy()))
@@ -186,10 +186,10 @@ object Encode {
     def numVars = vars.length
 
     override def toString: String = {
-      coding.activeIterator.map(p => s"${p._1},${p._2}").mkString(",")
+      coding.toArray.mkString(",")
     }
   }
-  case class VT(coding: Array[SparseVector[Double]], vars: Array[Variation]) extends Coding {
+  case class VT(coding: Array[DenseVector[Double]], vars: Array[Variation]) extends Coding {
     def isDefined = vars.length > 0
     def informative = coding.length > 1
     def copy = VT(coding.map(sv => sv.copy), vars.map(v => v.copy()))
@@ -208,7 +208,7 @@ object Encode {
   sealed trait Raw[A] extends Encode[A] {
     lazy val isDefined = maf.exists(m => m > 0.0 && m < 1.0)
     override def informative(cutoff: Double) = true
-    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
+    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummyDV, DummyVars)
     def weight = DummyDV
   }
 
@@ -217,7 +217,7 @@ object Encode {
     override def informative(cutoff: Double) = true
     def weight = DummyDV
     lazy val isDefined = maf.exists(m => m.isCommon(fixedCutoff))
-    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummySV, DummyVars)
+    def getFixedBy(cutoff: Double = fixedCutoff) = Fixed(DummyDV, DummyVars)
   }
 
   sealed trait CMC[A] extends Encode[A] {
@@ -225,15 +225,15 @@ object Encode {
     def weight = DummyDV
     def getFixedBy(cutoff: Double = fixedCutoff): Fixed = {
       definedIndices(_.isRare(cutoff)).map{idx =>
-        val sv = idx.map{i =>
+        val dv = idx.map{i =>
           vars(i).toCounter(genotype.toCMC(_, maf(i)), 0.0)
-        }.reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toSparseVector(x => x)
+        }.reduce((a, b) => a.++(b)(CmcAddNaAdjust)).toDenseVector(x => x)
         val variations = idx.map{ i =>
           val mc = mafCount(i)
           val res = vars(i).toVariation()
           res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
         }
-        Fixed(sv, variations)
+        Fixed(dv, variations)
       }
     }.getOrElse(DummyFixed)
   }
@@ -244,16 +244,16 @@ object Encode {
     def getFixedBy(cutoff: Double = fixedCutoff): Fixed = {
       val w = weight
       definedIndices(_.isRare(cutoff)).map{idx =>
-        val sv = idx.map{i =>
+        val dv = idx.map{i =>
           //println(s"i:$i vars len: ${vars.length} maf len: ${maf.length} weight len: ${w.length}")
           vars(i).toCounter(genotype.toBRV(_, maf(i)) * w(i), 0.0)
-        }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toSparseVector(x => x)
+        }.reduce((a, b) => a.++(b)(BrvAddNaAdjust)).toDenseVector(x => x)
         val variations = idx.map{ i =>
           val mc = mafCount(i)
           val res = vars(i).toVariation()
           res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
         }
-        Fixed(sv, variations)
+        Fixed(dv, variations)
       }.getOrElse(DummyFixed)
     }
   }
@@ -431,7 +431,7 @@ abstract class Encode[A: Genotype] extends Serializable {
           v.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
       }
       Encode.VT(cm, variations)
-    }.getOrElse(Encode.VT(Array(DummySV), DummyVars))
+    }.getOrElse(Encode.VT(Array(DummyDV), DummyVars))
   }
 
   def getCoding: Coding = {

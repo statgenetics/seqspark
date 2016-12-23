@@ -4,16 +4,40 @@ import breeze.linalg._
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
 import org.dizhang.seqspark.stat.{LCCSLiu, LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.scalatest.FlatSpec
+import org.slf4j.LoggerFactory
 
 /**
   * Created by zhangdi on 11/23/16.
   */
 class SKATSpec extends FlatSpec {
+  val logger = LoggerFactory.getLogger(getClass)
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
+
+  val nm: SKATO.NullModel = {
+    val file = scala.io.Source.fromURL(getClass.getResource("/2k.tsv")).getLines().toArray
+    val header = file.head.split("\t")
+    val dat = for (s <- file.slice(1, file.length)) yield s.split("\t")
+    val pheno = header.zip(for (i <- header.indices)
+      yield DenseVector(dat.map(x => try {x(i).toDouble} catch {case e: Exception => 0.0}))).toMap
+    val lr = LinearRegression(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")))
+    SKATO.NullModel(lr)
+  }
+
+  def geno(fn: String): CSCMatrix[Double] = {
+    val file = scala.io.Source.fromURL(getClass.getResource(fn)).getLines().toArray
+    val dat = for (s <- file) yield s.split(",")
+    val idxes = for (i <- dat.head.indices) yield dat.map(_(i).toDouble).zipWithIndex.filter(_._1 != 0.0).map(_._2)
+    val arrs = for (i <- dat.head.indices) yield dat.map(_(i).toDouble).filter(_ != 0.0)
+    val res = SparseVector.horzcat(idxes.zip(arrs).map{p =>
+      new SparseVector[Double](p._1, p._2, dat.length)
+    }: _*)
+    //logger.info(s"${idxes.indices}")
+    res
+  }
 
   def encode(n: Int): Encode[Byte] = {
     val conf = ConfigFactory.load().getConfig("seqspark.association.method.skat")
@@ -50,7 +74,14 @@ class SKATSpec extends FlatSpec {
 
 
   "A SKAT" should "be fine" in {
-    //SKAT(nullModel, encode(10).getCoding, "davies", 0.0).pValue
+
+    val cda = geno("/CDA.dat")
+
+    val d = SKAT(nm.STNullModel, Encode.Rare(cda, Array[Variation]()), "liu.mod", 0.1)
+
+    logger.info("variance:" + nm.STNullModel.asInstanceOf[ScoreTest.LinearModel].residualsVariance.toString)
+    logger.info(SKAT.getLambda(d.vc).toString)
+    logger.info(d.result.toString)
 
     for (i <- List(10, 20, 50, 100, 200, 300, 500, 1000)) {
       //val cd = encode(i).getCoding

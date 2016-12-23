@@ -201,20 +201,19 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
     (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
   }
 
-  def geno = x.coding * cholesky(kernel).t
+  def geno = x.coding * cholesky(kernel)
   lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
-    /**
-    if (geno.activeSize > 0.05 * geno.rows * geno.cols) {
-      ScoreTest(nullModel, geno.toDense)
-    } else {
-      ScoreTest(nullModel, geno)
-    }
-    */
+
+  def phi2 = nullModel match {
+    case lm: LinearModel => lm.residualsVariance
+    case _ => 1.0
+  }
+
   def qScore: Double = {
-    scoreTest.score.t * scoreTest.score
+    scoreTest.score.t * scoreTest.score //* phi2
   }
   //lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
-  lazy val vc = scoreTest.variance //scoreSigma * kernel * scoreSigma
+  lazy val vc = scoreTest.variance //* phi2 //scoreSigma * kernel * scoreSigma
 
   def result: AssocMethod.SKATResult
 }

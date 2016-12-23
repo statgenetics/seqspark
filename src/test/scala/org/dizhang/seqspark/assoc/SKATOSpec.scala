@@ -2,13 +2,13 @@ package org.dizhang.seqspark.assoc
 
 import java.io.{File, PrintWriter}
 
-import breeze.linalg.{DenseMatrix, DenseVector, linspace}
+import breeze.linalg.{CSCMatrix, DenseMatrix, DenseVector, SparseVector, linspace}
 import breeze.numerics.pow
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
 import org.dizhang.seqspark.assoc.SKATO.LiuPValue
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.General._
@@ -21,6 +21,28 @@ import org.slf4j.LoggerFactory
 class SKATOSpec extends FlatSpec with Matchers {
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
   val logger = LoggerFactory.getLogger(getClass)
+
+  val nm: SKATO.NullModel = {
+    val file = scala.io.Source.fromURL(getClass.getResource("/2k.tsv")).getLines().toArray
+    val header = file.head.split("\t")
+    val dat = for (s <- file.slice(1, file.length)) yield s.split("\t")
+    val pheno = header.zip(for (i <- header.indices)
+      yield DenseVector(dat.map(x => try {x(i).toDouble} catch {case e: Exception => 0.0}))).toMap
+    val lr = LinearRegression(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")))
+    SKATO.NullModel(lr)
+  }
+
+  def geno(fn: String): CSCMatrix[Double] = {
+    val file = scala.io.Source.fromURL(getClass.getResource(fn)).getLines().toArray
+    val dat = for (s <- file) yield s.split(",")
+    val idxes = for (i <- dat.head.indices) yield dat.map(_(i).toDouble).zipWithIndex.filter(_._1 != 0.0).map(_._2)
+    val arrs = for (i <- dat.head.indices) yield dat.map(_(i).toDouble).filter(_ != 0.0)
+    val res = SparseVector.horzcat(idxes.zip(arrs).map{p =>
+      new SparseVector[Double](p._1, p._2, dat.length)
+    }: _*)
+    logger.info(s"${idxes.indices}")
+    res
+  }
 
   def encode(num: Int): Encode[Byte] = {
     val conf = ConfigFactory.load().getConfig("seqspark.association.method.skato")
@@ -53,13 +75,20 @@ class SKATOSpec extends FlatSpec with Matchers {
     result
   }
 
+
   "A SKATO" should "be fine" in {
 
+    val cda = geno("/CDA.dat")
+    val d = SKATO(nm, Encode.Rare(cda, Array[Variation]()), "optimal")
+    //val l = SKATO(nm, Encode.Rare(cda, Array[Variation]()), "liu.mod")
 
-
-    for (i <- List(2, 5, 10, 100, 200, 300, 500, 1000)) {
+    logger.info(d.result.toString)
+    //logger.info("qscores: " + d.qScores.mkString(","))
+    //logger.info(l.result.toString)
+    /**
+    for (i <- List(2, 5, 10, 100, 200, 300, 500)) {
       val cd = encode(i).getCoding
-      for (j <- 0 to 3) {
+      for (j <- 0 to 0) {
         time {
           val so = SKATO(nullModel, cd, "liu.mod")
           val res = so.result
@@ -73,7 +102,7 @@ class SKATOSpec extends FlatSpec with Matchers {
       }
     }
 
-    /**
+
     val pw = new PrintWriter(new File("skat.data"))
     val geno = so.geno.toDense
     for (i <- 0 until so.geno.cols) {

@@ -341,7 +341,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   def x: Encode.Rare
   def geno: CM[Double] = x.coding
 
-  def numVars: Int = x.vars.length
+  def numVars: Int = x.coding.cols
   //lazy val misc = x.config.misc
   def method: String
   lazy val rhos: Array[Double] = {
@@ -383,7 +383,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     rhos.map(r => (1 - r) * i + r * o)
   }
 
-  lazy val LTs: Array[DM[Double]] = kernels.map(cholesky(_).t)
+  lazy val LTs: Array[DM[Double]] = kernels.map(x => cholesky(x))
 
 
   lazy val qScores: Array[Double] = kernels.map(k => score.t * k * score)
@@ -414,11 +414,11 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     if (isDefined) {
       try {
         val res = Integrate(integrand, 0.0, 40.0, 1e-25, 1e-4, 200)
-        val info = s"abserr=${res.abserr};ier=${res.iEr};nsub=${res.nSub};neval=${res.nEval}"
+        val info = s"pvalues=${pValues.mkString(",")};abserr=${res.abserr};ier=${res.iEr};nsub=${res.nSub};neval=${res.nEval}"
         AssocMethod.SKATOResult(x.vars, Some(pMin), Some(1 - res.value), info)
       } catch {
         case e: Exception =>
-          val info = s"InegrationError;pMin=$pMin"
+          val info = s"InegrationError;pvalues=${pValues.mkString(",")}"
           AssocMethod.SKATOResult(x.vars, Some(pMin), None, info)
       }
     } else {

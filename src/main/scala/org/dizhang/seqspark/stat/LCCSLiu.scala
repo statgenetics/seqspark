@@ -6,12 +6,15 @@ import breeze.numerics.pow
 import org.dizhang.seqspark.stat.LCCSLiu._
 import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
 import org.dizhang.seqspark.util.General.RichDouble
+import org.slf4j.LoggerFactory
 
 /**
   * Use Liu et al. to compute p value for
   * the linear combination of chi-square distributions.
   */
 object LCCSLiu {
+
+  val logger = LoggerFactory.getLogger(getClass)
 
   case class CDFLiu(pvalue: Double, ifault: Int) extends LCCS.CDF {
     def trace = Array(0.0)
@@ -85,6 +88,7 @@ trait LCCSLiu extends LinearCombinationChiSquare {
   def muX:Double = df + delta
 
   def cdf(cutoff: Double): CDFLiu = {
+    //logger.debug(s"muX: $muX sigmaX: $sigmaX muQ: $muQ sigmaQ: $sigmaQ df: $df delta: $delta ")
     val nccs = NonCentralChiSquare(df + delta, delta)
     val norm =  (cutoff - muQ)/sigmaQ
     val norm1 = norm * sigmaX + muX

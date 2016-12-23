@@ -47,7 +47,7 @@ case class LinearRegression(responses: DenseVector[Double], independents: DenseM
 
   val estimates = xs * coefficients
 
-  lazy val residualsVariance = sum(pow(residuals, 2))/residuals.length.toDouble
+  lazy val residualsVariance = sum(pow(residuals, 2))/(residuals.length - xs.cols).toDouble
   lazy val xsRotated = xs //if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
   lazy val information: DenseMatrix[Double] = xsRotated.t * xsRotated * residualsVariance
 

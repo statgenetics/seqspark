@@ -45,7 +45,7 @@ object ScoreTest {
                          estimates: DenseVector[Double],
                          xs: DenseMatrix[Double],
                          information: DenseMatrix[Double]) extends NullModel {
-    val residualsVariance = sum(pow(residuals, 2))/residuals.length
+    val residualsVariance = sum(pow(residuals, 2))/(residuals.length - xs.cols)
   }
 
   @SerialVersionUID(7778780301L)

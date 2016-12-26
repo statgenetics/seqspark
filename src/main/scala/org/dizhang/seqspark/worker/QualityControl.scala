@@ -90,7 +90,7 @@ object QualityControl {
     //simpleVCF.unpersist()
     if (conf.qualityControl.save) {
       res.cache()
-      res.saveAsObjectFile(conf.input.genotype.path + ".cache")
+      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
     }
     res
   }
@@ -117,7 +117,7 @@ object QualityControl {
     val res = annotated.variants(conf.qualityControl.variants)(ssc)
     if (conf.qualityControl.save) {
       res.cache()
-      res.saveAsObjectFile(conf.input.genotype.path + ".cache")
+      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
     }
     res
   }

@@ -34,7 +34,7 @@ object AssocMaster {
   def encode[A: Genotype](currentGenotype: Data[A],
                           y: DenseVector[Double],
                           cov: Option[DenseMatrix[Double]],
-                          controls: Array[Boolean],
+                          controls: Option[Array[Boolean]],
                           config: MethodConfig)
                          (implicit sc: SparkContext, cnf: RootConfig): RDD[(String, Encode.Coding)] = {
 
@@ -64,7 +64,7 @@ object AssocMaster {
     val bcCov = sc.broadcast(cov)
     val sm: String = config.config.root().render()
     annotated.map(p =>
-      (p._1, Encode(p._2, Option(bcControl.value), Option(bcy.value), bcCov.value, sm))
+      (p._1, Encode(p._2, bcControl.value, Option(bcy.value), bcCov.value, sm))
     ).map(x => x._1 -> x._2.getCoding).filter(p => p._2.isDefined && p._2.informative)
 
 
@@ -119,7 +119,6 @@ object AssocMaster {
                       y: DenseVector[Double],
                       cov: Option[DenseMatrix[Double]],
                       binaryTrait: Boolean,
-                      controls: Array[Boolean],
                       config: MethodConfig)
                      (implicit sc: SparkContext,
                       conf: RootConfig): Map[String, AssocMethod.Result] = {
@@ -279,8 +278,13 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val currentTrait = (traitName, tr)
         val methods = assocConf.methodList
         val indicator = sc.broadcast(phenotype.indicate(traitName))
-        val controls = phenotype.select(Pheno.Header.control).zip(indicator.value)
-          .filter(p => p._2).map(p => if (p._1.get == "1") true else false)
+        val controls = if (phenotype.contains(Pheno.Header.control)) {
+          Some(phenotype.select(Pheno.Header.control).zip(indicator.value)
+            .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
+        } else {
+          None
+        }
+
         val chooseSample = genotype.samples(indicator.value)(sc)
         val cond = LogicalParser.parse("informative")
         val currentGenotype = chooseSample.variants(cond)(ssc)
@@ -307,7 +311,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
   def runTraitWithMethod(currentGenotype: Data[A],
                          currentTrait: (String, DenseVector[Double]),
                          cov: Option[DenseMatrix[Double]],
-                         controls: Array[Boolean],
+                         controls: Option[Array[Boolean]],
                          method: String)(implicit sc: SparkContext, cnf: RootConfig): Unit = {
     logger.info(s"prepare data for association tests for ${currentTrait._1} with method $method")
     val config = cnf.association
@@ -358,7 +362,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val binary = config.`trait`(currentTrait._1).binary
     logger.info(s"run trait ${currentTrait._1} with method $method")
     if (permutation) {
-      val res = permutationTest(clean, currentTrait._2, cov, binary, controls, methodConfig)(sc, cnf).toArray
+      val res = permutationTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).toArray
       writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {
       val res = asymptoticTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()

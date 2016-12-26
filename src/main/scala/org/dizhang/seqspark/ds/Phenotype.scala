@@ -56,6 +56,8 @@ object Phenotype {
 
     private lazy val cols = df.columns
 
+    def contains(field: String): Boolean = cols.contains(field)
+
     def select(field: String): Array[Option[String]] = {
       if (cols.contains(field)) {
         val spark = df.sparkSession
@@ -107,6 +109,7 @@ object Phenotype {
 trait Phenotype {
 
   def select(field: String): Array[Option[String]]
+  def contains(field: String): Boolean
   def sampleNames = this.select("iid").map(_.getOrElse("NA"))
   def batch(field: String): Array[String] = {
     this.select(field).map{

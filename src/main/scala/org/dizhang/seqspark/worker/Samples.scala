@@ -44,14 +44,14 @@ object Samples {
       }
     }.reduce((a, b) => a ++ b)
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    val fid = pheno.select("fid").map(_.get)
+    //val fid = pheno.select("fid").map(_.get)
     val iid = pheno.select("iid").map(_.get)
     val outFile = "output/titv.txt"
     val pw = new PrintWriter(new File(outFile))
-    pw.write("fid,iid,ti,tv\n")
+    pw.write("iid,ti,tv\n")
     for (i <- iid.indices) {
       val c = cnt(i)
-      pw.write("%s,%s,%.2f,%.2f\n" format (fid(i), iid(i), c._1, c._2))
+      pw.write("%s,%.2f,%.2f\n" format (iid(i), c._1, c._2))
     }
     pw.close()
   }
@@ -106,7 +106,7 @@ object Samples {
                    (ssc: SingleStudyContext): Unit = {
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    val fid = pheno.select("fid").map(_.getOrElse("NA"))
+    //val fid = pheno.select("fid").map(_.getOrElse("NA"))
     //logger.info(s"fid ${fid.length}")
     val iid = pheno.select("iid").map(_.get)
     //logger.info(s"fid ${iid.length}")
@@ -116,13 +116,13 @@ object Samples {
     }
     //logger.info(s"sex ${sex.length}")
     val pw = new PrintWriter(new File(outFile))
-    pw.write("fid,iid,sex,xHet,xHom,yCall,yMis\n")
+    pw.write("iid,sex,xHet,xHom,yCall,yMis\n")
     //logger.info(s"before counter")
-    val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
-    val y: Counter[(Double, Double)] = data._2.getOrElse(Counter.fill(fid.length)((0.0, 0.0)))
+    val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(iid.length)((0.0, 0.0)))
+    val y: Counter[(Double, Double)] = data._2.getOrElse(Counter.fill(iid.length)((0.0, 0.0)))
     //logger.info(s"this should be the sample size: ${iid.length} ${x.length} ${y.length}")
     for (i <- iid.indices) {
-      pw.write("%s,%s,%s,%f,%f,%f,%f\n" format (fid(i), iid(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
+      pw.write("%s,%s,%f,%f,%f,%f\n" format (iid(i), sex(i), x(i)._1, x(i)._2, y(i)._1, y(i)._2))
     }
     pw.close()
     //logger.info("are we done now?")

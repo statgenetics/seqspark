@@ -78,7 +78,7 @@ class SKATOSpec extends FlatSpec with Matchers {
 
   "A SKATO" should "be fine" in {
 
-    val cda = geno("/CDA.dat")
+    val cda = geno("/FAM96A.dat")
     val d = SKATO(nm, Encode.Rare(cda, Array[Variation]()), "optimal")
     //val l = SKATO(nm, Encode.Rare(cda, Array[Variation]()), "liu.mod")
 

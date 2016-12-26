@@ -103,7 +103,7 @@ object UserConfig {
 
     val filter: LogExpr = LogicalParser.parse(config.getStringList("filter").asScala.toList)
 
-    val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+    //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
     val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {

@@ -68,12 +68,15 @@ object Samples {
         (0, 1)
       }
     }
+    /**
     val gb = ssc.userConfig.input.genotype.genomeBuild
     val pseudo = if (gb == GenomeBuild.hg19) {
       Hg19.pseudo
     } else {
       Hg38.pseudo
     }
+      */
+    val pseudo = Hg19.pseudo
     val chrX = self.filter(v =>
       (! IntervalTree.overlap(pseudo, v.toRegion)) && (v.chr == "X" | v.chr == "chrX"))
       chrX.cache()

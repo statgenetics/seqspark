@@ -187,7 +187,7 @@ object AssocMaster {
       asymptoticRes(x._1) match {
         case AssocMethod.BurdenAnalytic(v, s, _) =>
           (x._1, AssocMethod.BurdenResampling(v, s, x._2))
-        case AssocMethod.VTAnalytic(v, n, s, _) =>
+        case AssocMethod.VTAnalytic(v, n, s, _, _) =>
           (x._1, AssocMethod.VTResampling(v, n, s, x._2))
       }
     }

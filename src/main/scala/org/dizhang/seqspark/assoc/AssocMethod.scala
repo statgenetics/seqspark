@@ -54,10 +54,12 @@ object AssocMethod {
   case class VTAnalytic(vars: Array[Variation],
                         numTH: Int,
                         statistic: Double,
-                        pValue: Option[Double]) extends Result {
+                        pValue: Option[Double],
+                        info: String) extends Result {
     def header = Header.VTAH.value
     override def toString: String = {
-      s"${vars.length}\t$numTH\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}"
+      s"${vars.length}\t$numTH\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}" +
+      s"\t$info"
     }
     def self = this
   }
@@ -112,10 +114,10 @@ object AssocMethod {
       def value = "name\tvars\tref-statistic\tp-value\tpermutations"
     }
     implicit object VTAH extends Header[VTAnalytic] {
-      def value = "name\tvars\tthresholds\tstatistic\tp-value"
+      def value = "name\tvars\tthresholds\tstatistic\tp-value\tinfo"
     }
     implicit object VTRH extends Header[VTResampling] {
-      def value = "name\tvars\tthresholds\tminP\tp-value\tpermutations"
+      def value = "name\tvars\tthresholds\tmaxT\tp-value\tpermutations"
     }
     implicit object SKATH extends Header[SKATResult] {
       def value = "name\tvars\tq-score\tp-value\tinfo"

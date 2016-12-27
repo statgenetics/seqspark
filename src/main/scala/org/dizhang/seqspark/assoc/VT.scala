@@ -56,9 +56,9 @@ object VT {
       ScoreTest(nullModel, m)
     }
     val statistic = getStatistic(nullModel, x)
+    private val ss = diag(scoreTest.variance).map(_.sqrt)
+    private val ts = scoreTest.score :/ ss
     val pValue = {
-      val ss = diag(scoreTest.variance).map(_.sqrt)
-      val ts = scoreTest.score :/ ss
       val maxT = max(ts)
       val cutoff = maxT * ss
       val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff).pvalue)
@@ -67,8 +67,10 @@ object VT {
         case _ => None
       }
     }
-    def result: AssocMethod.VTAnalytic =
-      AssocMethod.VTAnalytic(x.vars, x.size, statistic, pValue)
+    def result: AssocMethod.VTAnalytic = {
+      val info = s"Ts=${ts.toArray.mkString(",")}"
+      AssocMethod.VTAnalytic(x.vars, x.size, statistic, pValue, info)
+    }
   }
 
   @SerialVersionUID(7727880201L)

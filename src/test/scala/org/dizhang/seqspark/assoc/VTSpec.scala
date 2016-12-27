@@ -51,9 +51,9 @@ class VTSpec extends FlatSpec {
     val reg = LinearRegression(y, dm.t)
     ScoreTest.NullModel(reg)
   }
-  //"A VT" should "be fine" in {
-    //println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
-    //val vt = VT(nullModel, encode.getVT)
-    //println(s"S: ${vt.statistic} P: ${vt.pValue}")
-  //}
+  "A VT" should "be fine" in {
+    println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")
+    val vt = VT(nullModel, encode.getVT)
+    println(s"S: ${vt.statistic} P: ${vt.pValue}")
+  }
 }

@@ -205,6 +205,8 @@ sealed trait Counter[A] extends Serializable {
 
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A]
 
+  def map[B](f: A => B): Counter[B]
+
   def toDenseVector(make: A => Double): DenseVector[Double] = {
     DenseVector(toIndexedSeq.map(make(_)): _*)
   }
@@ -239,6 +241,10 @@ case class DenseCounter[A](elems: IndexedSeq[A], default: A)
     ).map(identity)
   }
 
+  def map[B](f: A => B): Counter[B] = {
+    Counter.fromIndexedSeq(elems.map(f), f(default))
+  }
+
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
     require(this.length == that.length)
     val newElems = this.elems.zip(that.toIndexedSeq).map(x => sg.op(x._1, x._2))
@@ -271,6 +277,10 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
       for ((k, s) <- sizes) yield k -> (s - denseSizes.getOrElse(k, 0))
     val sparse = sparseSizes.map(x => x._1 -> sg.pow(default, x._2))
     dense ++ (for ((k, v) <- sparse) yield k -> sg.op(v, dense.getOrElse(k, sg.zero)))
+  }
+
+  def map[B](f: A => B): Counter[B] = {
+    Counter.fromMap(elems.map(p => p._1 -> f(p._2)), f(default), size)
   }
 
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {

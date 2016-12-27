@@ -136,8 +136,8 @@ object AssocMaster {
       case "genome" => 1000000
       case _ => codings.count().toInt
     }
-    val max = Permu.max2(sites)
-    val min = Permu.min2(sites)
+    val max = Permu.max(sites)
+    val min = Permu.min(sites)
     val base = Permu.base
     val batchSize = min * base
     val loops = math.round(math.log(sites)/math.log(base)).toInt

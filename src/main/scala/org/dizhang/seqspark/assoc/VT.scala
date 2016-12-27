@@ -67,7 +67,7 @@ object VT {
       val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff))
       pTry match {
         case Success(p) =>
-          VT.logger.debug(s"info:${p.inform} err:${p.error}")
+          //VT.logger.debug(s"info:${p.inform} err:${p.error}")
           Some(1.0 - p.pvalue)
         case _ => None
       }

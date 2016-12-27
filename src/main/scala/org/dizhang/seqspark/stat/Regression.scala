@@ -88,7 +88,7 @@ case class LogisticRegression(responses: DenseVector[Double],
 
   //val model3 = new TruncatedNewtonMinimizer[DenseVector[Double], ]()
 
-  val model2 = new LBFGS[DenseVector[Double]](maxIter = 100, tolerance = 1e-6)
+  val model2 = new LBFGS[DenseVector[Double]](maxIter = 1000, tolerance = 1e-5)
 
   val model = new LBFGSB(DenseVector.fill(xs.cols)(-1.0), DenseVector.fill(xs.cols)(1.0))
 

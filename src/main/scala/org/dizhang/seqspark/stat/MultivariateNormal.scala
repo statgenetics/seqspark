@@ -29,7 +29,7 @@ trait MultivariateNormal extends Serializable {
 
     val c = (for (i <- 0 until corr.rows) yield corr(i, ::).t.toArray.mkString(",")).mkString("\n")
 
-    MultivariateNormal.logger.debug("cor:\n" + c)
+    //MultivariateNormal.logger.debug("cor:\n" + c)
 
     val corrMat = corr
     val corrArr =
@@ -37,7 +37,7 @@ trait MultivariateNormal extends Serializable {
         i <- 1 until corr.rows
         j <- 0 until i
       } yield corrMat(i, j)).toArray
-    MultivariateNormal.logger.debug(s"cor array: ${corrArr.mkString(",")}")
+    //MultivariateNormal.logger.debug(s"cor array: ${corrArr.mkString(",")}")
     val lower = Array.fill(numVariates)(0.0)
     val upper = cutoff //(cutoff - mu) :/ diag(cov).map(x => x.sqrt)
     val infin = Array.fill(numVariates)(0)

@@ -140,7 +140,7 @@ object AssocMaster {
     val min = Permu.min(sites)
     val base = Permu.base
     val batchSize = min * base
-    val loops = math.round(math.log(sites)/math.log(base)).toInt
+    val loops = math.round(math.log(max/batchSize)/math.log(base)).toInt
     var curEncode = codings
     var pCount = sc.broadcast(asymptoticRes.map(x => x._1 -> (0, 0)))
     for {
@@ -158,6 +158,7 @@ object AssocMaster {
         val parSpace = curEncode.mapPartitions(p => Array(p.size).toIterator).collect().sorted
         logger.info(s"partition space max: ${parSpace.max} min: ${parSpace.min}, median: ${parSpace(jobs/2)}")
       }
+      val copies: Int = math.pow(base, i).toInt
       val curPCount: Map[String, (Int, Int)] = curEncode.map{x =>
         val ref = asymptoticStatistic.value(x._1)
         val minTests = {
@@ -167,20 +168,21 @@ object AssocMaster {
             math.max(2 * (min - pCount.value(x._1)._1)/(curMax/batchSize), 1)
           }
         }
+        val maxTests = curMax/copies
         val model =
           if (config.`type` == MethodType.snv) {
-            SNV(ref, minTests, batchSize, nm.value, x._2)
+            SNV(ref, minTests, maxTests, nm.value, x._2)
           } else if (config.maf.getBoolean("fixed")) {
-            Burden(ref, minTests, batchSize, nm.value, x._2)
+            Burden(ref, minTests, maxTests, nm.value, x._2)
           } else {
-            VT(ref, minTests, batchSize, nm.value, x._2)
+            VT(ref, minTests, maxTests, nm.value, x._2)
           }
         x._1 -> model.pCount
       }.reduceByKey((a, b) => IntPair.op(a, b)).collect().toMap
 
       pCount = sc.broadcast(for ((k, v) <- pCount.value)
         yield if (curPCount.contains(k)) k -> IntPair.op(v, curPCount(k)) else k -> v)
-      curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min)
+      curEncode = curEncode.filter(x => pCount.value(x._1)._1 < min && pCount.value(x._1)._2 < max)
       //curEncode.persist(StorageLevel.MEMORY_AND_DISK)
     }
     pCount.value.map{x =>

@@ -199,11 +199,9 @@ object Encode {
     def numVars = vars.length
 
     override def toString: String = {
-      size.toString + "," + coding.zipWithIndex.map{
-        case (sv, j) => sv.activeIterator.map{
-          case (i, v) => s"$i,$j,$v"
-        }.mkString(",")
-      }.mkString(",")
+      size.toString + "," + coding.map(dv =>
+        dv.toArray.mkString(",")
+      ).mkString(",")
     }
   }
 

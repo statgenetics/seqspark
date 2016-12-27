@@ -4,6 +4,7 @@ import breeze.linalg._
 import org.dizhang.seqspark.stat.ScoreTest.NullModel
 import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.util.General.RichDouble
+import org.slf4j.LoggerFactory
 
 import scala.language.existentials
 import scala.util.{Success, Try}
@@ -19,6 +20,8 @@ trait VT extends AssocMethod {
 }
 
 object VT {
+
+  val logger = LoggerFactory.getLogger(getClass)
 
   def apply(nullModel: NullModel,
             x: Encode.Coding): AnalyticTest = {
@@ -60,10 +63,12 @@ object VT {
     private val ts = scoreTest.score :/ ss
     val pValue = {
       val maxT = max(ts)
-      val cutoff = maxT :* ss //DenseVector.ones[Double](ts.length)
-      val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff).pvalue)
+      val cutoff = maxT :* DenseVector.ones[Double](ts.length)
+      val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff))
       pTry match {
-        case Success(p) => Some(1.0 - p)
+        case Success(p) =>
+          VT.logger.debug(s"info:${p.inform} err:${p.error}")
+          Some(1.0 - p.pvalue)
         case _ => None
       }
     }

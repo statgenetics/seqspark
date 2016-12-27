@@ -37,7 +37,7 @@ object VT {
     val m = x.asInstanceOf[Encode.VT].coding
     val ts = m.map{sv =>
       val st = ScoreTest(nm, sv)
-      st.score(0)/st.variance(0, 0)
+      st.score(0)/st.variance(0, 0).sqrt
     }
     //val ts = st.score :/ diag(st.variance).map(x => x.sqrt)
     max(ts)

@@ -60,7 +60,7 @@ object VT {
     private val ts = scoreTest.score :/ ss
     val pValue = {
       val maxT = max(ts)
-      val cutoff = maxT * ss
+      val cutoff = maxT * DenseVector.ones[Double](ts.length)
       val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff).pvalue)
       pTry match {
         case Success(p) => Some(1.0 - p)

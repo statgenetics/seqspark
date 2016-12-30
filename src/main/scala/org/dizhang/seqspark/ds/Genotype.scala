@@ -19,6 +19,7 @@ sealed trait Genotype[A] extends Serializable {
   def isMut(g: A): Boolean
   def isHet(g: A): Boolean
   def toHWE(g: A): Genotype.Imp
+  def toVCF(g: A): String
 }
 
 object Genotype {
@@ -46,6 +47,7 @@ object Genotype {
         case _ => a2.toString
       }
     }
+    def toVCF(g: Byte) = toRaw(g)
     def a1(g: Byte) = (g << 30) >>> 31
     def a2(g: Byte) = (g << 31) >>> 31
     def isMis(g: Byte): Boolean = (g & 4) == 4
@@ -129,6 +131,9 @@ object Genotype {
     }
   }
   implicit object Raw extends Genotype[String] {
+
+    def toVCF(g: String) = gt(g)
+
     def gt(g: String): String = g.split(":")(0)
 
     def toSimpleGenotype(g: String): Byte = {
@@ -258,6 +263,17 @@ object Genotype {
     def isHet(g: Imp): Boolean = g._2 >= (1.0 - 1e-2)
     def isMut(g: Imp): Boolean = g._3 >= (1.0 - 1e-2)
     def toHWE(g: Imp): Imp = g
+    def toVCF(g: Imp): String = {
+      if (g._1 > g._2 && g._1 > g._3) {
+        "0/0"
+      } else if (g._2 > g._1 && g._2 > g._3) {
+        "0/1"
+      } else if (g._3 > g._1 && g._3 > g._2) {
+        "1/1"
+      } else {
+        "./."
+      }
+    }
     def callRate(g: Imp): (Double, Double) = {
       if (g._1 + g._2 + g._3 == 1.0)
         (2, 2)

@@ -18,7 +18,7 @@ object Bed {
 
   def apply(v: Variant[Byte]): Bed = {
     def makeBed (g: Byte): Byte = {
-      /** not function right now */
+      /** not functional right now */
       0
 
     }

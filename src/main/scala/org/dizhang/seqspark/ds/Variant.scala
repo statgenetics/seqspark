@@ -136,6 +136,7 @@ abstract class Variant[A: Genotype] extends Serializable {
   def denseSize: Int
   def length: Int = size
 
+  private def gt = implicitly[Genotype[A]]
   def chr: String = meta(0)
   def pos: String = meta(1)
   def id: String = meta(2)
@@ -152,8 +153,8 @@ abstract class Variant[A: Genotype] extends Serializable {
 
   def mutType: MutType.Value = Variant.mutType(ref, alt)
 
-  def geno(implicit make: A => String): IndexedSeq[String] =
-    Variant.toIndexedSeq(this.map(g => make(g)))
+  def geno: IndexedSeq[String] =
+    Variant.toIndexedSeq(this.map(g => gt.toVCF(g)))
 
   def map[B: Genotype](f: A => B): Variant[B]
 
@@ -177,7 +178,7 @@ abstract class Variant[A: Genotype] extends Serializable {
 
   def toCounter[B](make: A => B, d: B): Counter[B] = Variant.toCounter(this, make, d)
 
-  def toString(implicit make: A => String) = {
+  override def toString = {
     s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.mkString('\t'.toString)}"
   }
 

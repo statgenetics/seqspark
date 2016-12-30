@@ -21,8 +21,11 @@ object Samples {
 
   def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
     logger.info(s"perform PCA")
+    val geno = implicitly[Genotype[A]]
     val cond = LogicalParser.parse("maf >= 0.01 and maf <= 0.99 and chr != \"X\" and chr != \"Y\"")
     val common = self.variants(cond)(ssc)
+    common.cache()
+    common.saveAsTextFile(ssc.userConfig.input.genotype.path + s".${ssc.userConfig.project}.pca")
     val res =  new PCA(common).pc(10)
     logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
@@ -38,9 +41,9 @@ object Samples {
     val geno = implicitly[Genotype[A]]
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       if (v.isTi) {
-        v.toCounter(g => (geno.toAAF(g)._1, 0.0), (0.0, 0.0))
+        v.toCounter(g => (1.0, 0.0), (0.0, 0.0))
       } else {
-        v.toCounter(g => (0.0, geno.toAAF(g)._1), (0.0, 0.0))
+        v.toCounter(g => (0.0, 1.0), (0.0, 0.0))
       }
     }.reduce((a, b) => a ++ b)
     val pheno = Phenotype("phenotype")(ssc.sparkSession)

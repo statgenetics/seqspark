@@ -139,7 +139,15 @@ object SingleStudy {
       } catch {
         case e: Exception =>
           logger.info("no cache, compute from start")
-          val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
+          val raw = Import.fromVCF(ssc)
+
+          if (cnf.benchmark) {
+            raw.cache()
+            raw.foreach(_ => Unit)
+            logger.info("VCF imported")
+          }
+
+          val res = QualityControl.cleanVCF(raw)
           res.cache()
           //res.saveAsObjectFile(cnf.project)
           res

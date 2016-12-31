@@ -57,6 +57,7 @@ object Samples {
       pw.write("%s,%.2f,%.2f\n" format (iid(i), c._1, c._2))
     }
     pw.close()
+    logger.info("finished computing ti/tv")
   }
 
   def checkSex[A: Genotype](self:Data[A])(ssc: SingleStudyContext): Unit = {

@@ -22,7 +22,10 @@ object Samples {
   def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
     logger.info(s"perform PCA")
     val geno = implicitly[Genotype[A]]
-    val cond = LogicalParser.parse("maf >= 0.01 and maf <= 0.99 and chr != \"X\" and chr != \"Y\"")
+
+    val cond = LogicalParser.AND(
+      LogicalParser.parse("maf >= 0.01 and maf <= 0.99 and chr != \"X\" and chr != \"Y\""),
+      ssc.userConfig.qualityControl.variants)
     val common = self.variants(cond)(ssc)
     common.cache()
     common.saveAsTextFile(ssc.userConfig.input.genotype.path + s".${ssc.userConfig.project}.pca")

@@ -92,6 +92,11 @@ object QualityControl {
       res.cache()
       res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
     }
+    if (conf.qualityControl.export) {
+      res.cache()
+      res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
+    }
+
     res
   }
 
@@ -118,6 +123,10 @@ object QualityControl {
     if (conf.qualityControl.save) {
       res.cache()
       res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
+    }
+    if (conf.qualityControl.export) {
+      res.cache()
+      res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
     }
     res
   }

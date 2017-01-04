@@ -134,6 +134,7 @@ object UserConfig {
     val variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
     val summaries = config.getStringList("summaries").asScala.toList
     val save = config.getBoolean("save")
+    val export = config.getBoolean("export")
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {

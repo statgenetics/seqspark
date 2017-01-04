@@ -7,6 +7,7 @@ import org.apache.commons.math3.random.MersenneTwister
 import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
 import org.dizhang.seqspark.stat.{LCCSLiu, LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.scalatest.FlatSpec
 import org.slf4j.LoggerFactory
 
@@ -17,14 +18,14 @@ class SKATSpec extends FlatSpec {
   val logger = LoggerFactory.getLogger(getClass)
   val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(100)))
 
-  val nm: SKATO.NullModel = {
+  val nm: NM = {
     val file = scala.io.Source.fromURL(getClass.getResource("/2k.tsv")).getLines().toArray
     val header = file.head.split("\t")
     val dat = for (s <- file.slice(1, file.length)) yield s.split("\t")
     val pheno = header.zip(for (i <- header.indices)
       yield DenseVector(dat.map(x => try {x(i).toDouble} catch {case e: Exception => 0.0}))).toMap
-    val lr = LinearRegression(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")))
-    SKATO.NullModel(lr)
+    NM(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")), true, false)
+
   }
 
   def geno(fn: String): CSCMatrix[Double] = {
@@ -68,8 +69,8 @@ class SKATSpec extends FlatSpec {
     }
     val y = DenseVector(rand.sample(2000): _*)
     val dm = DenseMatrix(dat: _*)
-    val reg = LinearRegression(y, dm.t)
-    ScoreTest.NullModel(reg)
+    NM(y, dm.t, true, false)
+
   }
 
 
@@ -77,9 +78,8 @@ class SKATSpec extends FlatSpec {
 
     val cda = geno("/CDA.dat")
 
-    val d = SKAT(nm.STNullModel, Encode.Rare(cda, Array[Variation]()), "liu.mod", 0.1)
+    val d = SKAT(nm, Encode.Rare(cda, Array[Variation]()), "liu.mod", 0.1)
 
-    logger.info("variance:" + nm.STNullModel.asInstanceOf[ScoreTest.LinearModel].residualsVariance.toString)
     logger.info(SKAT.getLambda(d.vc).toString)
     logger.info(d.result.toString)
 

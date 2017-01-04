@@ -1,5 +1,6 @@
 package org.dizhang.seqspark.assoc
 
+import breeze.linalg.{DenseMatrix, DenseVector}
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 import org.dizhang.seqspark.ds.Variation
 
@@ -17,6 +18,9 @@ object AssocMethod {
       new Statistic[A](sg.op(this.value, that.value))
     }
   }
+
+
+
   /** help presenting the results */
   trait Result {
     def vars: Array[Variation]
@@ -33,10 +37,11 @@ object AssocMethod {
 
   case class BurdenAnalytic(vars: Array[Variation],
                             statistic: Double,
-                            pValue: Option[Double]) extends Result {
+                            pValue: Option[Double],
+                            info: String) extends Result {
     def header = Header.ARH.value
     override def toString: String = {
-      s"${vars.length}\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}"
+      s"${vars.length}\t$statistic\t${pValue.map(_.toString).getOrElse("NA")}\t$info"
     }
     def self = this
   }
@@ -108,7 +113,7 @@ object AssocMethod {
 
   object Header {
     implicit object ARH extends Header[BurdenAnalytic] {
-      def value = "name\tvars\tstatistic\tp-value"
+      def value = "name\tvars\tstatistic\tp-value\tinfo"
     }
     implicit object RRH extends Header[BurdenResampling] {
       def value = "name\tvars\tref-statistic\tp-value\tpermutations"

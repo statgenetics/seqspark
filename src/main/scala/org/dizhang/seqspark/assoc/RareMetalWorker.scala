@@ -5,6 +5,7 @@ import org.dizhang.seqspark.assoc.RareMetalWorker._
 import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.stat.ScoreTest
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.util.Constant
 
 import scala.language.existentials
@@ -22,25 +23,29 @@ import scala.language.existentials
   */
 @SerialVersionUID(7727790001L)
 sealed trait RareMetalWorker extends AssocMethod {
-  def nullModel: ScoreTest.NullModel
-  def sampleSize: Int = nullModel.responses.length
-  def x: Encode[_]
-  def common: Option[Encode.Common]
-  def rare: Option[Encode.Rare]
+  def nullModel: NM.Fitted
+  def sampleSize: Int = nullModel.y.length
+  def x: Encode.Coding
+  def common: Option[Encode.Common] = x match {
+    case c: Encode.Common => Some(c)
+    case m: Encode.Mixed => Some(m.common)
+    case _ => None
+  }
+  def rare: Option[Encode.Rare] = x match {
+    case r: Encode.Rare => Some(r)
+    case m: Encode.Mixed => Some(m.rare)
+    case _ => None
+  }
   def model: ScoreTest
   def score: DV[Double]
   def variance: DM[Double]
   def result: RareMetalWorker.RMWResult = {
-    nullModel match {
-      case nm: ScoreTest.LinearModel =>
-        RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
-          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
-      case nm: ScoreTest.LogisticModel =>
-        RareMetalWorker.DefaultRMWResult(binary = true, Array(sampleSize),
-          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
-      case _ =>
-        RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
-          commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
+    if (nullModel.binary) {
+      RareMetalWorker.DefaultRMWResult(binary = true, Array(sampleSize),
+        commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
+    } else {
+      RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
+        commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
     }
   }
 }
@@ -51,11 +56,13 @@ object RareMetalWorker {
   val SegmentSize = 1e6.toInt
 
   @SerialVersionUID(7727790101L)
-  final case class Analytic(nullModel: ScoreTest.NullModel,
-                            x: Encode[_]) extends RareMetalWorker {
-    val common = x.getCommon()
-    val rare = x.getRare()
-    val model = ScoreTest (nullModel, common.map(_.coding), rare.map(_.coding))
+  final case class Analytic(nullModel: NM.Fitted,
+                            x: Encode.Coding) extends RareMetalWorker {
+    val model = x match {
+      case Encode.Common(c, v) => ScoreTest(nullModel, c)
+      case Encode.Rare(r, v) => ScoreTest(nullModel, r)
+      case Encode.Mixed(r, c) => ScoreTest(nullModel, c.coding, r.coding)
+    }
     val score = model.score
     val variance = model.variance
   }

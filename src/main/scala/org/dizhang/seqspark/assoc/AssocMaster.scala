@@ -70,16 +70,6 @@ object AssocMaster {
 
   }
 
-  def adjustForCov(binaryTrait: Boolean,
-                   y: DenseVector[Double],
-                  cov: DenseMatrix[Double]): Regression = {
-      if (binaryTrait) {
-        LogisticRegression(y, cov)
-      } else {
-        LinearRegression(y, cov)
-      }
-  }
-
   def maxThisLoop(base: Int, i: Int, max: Int, bs: Int): Int = {
     val thisLoopLimit = math.pow(base, i).toInt * bs
     val partialSum = sum(0 to i map(x => math.pow(base, x).toInt)) * bs
@@ -123,8 +113,7 @@ object AssocMaster {
                      (implicit sc: SparkContext,
                       conf: RootConfig): Map[String, AssocMethod.Result] = {
     logger.info("start permutation test")
-    val reg = adjustForCov(binaryTrait, y, cov.get)
-    val nm = sc.broadcast(ScoreTest.NullModel(reg))
+    val nm = sc.broadcast(HypoTest.NullModel(y, cov, fit = true, binaryTrait).asInstanceOf[HypoTest.NullModel.Fitted])
     logger.info("get the reference statistics first")
     val jobs = conf.jobs
     val asymptoticRes = asymptoticTest(codings, y, cov, binaryTrait, config).collect().toMap
@@ -187,7 +176,7 @@ object AssocMaster {
     }
     pCount.value.map{x =>
       asymptoticRes(x._1) match {
-        case AssocMethod.BurdenAnalytic(v, s, _) =>
+        case AssocMethod.BurdenAnalytic(v, s, _, _) =>
           (x._1, AssocMethod.BurdenResampling(v, s, x._2))
         case AssocMethod.VTAnalytic(v, n, s, _, _) =>
           (x._1, AssocMethod.VTResampling(v, n, s, x._2))
@@ -203,24 +192,22 @@ object AssocMaster {
                     (implicit sc: SparkContext,
                      conf: RootConfig): RDD[(String, AssocMethod.Result)] = {
     logger.info("start asymptotic test")
-    val reg = adjustForCov(binaryTrait, y, cov.get)
+    val fit = config.test == TestMethod.score
+    val nm = sc.broadcast(HypoTest.NullModel(y, cov, fit, binaryTrait))
+
     //logger.info(s"covariates design matrix cols: ${reg.xs.cols}")
     //logger.info(s"covariates design matrix rank: ${rank(reg.xs)}")
     val res: RDD[(String, AssocMethod.Result)] = config.`type` match {
       case MethodType.snv =>
-        val nm = sc.broadcast(ScoreTest.NullModel(reg))
-        codings.map(p => (p._1, SNV.AnalyticTest(nm.value, p._2.asInstanceOf[Encode.Common]).result))
+        codings.map(p => (p._1, SNV(nm.value, p._2.asInstanceOf[Encode.Common]).result))
       case MethodType.skat =>
-        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         val method = config.misc.method
         val rho = config.misc.rho
         codings.map(p => (p._1, SKAT(nm.value, p._2, method, rho).result))
       case MethodType.skato =>
-        val snm = sc.broadcast(SKATO.NullModel(reg))
         val method = config.misc.method
-        codings.map(p => (p._1, SKATO(snm.value, p._2, method).result))
+        codings.map(p => (p._1, SKATO(nm.value, p._2, method).result))
       case _ =>
-        val nm = sc.broadcast(ScoreTest.NullModel(reg))
         if (config.maf.getBoolean("fixed"))
           codings.map(p => (p._1, Burden(nm.value, p._2).result))
         else

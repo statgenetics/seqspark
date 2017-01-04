@@ -5,7 +5,7 @@ import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
 import breeze.numerics.{lgamma, pow}
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.assoc.SKATO._
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.numerics.Integrate
@@ -26,12 +26,17 @@ object SKATO {
   /** the GK integration size */
   val GKSize: Int = 21
 
-  def apply(nullModel: NullModel,
+  def apply(nullModel: NM,
             x: Encode.Coding,
             method: String): SKATO = {
+    val nmf = nullModel match {
+      case NM.Simple(y, b) => NM.Fit(y, b)
+      case NM.Mutiple(y, c, b) => NM.Fit(y, c, b)
+      case nm: NM.Fitted => nm
+    }
     method match {
-      case "liu"|"liu.mod"|"optimal" => LiuModified(nullModel, x.asInstanceOf[Encode.Rare], method)
-      case _ => Davies(nullModel, x.asInstanceOf[Encode.Rare], method)
+      case "liu"|"liu.mod"|"optimal" => LiuModified(nmf, x.asInstanceOf[Encode.Rare], method)
+      case _ => Davies(nmf, x.asInstanceOf[Encode.Rare], method)
 
     }
   }
@@ -109,41 +114,6 @@ object SKATO {
     if (k < 0) 0.0001 else k
   }
 
-  @SerialVersionUID(302L)
-  trait NullModel extends Regression.Result with Serializable {
-    val informationInverse: DM[Double] = inv(information)
-    def STNullModel: STNull
-  }
-
-  object NullModel {
-    def apply(reg: Regression): NullModel = {
-      reg match {
-        case _: LogisticRegression =>
-          LogisticModel(reg.responses, reg.estimates, reg.xs, reg.information)
-        case _ =>
-          LinearModel(reg.responses, reg.estimates, reg.xs, reg.information)
-      }
-    }
-  }
-
-  case class LinearModel(responses: DV[Double],
-                         estimates: DV[Double],
-                         xs: DM[Double],
-                         information: DM[Double]) extends NullModel {
-    val STNullModel: STLinear = STLinear(responses, estimates, xs, information)
-    val sigma = STNullModel.residualsVariance.sqrt
-    val xsInfoInv = xs * informationInverse * STNullModel.residualsVariance
-  }
-  case class LogisticModel(responses: DV[Double],
-                           estimates: DV[Double],
-                           xs: DM[Double],
-                           information: DM[Double]) extends NullModel {
-    val STNullModel: STLogistic = STLogistic(responses, estimates, xs, information)
-    def variance = STNullModel.residualsVariance
-    val sigma = variance.map(p => p.sqrt)
-    val xsInfoInv = (xs(::, *) :* sigma) * informationInverse
-  }
-
   @SerialVersionUID(303L)
   case class Parameters(muQ: Double,
                         varQ: Double,
@@ -196,7 +166,7 @@ object SKATO {
   }
 
   @SerialVersionUID(7727760101L)
-  case class Davies(nullModel: NullModel,
+  case class Davies(nullModel: NM.Fitted,
                     x: Encode.Rare,
                     method: String) extends SKATO with AsymptoticKur {
 
@@ -277,7 +247,7 @@ object SKATO {
   }
 
   @SerialVersionUID(7727760301L)
-  case class LiuModified(nullModel: NullModel,
+  case class LiuModified(nullModel: NM.Fitted,
                          x: Encode.Rare,
                          method: String)
     extends LiuPValue with AsymptoticKur
@@ -289,13 +259,13 @@ object SKATO {
     }
   }
 
-  case class SmallSampleAdjust(nullModel: LogisticModel,
+  case class SmallSampleAdjust(nullModel: NM.Fitted,
                                x: Encode.Rare,
                                resampled: DM[Double],
                                method: String)
     extends LiuPValue
   {
-    lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
+    lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.b), Some(resampled))
 
     lazy val lambdasUsOpt = {
       val res = vcs.map { vc => SKAT.getLambdaU(vc) }
@@ -319,7 +289,7 @@ object SKATO {
     lazy val pValues = {
       rhos.indices.map{i =>
         val simQs = simScores(*, ::).map(s => s.t * kernels(i) * s)
-        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.variance, simQs).cdf(qScores(i)).pvalue
+        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.b, simQs).cdf(qScores(i)).pvalue
       }.toArray
     }
 
@@ -337,7 +307,7 @@ object SKATO {
 
 @SerialVersionUID(7727760001L)
 trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
-  def nullModel: NullModel
+  def nullModel: NM.Fitted
   def x: Encode.Rare
   def geno: CM[Double] = x.coding
 
@@ -352,19 +322,13 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
       //case _ => misc.rCorr
     }
   }
-  /**
-    * we don't store P0 or P0sqrt, because n x n matrix could be too large
-    * instead, we always directly compute and store P0sqrt * Z
-    *
-    *  */
+
   lazy val P0SqrtZ: DM[Double] = {
     val z: CM[Double] = geno
-    nullModel match {
-      case lm: LinearModel =>
-        (- lm.xsInfoInv * (lm.xs.t * z) + z)/lm.sigma
-      case lm: LogisticModel =>
-        colMultiply(z, lm.sigma).toDense - lm.xsInfoInv * (lm.xs.t * colMultiply(z, lm.variance))
-    }
+    val nm = nullModel
+    val sigma = sqrt(nm.b)
+    val xsInfoInv = (nm.xs(::, *) :* sigma) * nm.invInfo * nm.a
+    (- xsInfoInv * (nm.xs.t * colMultiply(z, nm.b)) + z) / sqrt(nm.a)
   }
 
   def paramOpt: Option[Parameters]
@@ -373,7 +337,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def df = param.df
 
-  lazy val scoreTest: ScoreTest = ScoreTest(nullModel.STNullModel, geno)
+  lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
 
   lazy val score = scoreTest.score
 

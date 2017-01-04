@@ -1,8 +1,9 @@
 package org.dizhang.seqspark.stat
-
+import HypoTest.{NullModel => NM}
 import breeze.linalg._
 import org.scalatest.{FlatSpec, Matchers}
 import breeze.stats.distributions._
+
 
 /**
   * Created by zhangdi on 12/1/16.
@@ -28,10 +29,8 @@ class ScoreTestSpec extends FlatSpec with Matchers {
       DenseVector.horzcat((1 to m).map(i => rnorm1(n)): _*)
     }
 
-    val lr = LinearRegression(rnorm1(sampleSize), rnorm2(sampleSize, 5))
-    val lgr = LogisticRegression(rbinom(sampleSize, bg), rnorm2(sampleSize, 5))
-    val nm = ScoreTest.NullModel(lr)
-    val nm2 = ScoreTest.NullModel(lgr)
+    val nm = NM.Fit(rnorm1(sampleSize), rnorm2(sampleSize, 5), binary = false)
+    val nm2 = NM.Fit(rbinom(sampleSize, bg), rnorm2(sampleSize, 5), binary = true)
 
   def time[R](block: => R)(tag: String): R = {
     val t0 = System.nanoTime()

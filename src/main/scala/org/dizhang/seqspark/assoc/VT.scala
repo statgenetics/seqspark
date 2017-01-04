@@ -1,7 +1,7 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg._
-import org.dizhang.seqspark.stat.ScoreTest.NullModel
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
 import org.dizhang.seqspark.util.General.RichDouble
 import org.slf4j.LoggerFactory
@@ -14,7 +14,7 @@ import scala.util.{Success, Try}
   */
 @SerialVersionUID(7727880001L)
 trait VT extends AssocMethod {
-  def nullModel: NullModel
+  def nullModel: NM
   def x: Encode.VT
   def result: AssocMethod.Result
 }
@@ -23,18 +23,23 @@ object VT {
 
   val logger = LoggerFactory.getLogger(getClass)
 
-  def apply(nullModel: NullModel,
-            x: Encode.Coding): AnalyticTest = {
-    AnalyticTest(nullModel, x.asInstanceOf[Encode.VT])
+  def apply(nullModel: NM,
+            x: Encode.Coding): VT with AssocMethod.AnalyticTest = {
+    val nmf = nullModel match {
+      case NM.Simple(y, b) => NM.Fit(y, b)
+      case NM.Mutiple(y, c, b) => NM.Fit(y, c, b)
+      case nm: NM.Fitted => nm
+    }
+    AnalyticScoreTest(nmf, x.asInstanceOf[Encode.VT])
   }
 
   def apply(ref: Double, min: Int, max: Int,
-            nullModel: NullModel,
+            nullModel: NM.Fitted,
             x: Encode.Coding): ResamplingTest = {
     ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.VT])
   }
 
-  def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
+  def getStatistic(nm: NM.Fitted, x: Encode.Coding): Double = {
     //println(s"scores: ${st.score.toArray.mkString(",")}")
     //println(s"variances: ${diag(st.variance).toArray.mkString(",")}")
     val m = x.asInstanceOf[Encode.VT].coding
@@ -47,8 +52,8 @@ object VT {
   }
 
   @SerialVersionUID(7727880101L)
-  final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode.VT)
+  final case class AnalyticScoreTest(nullModel: NM.Fitted,
+                                     x: Encode.VT)
     extends VT with AssocMethod.AnalyticTest
   {
     val scoreTest = {
@@ -82,7 +87,7 @@ object VT {
   final case class ResamplingTest(refStatistic: Double,
                                   min: Int,
                                   max: Int,
-                                  nullModel: NullModel,
+                                  nullModel: NM.Fitted,
                                   x: Encode.VT)
     extends VT with AssocMethod.ResamplingTest
   {

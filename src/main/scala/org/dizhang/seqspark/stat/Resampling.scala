@@ -4,7 +4,7 @@ import breeze.linalg.{DenseVector, shuffle}
 import breeze.stats.distributions.Bernoulli
 import org.dizhang.seqspark.assoc.Encode
 import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
+import org.dizhang.seqspark.stat.HypoTest.NullModel
 
 import scala.language.existentials
 
@@ -22,7 +22,7 @@ object Resampling {
     * convenient for the SmallSample SKAT test
     *  */
   @SerialVersionUID(7778770101L)
-  final case class Base(nullModel: NullModel) extends Resampling
+  final case class Base(nullModel: NullModel.Fitted) extends Resampling
 
 
   /**
@@ -30,28 +30,12 @@ object Resampling {
     * */
   @SerialVersionUID(7778770301L)
   final case class Simple(refStatistic: Double, min: Int, max: Int,
-                          nullModel: NullModel, coding: Encode.Coding,
-                          transformer: (NullModel, Encode.Coding) => Double) extends Resampling {
-    def makeNewStatistic(newNullModel: NullModel): Double = {
-      /**
-      val st: ScoreTest =
-        coding match {
-          case Encode.Fixed(c, _) =>
-            ScoreTest(newNullModel, c)
-          case Encode.VT(c, _) =>
-            ScoreTest(newNullModel, c)
-          case Encode.Common(c, _) =>
-            ScoreTest(newNullModel, c)
-          case Encode.Mixed(r, c) =>
-            ScoreTest(newNullModel, c.coding, r.coding)
-          case Encode.Rare(c, _) =>
-            ScoreTest(newNullModel, c)
-          case _ =>
-            ScoreTest.Dummy
-        }
-        */
+                          nullModel: NullModel.Fitted, coding: Encode.Coding,
+                          transformer: (NullModel.Fitted, Encode.Coding) => Double) extends Resampling {
+    def makeNewStatistic(newNullModel: NullModel.Fitted): Double = {
       transformer(newNullModel, coding)
     }
+
     def pCount: PairInt = {
       var res = (0, 0)
       for (i <- 0 to max) {
@@ -66,78 +50,33 @@ object Resampling {
       res
     }
   }
-  /**
-    * the test class is for Burden test and VT test
-    * the transformer is a function transforms the
-    * result of variant level score test to a statistic
-    *
-    *  */
-  @SerialVersionUID(7778770201L)
-  final case class Test(refStatistic: Double, min: Int, max: Int,
-                        nullModel: NullModel, x: Encode[_], transformer: ScoreTest => Double) extends Resampling {
 
-    /** if weight is learned from data, re-generate the genotype coding based on newY */
-    def makeNewX(newY: DenseVector[Double]): Encode[_] = {
-      x.getNew(newY)
-    }
-
-    /** re-compute the statistic for the new null model and newX */
-    def makeNewStatistic(newNullModel: NullModel, newX: Encode[_]): Double = {
-
-      if (newX.config.maf.getBoolean("fixed")) {
-        val st = ScoreTest(newNullModel, newX.getFixed.coding)
-        transformer(st)
-      } else {
-        val st = ScoreTest.Dummy
-        transformer(st)
-      }
-    }
-
-    /** pValue */
-    def pCount: PairInt = {
-      var res = (0, 0)
-      for (i <- 0 to max) {
-        if (res._1 >= min)
-          return res
-        else {
-          val newNullModel = makeNewNullModel
-          val newX = makeNewX(newNullModel.responses)
-          val statistic = makeNewStatistic(newNullModel, newX)
-          res = PairInt.op(res, if (statistic > refStatistic) (1, 1) else (0, 1))
-        }
-      }
-      res
-    }
-  }
 }
+
 @SerialVersionUID(7778770001L)
 sealed trait Resampling extends HypoTest {
-  def nullModel: NullModel
+  def nullModel: NullModel.Fitted
 
   lazy val makeNewY: () => DenseVector[Double] = {
-    nullModel match {
-      case LinearModel(y, e, c, i) =>
-        () => e + shuffle(nullModel.residuals)
-      case LogisticModel(y, e, c, i) =>
-        () => e.map(p => if (new Bernoulli(p).draw()) 1.0 else 0.0)
+    if (nullModel.binary) {
+      () => nullModel.estimates.map(p => if (new Bernoulli(p).draw()) 1.0 else 0.0)
+    } else {
+      () => nullModel.estimates + shuffle(nullModel.residuals)
     }
   }
   /** new null model is made based on newY,
     * which could be from permutated residuals (linear),
     * or from bootstrap (logistic)
     * */
-  def makeNewNullModel: NullModel = {
-    nullModel match {
-      case LinearModel(y, e, c, i) =>
-        val newY = e + shuffle(nullModel.residuals)
-        val reg = LinearRegression(newY, c(::, 1 until c.cols))
-        LinearModel(newY, reg.estimates, c, i)
-      case LogisticModel(y, e, c, i) =>
-        val newY = e.map(p => if (new Bernoulli(p).draw()) 1.0 else 0.0)
-        val reg = LogisticRegression(newY, c(::, 1 until c.cols))
-        LogisticModel(newY, reg.estimates, c, reg.information)
-      case _ => nullModel
-    }
+  def makeNewNullModel: NullModel.Fitted = {
+    val newY = makeNewY()
+    val cols = nullModel.xs.cols
+    NullModel(
+      newY,
+      nullModel.xs(::, 1 until cols),
+      fit = true,
+      binary = nullModel.binary
+    ).asInstanceOf[NullModel.Fitted]
   }
 }
 

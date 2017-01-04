@@ -4,7 +4,7 @@ import breeze.linalg.{*, CSCMatrix, cholesky, diag, eigSym, sum, DenseMatrix => 
 import breeze.stats.mean
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.SKAT._
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel, LogisticModel, NullModel}
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
 
@@ -29,25 +29,31 @@ object SKAT {
   }
   */
 
-  def apply(nullModel: NullModel,
+  def apply(nullModel: NM,
             x: Encode.Coding,
             method: String,
             rho: Double): SKAT = {
+    val nmf = nullModel match {
+      case NM.Simple(y, b) => NM.Fit(y, b)
+      case NM.Mutiple(y, c, b) => NM.Fit(y, c, b)
+      case nm: NM.Fitted => nm
+    }
+
     method match {
-      case "liu.mod" => LiuModified(nullModel, x.asInstanceOf[Encode.Rare], rho)
-      case "liu" => Liu(nullModel, x.asInstanceOf[Encode.Rare], rho)
-      case _ => Davies(nullModel, x.asInstanceOf[Encode.Rare], rho)
+      case "liu.mod" => LiuModified(nmf, x.asInstanceOf[Encode.Rare], rho)
+      case "liu" => Liu(nmf, x.asInstanceOf[Encode.Rare], rho)
+      case _ => Davies(nmf, x.asInstanceOf[Encode.Rare], rho)
     }
   }
 
-  def apply(nullModel: LogisticModel,
+  def apply(nullModel: NM.Fitted,
             x: Encode.Coding,
             resampled: DM[Double],
             rho: Double): SKAT = {
     SmallSampleAdjust(nullModel, x.asInstanceOf[Encode.Rare], resampled, rho)
   }
 
-  def makeResampled(nullModel: LogisticModel)(implicit sc: SparkContext): DM[Double] = {
+  def makeResampled(nullModel: NM.Fitted)(implicit sc: SparkContext): DM[Double] = {
     val times = sc.parallelize(1 to 10000)
     val nm = sc.broadcast(nullModel)
     times.map(i =>
@@ -105,7 +111,7 @@ object SKAT {
   }
 
   @SerialVersionUID(7727750101L)
-  final case class Davies(nullModel: NullModel,
+  final case class Davies(nullModel: NM.Fitted,
                           x: Encode.Rare,
                           rho: Double = 0.0) extends SKAT {
 
@@ -128,7 +134,7 @@ object SKAT {
 
   }
   @SerialVersionUID(7727750201L)
-  final case class Liu(nullModel: NullModel,
+  final case class Liu(nullModel: NM.Fitted,
                        x: Encode.Rare,
                        rho: Double = 0.0) extends SKAT {
 
@@ -143,7 +149,7 @@ object SKAT {
 
   }
   @SerialVersionUID(7727750301L)
-  final case class LiuModified(nullModel: NullModel,
+  final case class LiuModified(nullModel: NM.Fitted,
                                x: Encode.Rare,
                                rho: Double = 0.0) extends SKAT {
 
@@ -157,7 +163,7 @@ object SKAT {
     }
   }
   @SerialVersionUID(7727750401L)
-  final case class SmallSampleAdjust(nullModel: LogisticModel,
+  final case class SmallSampleAdjust(nullModel: NM.Fitted,
                                      x: Encode.Rare,
                                      resampled: DM[Double],
                                      rho: Double = 0.0) extends SKAT {
@@ -168,7 +174,7 @@ object SKAT {
     def result: AssocMethod.SKATResult = {
       getLambdaU(vc) match {
         case Some((l, u)) =>
-          val cdf = new LCCSResampling(l, u, nullModel.residualsVariance, simQs).cdf(qScore)
+          val cdf = new LCCSResampling(l, u, nullModel.b, simQs).cdf(qScore)
           if (cdf.ifault == 0)
             AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "Method=SmallSampleAdjust;success")
           else
@@ -186,7 +192,7 @@ object SKAT {
   * */
 @SerialVersionUID(7727750001L)
 trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
-  def nullModel: NullModel
+  def nullModel: NM.Fitted
   def x: Encode.Rare
   def rho: Double
 
@@ -204,10 +210,7 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
   def geno = x.coding * cholesky(kernel)
   lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
 
-  def phi2 = nullModel match {
-    case lm: LinearModel => lm.residualsVariance
-    case _ => 1.0
-  }
+  def phi2 = nullModel.a
 
   def qScore: Double = {
     scoreTest.score.t * scoreTest.score //* phi2

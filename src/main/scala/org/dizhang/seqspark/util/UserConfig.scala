@@ -65,7 +65,7 @@ object UserConfig {
 
   object TestMethod extends Enumeration {
     val score = Value("score")
-    val lhr = Value("lhr")
+    //val lhr = Value("lhr")
     val wald = Value("wald")
   }
 
@@ -217,7 +217,10 @@ object UserConfig {
     val weight = WeightMethod.withName(config.getString("weight"))
     val maf = config.getConfig("maf")
     val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
-    val test = TestMethod.withName("score")
+    val test = if (config.hasPath("test"))
+      TestMethod.withName(config.getString("test"))
+    else
+      TestMethod.score
     val misc: MiscConfig = MiscConfig(config.getConfig("misc"))
   }
 

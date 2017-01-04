@@ -1,8 +1,8 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.stats.distributions.Gaussian
-import org.dizhang.seqspark.stat.ScoreTest.NullModel
-import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
+import org.dizhang.seqspark.stat.{Resampling, ScoreTest, WaldTest}
 import org.dizhang.seqspark.util.General._
 
 import scala.language.existentials
@@ -11,31 +11,36 @@ import scala.language.existentials
   * Created by zhangdi on 12/1/16.
   */
 trait SNV extends AssocMethod {
-  def nullModel: NullModel
+  def nullModel: NM
   def x: Encode.Common
   def result: AssocMethod.Result
 }
 
 object SNV {
-  def apply(nullModel: NullModel,
-            x: Encode.Coding): AnalyticTest = {
-    AnalyticTest(nullModel, x.asInstanceOf[Encode.Common])
+  def apply(nullModel: NM,
+            x: Encode.Coding): SNV with AssocMethod.AnalyticTest = {
+    nullModel match {
+      case nm: NM.Fitted =>
+        AnalyticScoreTest(nm, x.asInstanceOf[Encode.Common])
+      case _ =>
+        AnalyticWaldTest(nullModel, x.asInstanceOf[Encode.Common])
+    }
   }
 
   def apply(ref: Double, min: Int, max: Int,
-            nullModel: NullModel,
+            nullModel: NM.Fitted,
             x: Encode.Coding): ResamplingTest = {
     ResamplingTest(ref, min, max, nullModel, x.asInstanceOf[Encode.Common])
   }
 
-  def getStatistic(nm: NullModel, x: Encode.Coding): Double = {
+  def getStatistic(nm: NM.Fitted, x: Encode.Coding): Double = {
     val st = ScoreTest(nm, x.asInstanceOf[Encode.Common].coding)
     math.abs(st.score(0)/st.variance(0,0).sqrt)
   }
 
   @SerialVersionUID(7727280101L)
-  final case class AnalyticTest(nullModel: NullModel,
-                                x: Encode.Common)
+  final case class AnalyticScoreTest(nullModel: NM.Fitted,
+                                     x: Encode.Common)
     extends SNV with AssocMethod.AnalyticTest
   {
     //val scoreTest = ScoreTest(nullModel, x.coding)
@@ -46,7 +51,19 @@ object SNV {
     }
 
     def result: AssocMethod.BurdenAnalytic = {
-      AssocMethod.BurdenAnalytic(x.vars, statistic, pValue)
+      AssocMethod.BurdenAnalytic(x.vars, statistic, pValue, "test=score")
+    }
+  }
+
+  case class AnalyticWaldTest(nullModel: NM,
+                              x: Encode.Common)
+    extends SNV with AssocMethod.AnalyticTest
+  {
+    private val wt = WaldTest(nullModel, x.coding.toDenseVector)
+    val statistic = wt.beta(1) / wt.std(1)
+    val pVaue = Some(wt.pValue(oneSided = false).apply(1))
+    def result = {
+      AssocMethod.BurdenAnalytic(x.vars, statistic, pVaue, s"test=wald;beta=${wt.beta(1)};betaStd=${wt.std(1)}")
     }
   }
 
@@ -54,7 +71,7 @@ object SNV {
   final case class ResamplingTest(refStatistic: Double,
                                   min: Int,
                                   max: Int,
-                                  nullModel: NullModel,
+                                  nullModel: NM.Fitted,
                                   x: Encode.Common)
     extends SNV with AssocMethod.ResamplingTest
   {

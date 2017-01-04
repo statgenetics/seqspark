@@ -7,6 +7,7 @@ import org.apache.commons.math3.random.MersenneTwister
 import org.scalatest.FlatSpec
 import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
 import org.dizhang.seqspark.stat.{LinearRegression, ScoreTest}
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.Constant
 import org.slf4j.LoggerFactory
@@ -31,14 +32,14 @@ class VTSpec extends FlatSpec {
     Encode(vars, sm)
   }
 
-  val nm: SKATO.NullModel = {
+  val nm: NM = {
     val file = scala.io.Source.fromURL(getClass.getResource("/2k.tsv")).getLines().toArray
     val header = file.head.split("\t")
     val dat = for (s <- file.slice(1, file.length)) yield s.split("\t")
     val pheno = header.zip(for (i <- header.indices)
       yield DenseVector(dat.map(x => try {x(i).toDouble} catch {case e: Exception => 0.0}))).toMap
-    val lr = LinearRegression(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")))
-    SKATO.NullModel(lr)
+    NM(pheno("bmi"), DenseVector.horzcat(pheno("age"), pheno("sex"), pheno("disease")), true, false)
+
   }
 
   def geno(fn: String): Array[SparseVector[Double]] = {
@@ -71,14 +72,14 @@ class VTSpec extends FlatSpec {
     }
     val y = DenseVector(rand.sample(2000): _*)
     val dm = DenseMatrix(dat: _*)
-    val reg = LinearRegression(y, dm.t)
-    ScoreTest.NullModel(reg)
+    NM(y, dm.t, true, false)
+
   }
   "A VT" should "be fine" in {
 
     val cln6 = geno("/CLN6").map(_.toDenseVector)
 
-    val vt = VT.AnalyticTest(nm.STNullModel, Encode.VT(cln6, Array[Variation]()))
+    val vt = VT(nm, Encode.VT(cln6, Array[Variation]()))
 
     logger.info(vt.result.toString)
     //println(s"defined: ${encode.isDefined} informative: ${encode.informative()} mut: ${sum(encode.getFixed.coding)}")

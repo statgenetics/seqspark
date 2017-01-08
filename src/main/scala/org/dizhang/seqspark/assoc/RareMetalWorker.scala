@@ -56,13 +56,8 @@ sealed trait RareMetalWorker extends AssocMethod {
   def score: DV[Double]
   def variance: DM[Double]
   def result: RareMetalWorker.RMWResult = {
-    if (nullModel.binary) {
-      RareMetalWorker.DefaultRMWResult(binary = true, Array(sampleSize),
+      RareMetalWorker.DefaultRMWResult(binary = nullModel.binary, Array(sampleSize),
         commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
-    } else {
-      RareMetalWorker.DefaultRMWResult(binary = false, Array(sampleSize),
-        commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
-    }
   }
 }
 

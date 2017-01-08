@@ -75,8 +75,8 @@ object Genotype {
     def callRate(g: Byte): (Double, Double) = {
       val ctrl = g & 20 //g & b00010100, extract diploid and missing bits
       ctrl match {
-        case 20 => (0, 2) //b00010100, diploid and missing
-        case 16 => (2, 2) //b00010000, diploid, not missing
+        case 20 => (0, 1) //b00010100, diploid and missing
+        case 16 => (1, 1) //b00010000, diploid, not missing
         case 4 => (0, 1) //b00000100, monoploid and missing
         case _ => (1, 1) //b00000000, monoploid, not missing
       }
@@ -247,11 +247,19 @@ object Genotype {
     }
 
     def toAAF(g: String): (Double, Double) = {
-      val gt = g.split(":")(0).split("[/|]").map(_.toInt)
+      val gt = g.split(":")(0).split("[/|]")
       if (gt.length == 1) {
-        (gt(0), 1)
+        if (gt(0) == ".") {
+          (0, 0)
+        } else {
+          (gt(0).toInt, 1)
+        }
       } else {
-        (gt.sum, 2)
+        if (gt(0) == ".") {
+          (0, 0)
+        } else {
+          (gt.map(_.toInt).sum, 2)
+        }
       }
     }
 
@@ -292,9 +300,9 @@ object Genotype {
     }
     def callRate(g: Imp): (Double, Double) = {
       if (g._1 + g._2 + g._3 == 1.0)
-        (2, 2)
+        (1, 1)
       else
-        (0, 2)
+        (0, 1)
     }
     def toAAF(g: Imp): (Double, Double) = {
       (g._2 + 2 * g._3, 2)

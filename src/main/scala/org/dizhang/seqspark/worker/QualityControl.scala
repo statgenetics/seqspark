@@ -116,7 +116,8 @@ object QualityControl {
     res
   }
 
-  def cleanImputed(input: Data[(Double, Double, Double)])(implicit ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
+  def cleanImputed(input: Data[(Double, Double, Double)])
+                  (implicit ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
     val annotated = linkVariantDB(input)(conf, sc)

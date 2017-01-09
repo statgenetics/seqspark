@@ -74,21 +74,25 @@ object Genotypes {
       logger.info("no need to perform genotype QC")
       self
     } else {
-      val first = self.first()
-      val phased = Genotype.Raw.isPhased(first(0))
+      //val first = self.first()
       val fs = LogicalParser.names(cond)
 
       self.map { v =>
         val fm = v.parseFormat.toList
+        val phased = Genotype.Raw.isPhased(v(0))
         v.map { g =>
-          val mis = if (phased) {
-            Raw.diploidPhasedMis
-          } else if (Genotype.Raw.isDiploid(g)) {
-            Raw.diploidUnPhasedMis
+          if (g.contains(":")) {
+            val mis = if (phased) {
+              Raw.diploidPhasedMis
+            } else if (Genotype.Raw.isDiploid(g)) {
+              Raw.diploidUnPhasedMis
+            } else {
+              Raw.monoploidMis
+            }
+            Genotype.Raw.qc(g, cond, fm, mis)
           } else {
-            Raw.monoploidMis
+            g
           }
-          Genotype.Raw.qc(g, cond, fm, mis)
         }
       }
     }

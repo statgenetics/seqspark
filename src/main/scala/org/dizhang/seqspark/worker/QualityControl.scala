@@ -72,8 +72,6 @@ object QualityControl {
       countByFunction(annotated)
     }
 
-
-
     val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
 
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)

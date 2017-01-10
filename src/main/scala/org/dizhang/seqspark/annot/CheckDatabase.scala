@@ -86,7 +86,8 @@ object CheckDatabase {
   }
 
   def getDBterms(names: Set[String]): Set[String] = {
-    val fixedTerms = Set("maf", "chr", "alleleNum", "missingRate", "batchMissingRate", "batchSpecific", "hwePvalue", "isFunctional")
+    val fixedTerms = Set("maf", "chr", "informative", "alleleNum", "missingRate",
+      "batchMissingRate", "batchSpecific", "hwePvalue", "isFunctional")
     names -- fixedTerms
   }
 

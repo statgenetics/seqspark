@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.worker
 
-import org.dizhang.seqspark.annot.linkVariantDB
+import org.dizhang.seqspark.annot.{linkVariantDB, linkGeneDB}
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.util.SingleStudyContext
 import org.dizhang.seqspark.worker.Genotypes._
@@ -69,7 +69,10 @@ object QualityControl {
 
 
     if (sums.contains("annotation")) {
-      countByFunction(annotated)
+      logger.info("start gene annotation")
+      val geneAnnot = linkGeneDB(annotated)(conf, sc)
+      countByFunction(geneAnnot)
+      logger.info("finished gene annotation")
     }
 
     val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)

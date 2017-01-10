@@ -223,8 +223,13 @@ object SingleStudy {
       val methods = assocConf.methodList
       val annotated = if (methods.exists(m =>
         assocConf.method(m).misc.groupBy.contains("gene"))) {
-        logger.info("start functional annotation")
-        annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+        if (input.first().parseInfo.contains(util.Constant.Variant.InfoKey.anno)) {
+          logger.info("functional annotation already done")
+          input
+        } else {
+          logger.info("start functional annotation")
+          annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+        }
       } else {
         input
       }

@@ -31,13 +31,13 @@ import scala.util.{Failure, Success, Try}
 object Phenotype {
 
    val logger: Logger = LoggerFactory.getLogger(getClass)
+   val options = Map(
+     "nullValue" -> Pheno.mis,
+     "sep" -> Pheno.delim,
+     "header" -> "true"
+   )
 
    def update(path: String, table: String)(spark: SparkSession): Phenotype = {
-     val options = Map(
-       "nullValue" -> Pheno.mis,
-       "sep" -> Pheno.delim,
-       "header" -> "true"
-     )
      val dataFrame = spark.read.options(options).csv(path)
      logger.info(s"add ${dataFrame.columns.mkString(",")} to phenotype dataframe")
      val old = spark.table(table)
@@ -46,13 +46,15 @@ object Phenotype {
      Distributed(newdf)
    }
 
-  def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
+   def select(field: String, table: String)(spark: SparkSession): Phenotype = {
+     logger.info(s"select samples that have ${field} values")
+     val old = spark.table(table)
+     val newdf = spark.sql(s"SELECT * from $table where $field is not null")
+     newdf.createOrReplaceTempView(table)
+     Distributed(newdf)
+   }
 
-    val options = Map(
-      "nullValue" -> Pheno.mis,
-      "sep" -> Pheno.delim,
-      "header" -> "true"
-    )
+   def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
 
     logger.info(s"creating phenotype dataframe from $path")
 

@@ -107,14 +107,17 @@ object QualityControl {
       res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
     }
 
-    if (sums.contains("annotation")) {
+    val geneAnnot = if (sums.contains("annotation")) {
       logger.info("start gene annotation")
-      linkGeneDB(res)(conf, sc)
+      val tmp = linkGeneDB(res)(conf, sc)
       logger.info("finished gene annotation")
-      countByFunction(res)
+      countByFunction(tmp)
+      tmp
+    } else {
+      res
     }
 
-    res
+    geneAnnot
   }
 
   def cleanImputed(input: Data[(Double, Double, Double)])

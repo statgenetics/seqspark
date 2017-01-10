@@ -54,6 +54,14 @@ object Variants {
       pw.write(s"${k.toString}: $v\n")
     }
     pw.close()
+    val genes = self.flatMap(v =>
+      v.parseInfo(InfoKey.anno).split(",,").map(g => g.split("::")(0))
+    ).countByValue()
+    val pw2 = new PrintWriter(new File("output/variants_genes.txt"))
+    for ((k, v) <- genes) {
+      pw2.write(s"$k: $v")
+    }
+    pw2.close()
   }
 
   def decomposeVariant(v: Variant[String]): Array[Variant[String]] = {

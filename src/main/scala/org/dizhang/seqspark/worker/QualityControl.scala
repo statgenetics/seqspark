@@ -54,7 +54,7 @@ object QualityControl {
     logger.info("start quality control")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val annotated =  linkVariantDB(decompose(input))(conf, sc)
+    val annotated = linkVariantDB(decompose(input))(conf, sc)
 
     //annotated.cache()
     val sums = ssc.userConfig.qualityControl.summaries
@@ -66,16 +66,17 @@ object QualityControl {
       }
       statGdGq(annotated)(ssc)
     }
-
-
-    if (sums.contains("annotation")) {
+    val geneAnnot = if (sums.contains("annotation")) {
       logger.info("start gene annotation")
-      val geneAnnot = linkGeneDB(annotated)(conf, sc)
-      countByFunction(geneAnnot)
+      val res = linkGeneDB(annotated)(conf, sc)
       logger.info("finished gene annotation")
+      countByFunction(res)
+      res
+    } else {
+      annotated
     }
 
-    val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
+    val cleaned = genotypeQC(geneAnnot, conf.qualityControl.genotypes)
 
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
 

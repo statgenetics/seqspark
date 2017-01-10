@@ -59,7 +59,7 @@ object Variants {
     ).countByValue()
     val pw2 = new PrintWriter(new File("output/variants_genes.txt"))
     for ((k, v) <- genes) {
-      pw2.write(s"$k: $v")
+      pw2.write(s"$k: $v\n")
     }
     pw2.close()
   }

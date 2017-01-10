@@ -66,17 +66,9 @@ object QualityControl {
       }
       statGdGq(annotated)(ssc)
     }
-    val geneAnnot = if (sums.contains("annotation")) {
-      logger.info("start gene annotation")
-      val res = linkGeneDB(annotated)(conf, sc)
-      logger.info("finished gene annotation")
-      countByFunction(res)
-      res
-    } else {
-      annotated
-    }
 
-    val cleaned = genotypeQC(geneAnnot, conf.qualityControl.genotypes)
+
+    val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
 
     val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
 
@@ -113,6 +105,13 @@ object QualityControl {
     if (conf.qualityControl.export) {
       res.cache()
       res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
+    }
+
+    if (sums.contains("annotation")) {
+      logger.info("start gene annotation")
+      linkGeneDB(res)(conf, sc)
+      logger.info("finished gene annotation")
+      countByFunction(res)
     }
 
     res

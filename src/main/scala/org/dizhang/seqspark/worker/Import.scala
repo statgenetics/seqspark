@@ -162,7 +162,7 @@ object Import {
         case Left(_) => s1
         case Right(s) =>
           val samples = pheno.indicate(s)
-          Phenotype.select(s, "phenotype")
+          Phenotype.select(s, "phenotype")(ssc.sparkSession)
           s1.samples(samples)(sc)
       }
     }

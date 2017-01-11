@@ -98,14 +98,6 @@ object QualityControl {
     val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
     //annotated.unpersist()
     //simpleVCF.unpersist()
-    if (conf.qualityControl.save) {
-      res.cache()
-      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
-    }
-    if (conf.qualityControl.export) {
-      res.cache()
-      res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
-    }
 
     val geneAnnot = if (sums.contains("annotation")) {
       logger.info("start gene annotation")
@@ -116,6 +108,17 @@ object QualityControl {
     } else {
       res
     }
+
+    if (conf.qualityControl.save) {
+      geneAnnot.cache()
+      geneAnnot.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
+    }
+    if (conf.qualityControl.export) {
+      geneAnnot.cache()
+      geneAnnot.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
+    }
+
+
 
     geneAnnot
   }

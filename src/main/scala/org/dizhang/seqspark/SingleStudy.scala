@@ -148,7 +148,7 @@ object SingleStudy {
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {
         val cachePath = cnf.input.genotype.path + s".$project"
-        val res = sc.objectFile(cachePath).asInstanceOf[worker.Data[Byte]]
+        val res = sc.objectFile(cachePath).asInstanceOf[worker.Data[Byte]].map(identity)
         res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res
@@ -172,7 +172,7 @@ object SingleStudy {
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
       val clean = try {
         val cachePath = cnf.input.genotype.path + s".$project"
-        val res =sc.objectFile(cachePath).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        val res =sc.objectFile(cachePath).asInstanceOf[worker.Data[(Double, Double, Double)]].map(identity)
         res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res

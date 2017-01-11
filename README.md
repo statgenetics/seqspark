@@ -98,11 +98,11 @@ The configuration file contains all the options of SEQSpark.
 
 Under the root braces of the configuration file, you can set up general runtime options for a certain submission.
 
-```json
+```son
 project = SEQSpark
 localDir = ${PWD}
 dbDir = SEQSpark_db
-pipeline = [ qualityControl, association ]
+pipeline = [ "qualityControl", "association" ]
 ```
 
 ### 

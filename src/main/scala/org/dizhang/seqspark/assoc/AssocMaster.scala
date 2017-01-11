@@ -298,7 +298,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
         val cov =
           if (traitConfig.covariates.nonEmpty || traitConfig.pc > 0) {
             val all = traitConfig.covariates ++ (1 to traitConfig.pc).map(i => s"_pc$i")
-            phenotype.getCov(traitName, all, Array.fill(all.length)(0.05)) match {
+            phenotype.getCov(traitName, all, Array.fill(all.length)(0.0)) match {
               case Left(msg) =>
                 logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
                 None

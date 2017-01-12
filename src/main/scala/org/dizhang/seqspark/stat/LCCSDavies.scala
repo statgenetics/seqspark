@@ -47,7 +47,7 @@ object LCCSDavies {
   }
 
   private val limit: Double = 1e4
-  private val errorTolerance = 1e-4
+  private val errorTolerance = 1e-6
   private val ln28 = math.log(2)/8
 
   def exp1(x: Double): Double = {

@@ -102,7 +102,7 @@ object Samples {
       } else {
         if (idx == window) {
           bits = bits.filter(i => i < step)
-          bits = bits.map(i => i - step)
+          bits = bits.map(i => i - step)(mutable.BitSet.canBuildFrom)
           idx = window - step
         }
         val dv = iv.next()

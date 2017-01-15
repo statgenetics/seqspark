@@ -51,8 +51,10 @@ object SKATO {
       case nm: NM.Fitted => nm
     }
     method match {
-      case "liu"|"liu.mod"|"optimal" => LiuModified(nmf, x.asInstanceOf[Encode.Rare], method)
-      case _ => Davies(nmf, x.asInstanceOf[Encode.Rare], method)
+      case "liu"|"liu.mod"|"optimal.moment"|"optimal.moment.adj" =>
+        LiuModified(nmf, x.asInstanceOf[Encode.Rare], method)
+      case _ =>
+        Davies(nmf, x.asInstanceOf[Encode.Rare], method)
 
     }
   }
@@ -170,6 +172,26 @@ object SKATO {
     def lambdas = lambdasOpt.get
 
 
+    def pValues = {
+      method match {
+        case "optimal.mod"|"optimal.adj"|"optimal.moment.adj" =>
+          lambdas.zip(qScores).map{
+            case (l, q) =>
+              val cdf = LCCSDavies.Simple(l).cdf(q)
+              if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
+                1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+              } else {
+                1.0 - cdf.pvalue
+              }
+          }
+        case _ =>
+          lambdas.zip(qScores).map{case (l, q) =>
+            1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+          }
+      }
+    }
+
+
     def pMinQuantiles = {
       lambdas.map{lb =>
         val lm = LCCSLiu.Modified(lb)
@@ -185,18 +207,6 @@ object SKATO {
   case class Davies(nullModel: NM.Fitted,
                     x: Encode.Rare,
                     method: String) extends SKATO with AsymptoticKur {
-
-    def pValues = {
-      lambdas.zip(qScores).map{
-        case (l, q) =>
-          val cdf = LCCSDavies.Simple(l).cdf(q)
-          if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
-            1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
-          } else {
-            1.0 - cdf.pvalue
-          }
-      }
-    }
 
     def integrand(x: DV[Double]): DV[Double] = {
       require(x.length == GKSize)
@@ -267,13 +277,6 @@ object SKATO {
                          x: Encode.Rare,
                          method: String)
     extends LiuPValue with AsymptoticKur
-  {
-    def pValues = {
-      lambdas.zip(qScores).map{case (l, q) =>
-        1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
-      }
-    }
-  }
 
   case class SmallSampleAdjust(nullModel: NM.Fitted,
                                x: Encode.Rare,

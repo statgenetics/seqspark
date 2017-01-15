@@ -27,6 +27,10 @@ sealed trait Genotype[A] extends Serializable {
   def toAAF(g: A): (Double, Double) //This is the alt allele frequency
   def toCMC(g: A, af: Double): Double
   def toBRV(g: A, af: Double): Double
+  def toPCA(g: A, af: Double): Double = {
+    val maf = if (af <= 0.5) af else 1.0 - af
+    (toBRV(g, af) - 2 * maf)/(af * (1.0 - af))
+  }
   def callRate(g: A): (Double, Double)
   def isDiploid(g: A): Boolean
   def isPhased(g: A): Boolean

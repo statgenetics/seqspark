@@ -16,10 +16,10 @@ To build SEQSpark from source, you need `sbt` and `gfortran` installed.
 
 ### Getting Started
 
-In a HOCON format configuration file, you specify the paths of the input genotype file (VCF) and a PED-like phenotype file, and the pipeline with its parameters you want to run. HOCON is an abbreviation for Human-Optimized-Config-Object-Notation. As the name suggested, it is very intuitive to understand and easy to use. Please refer to Examples and Specification for more details. To minimize your typing, we embedded reasonable defaults for all the parameters also in a HOCON file which comes with SeqA. You only need to configure the different parts in your own file. With the configuration file and all the necessary input files ready, you can run your analysis like this: 
+In a HOCON format configuration file, you specify the paths of the input genotype file (VCF) and a PED-like phenotype file, and the pipeline with its parameters you want to run. HOCON is an abbreviation for Human-Optimized-Config-Object-Notation. As the name suggested, it is very intuitive to understand and easy to use. Please refer to Examples and Specification for more details. To minimize your typing, we embedded reasonable defaults for all the parameters also in a HOCON file which comes with SEQSpark. You only need to configure the different parts in your own file. With the configuration file and all the necessary input files ready, you can run your analysis like this: 
 
 ```shell
-cluster:~ user$ SEQSpark SingleStudy seqa.conf [spark-options]
+cluster:~ user$ SEQSpark SingleStudy some.conf [spark-options]
 ```
 
 As with other Spark-based applications, you can specify useful Spark options like “num-executors” on command line. For more options in Spark, please refer to submitting-applications. In section Configuration, we will explain the options in the configuration file section by section. In section Examples, we will give several examples on how to use it in various scenarios.

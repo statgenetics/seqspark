@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{DenseMatrix => BDM}
+import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.spark.mllib.feature.{PCA => SPCA}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
@@ -29,22 +29,13 @@ import org.slf4j.LoggerFactory
   * perform PCA for
   */
 @SerialVersionUID(103L)
-class PCA[A: Genotype](vcf: Data[A]) extends Serializable {
+class PCA(input: RDD[Array[Double]]) extends Serializable {
 
   val logger = LoggerFactory.getLogger(getClass)
 
-  def geno = implicitly[Genotype[A]]
-
   def prepare: RDD[Vector] = {
 
-    vcf.map{v =>
-      val af = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce.ratio
-      val cnt = v.toCounter(geno.toBRV(_, af), 0.0)
-      cnt match {
-        case DenseCounter(elems, _) => Vectors.dense(elems.toArray)
-        case SparseCounter(elems, _, n) => Vectors.sparse(n, elems.toSeq.sortBy(_._1))
-      }
-    }
+    input.map(a => Vectors.dense(a))
 
     /**
       * val input = vcf

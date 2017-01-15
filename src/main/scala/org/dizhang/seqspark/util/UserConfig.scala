@@ -151,6 +151,15 @@ object UserConfig {
     val summaries = config.getStringList("summaries").asScala.toList
     val save = config.getBoolean("save")
     val export = config.getBoolean("export")
+    val pca = PCAConfig(config.getConfig("pca"))
+  }
+
+  case class PCAConfig(config: Config) extends UserConfig {
+    def variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
+    def impute: String = config.getString("impute")
+    def noprune: Boolean = config.getBoolean("noprune")
+    def normalize: Boolean = config.getBoolean("normalize")
+    def prune: Config = config.getConfig("prune")
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {

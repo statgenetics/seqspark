@@ -101,7 +101,7 @@ object Samples {
         idx += 1
       } else {
         if (idx == window) {
-          bits = bits.filter(i => i < step)
+          bits = bits.filter(i => i >= step)
           bits = bits.map(i => i - step)
           idx = window - step
         }

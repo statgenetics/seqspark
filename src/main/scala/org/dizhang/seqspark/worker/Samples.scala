@@ -32,7 +32,7 @@ import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
+import scala.collection.BitSet
 
 /**
   * Created by zhangdi on 9/20/16.
@@ -92,7 +92,7 @@ object Samples {
                                   step: Int,
                                   r2: Double): Iterator[DenseVector[Double]] = {
     var res: List[DenseVector[Double]] = Nil
-    var bits = mutable.BitSet.empty
+    var bits = BitSet()
     var idx = 0
     while (iv.hasNext) {
       if (res.isEmpty) {
@@ -102,7 +102,7 @@ object Samples {
       } else {
         if (idx == window) {
           bits = bits.filter(i => i < step)
-          bits = bits.map(i => i - step)(mutable.BitSet.canBuildFrom)
+          bits = bits.map(i => i - step)
           idx = window - step
         }
         val dv = iv.next()

@@ -77,11 +77,12 @@ sub download_dbs {
 	if ($db_dir) {
 		print STDERR "going to download refseq and dbsnp to $db_dir\n";
 		for my $db (@db) {
-			if (!system("hdfs dfs -test -f $db_dir/$db")) {
+			my $test = system("hdfs dfs -test -f $db_dir/$db");
+			if (!$test) {
 				print STDERR "database $db already exists, skip downloading\n";
 				next;
 			}
-			!system("curl http://seqspark.dizhang.org/$db | hdfs dfs -appendToFile - $db_dir/$db") 
+			!system("curl http://seqspark.statgen.us/$db | hdfs dfs -appendToFile - $db_dir/$db") 
 				or die "Failed to download\n";
 		}
 		

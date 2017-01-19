@@ -39,3 +39,5 @@ assemblyMergeStrategy in assembly := {
 
 assemblyJarName in assembly := "SeqSpark.jar"
 test in assembly := {}
+mainClass in (Compile, run) := Some("org.dizhang.seqspark.SingleStudy")
+mainClass in (Compile, packageBin) := Some("org.dizhang.seqspark.SingleStudy")

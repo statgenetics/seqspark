@@ -42,12 +42,13 @@ object MetaAnalysis {
       .resolve()
 
     implicit val rootConf = RootConfig(userConf)
-    run
+    main
   }
 
-  def run(implicit rootConf: RootConfig): Unit = {
-    logger.info("start meta analysis")
-    logger.info("end meta analysis")
+  def main(implicit rootConf: RootConfig): Unit = {
+    logger.info("meta-analysis not available in this distribution, please update to the lastest version using 'git pull'")
+    //logger.info("start meta analysis")
+    //logger.info("end meta analysis")
   }
 
 }

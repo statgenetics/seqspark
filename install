@@ -16,19 +16,12 @@ GetOptions(
 	'db-dir=s' => \$db_dir,
 	'h|help!' => \$help
 );
+#check db_dir
+unless ($db_dir =~ m#^/#) {
+	$db_dir = $ENV{USER} . "/$db_dir";
+}
 
 sub build {
-	my $arch;
-	if ($^O eq "linux") {
-		$arch = "linux-x86-64";
-	} else {
-		$arch = $^O;
-	}
-	my $dir = "src/main/resources/$arch";
-	unless (-d $dir) {
-		mkdir $dir or die "cannot create dir $dir $!\n";
-	}
-	!system("gfortran", "-shared", "-O2", "src/main/fortran/mvndstpack.f", "-o", "src/main/resources/$arch/libmvn.so", "-fpic") or die "You don't have gfortran installed?\nFailed to compile dependency library mvndstpack.f: $!\n";
 	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
 }
 
@@ -54,10 +47,20 @@ sub install {
 	}
 	my $scripts = "bin";
 	my $conf = "conf";
-	!system("mkdir", "-p", "$prefix/db") or die "Failed to create $prefix/\n";
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
-	!system("cp", "-r", $conf, $prefix) or die "Failed to copy conf folder to $prefix/\n";
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
+	##prepare conf
+	open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
+	open my $o_conf, ">$prefix/reference.conf" or die "Failed to open $prefix/reference.conf for write: $!\n";
+	while (<$i_conf>) {
+		if (m/dbDir_unset/) {
+			print $o_conf "dbDir = $db_dir\n";
+		} else {
+			print $o_conf $_;
+		}
+	}
+	close $i_conf;
+	close $o_conf;
 }
 
 sub download_dbs {
@@ -86,7 +89,7 @@ sub help {
 Options:
 	--help,-h            Show this help message
 	--prefix=[dir]       Set install directory. [~/seqspark]
-	--db-dir=[dir]       HDFS path to store the database files. [seqspark]\n";
+	--db-dir=[dir]       HDFS path to store the database files. [/user//seqspark]\n";
 	exit;
 }
 
@@ -97,11 +100,6 @@ sub main {
 	
 	&build;
 	&install;
-	if ($db_dir) {
-		&download_dbs;
-	} else {
-		print STDERR "No db-dir specified, skip downloading database.\n";
-	}
 }
 
 &main;

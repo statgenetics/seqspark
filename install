@@ -17,8 +17,13 @@ GetOptions(
 	'h|help!' => \$help
 );
 #check db_dir
+my $user = $ENV{USER};
+if ($db_dir eq "") {
+	die "$db_dir not provided, use /user/$user/seqspark as default\n";
+	$db_dir = "seqspark";
+}
 unless ($db_dir =~ m#^/#) {
-	$db_dir = $ENV{USER} . "/$db_dir";
+	$db_dir = "/user/". $ENV{USER} . "/$db_dir";
 }
 
 sub build {
@@ -61,6 +66,7 @@ sub install {
 	}
 	close $i_conf;
 	close $o_conf;
+	&download_dbs;
 }
 
 sub download_dbs {

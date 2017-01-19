@@ -124,7 +124,7 @@ object Import {
       case Left(UC.Samples.none) => true
       case _ => false
     }
-    val filter = imConf.filter
+    val filter = imConf.filters
     val terms = LogicalParser.names(filter)
     val raw = sc.textFile(imConf.path, conf.jobs)
     val default = "0/0"

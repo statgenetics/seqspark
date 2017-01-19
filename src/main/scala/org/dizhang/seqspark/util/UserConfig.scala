@@ -117,7 +117,7 @@ object UserConfig {
 
     //val filters = config.getStringList("filters").asScala.toArray
 
-    val filter: LogExpr = LogicalParser.parse(config.getStringList("filter").asScala.toList)
+    val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
@@ -182,11 +182,12 @@ object UserConfig {
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
-    val varLimit: Int = {
-      if (config.hasPath("varLimit"))
-        config.getInt("varLimit")
-      else
-        500
+    val varLimit: (Int, Int) = {
+      if (config.hasPath("varLimit")) {
+        val res = config.getIntList("varLimit").asScala.toList
+        (res(0), res(1))
+      } else
+        (0, 2000)
     }
     val groupBy: List[String] = {
       if (config.hasPath("groupBy"))

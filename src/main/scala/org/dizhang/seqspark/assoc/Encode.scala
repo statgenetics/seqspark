@@ -478,7 +478,10 @@ abstract class Encode[A: Genotype] extends Serializable {
           }
         case _ => Empty
       }
-    if (res.numVars < config.misc.varLimit) res else Empty
+    if (res.numVars < config.misc.varLimit._2 && res.numVars >= config.misc.varLimit._1)
+      res
+    else
+      Empty
   }
 
   def isDefined: Boolean

@@ -25,7 +25,7 @@ dolores@cluster: ~$ git clone https://github.com/statgenetics/seqspark.git
 To compile the source code and install:
 
 ```shell
-dolores@cluster: seqspark$ ./install --prefix ~/software/seqspark --db-dir ref 
+dolores@cluster: seqspark$ ./install --prefix ~/software/seqspark --db-dir /user/dolores/seqspark
 ```
 
 If you have never compiled `SEQSpark` before, it may take some time to download its dependencies. The `install` script not only compiles the source code, but also downloads the RefSeq and dbSNP databases. For other prebuilt databases, you need to use the script `seqspark-db`. The CADD database is quite large (65GB), so depending on the network connection it may take quite some time to download.

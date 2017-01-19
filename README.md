@@ -470,7 +470,7 @@ The `resampling` and `maf.source` options are the same as for the single variant
 
 `weight`: Variant weights can be used for all tests except for CMC
 
-- `wss`: $\frac{1}{\sqrt{{MAF} \times {(1-MAF}}}$
+- `wss`: $\frac{1}{\sqrt{MAF \times {(1-MAF)}}}$
 - `none`: no weight, or the weights are equal for all variants
 - `skat`: weighted style for SKAT - $Beta(MAF, a_1, a_2)$, where $a_1$ and $a_2$ are 1 and 25 by default, and can be specified in `misc`.
 - `"some_key"`: use `"some_key"` in the INFO field of the VCF

@@ -125,8 +125,17 @@ object Samples {
   }
 
   def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
-    logger.info("compute ti/tv for samples")
+    logger.info("compute ti/tv ratio")
     val geno = implicitly[Genotype[A]]
+    val cntAll = self.map(v =>
+      if (v.isTi) {
+        (1.0, 0.0)
+      } else if (v.isTv) {
+        (0.0, 1.0)
+      } else {
+        (0.0, 0.0)
+      }
+    ).reduce((a, b) => (a._1 + b._1, a._2 + b._2))
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       if (v.isTi) {
         v.toCounter(g => (1.0, 0.0), (0.0, 0.0))
@@ -139,6 +148,7 @@ object Samples {
     val iid = pheno.select("iid").map(_.get)
     val outFile = "output/titv.txt"
     val pw = new PrintWriter(new File(outFile))
+    pw.write(s"#all,${cntAll._1},${cntAll._2}\n")
     pw.write("iid,ti,tv\n")
     for (i <- iid.indices) {
       val c = cnt(i)

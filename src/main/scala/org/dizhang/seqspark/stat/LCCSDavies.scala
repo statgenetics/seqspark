@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.stat
 
 import breeze.linalg.{DenseVector, max, min, sum}
@@ -5,13 +21,31 @@ import breeze.numerics._
 import breeze.numerics.constants.Pi
 import org.dizhang.seqspark.stat.LCCSDavies._
 import org.dizhang.seqspark.stat.{LinearCombinationChiSquare => LCCS}
+import org.slf4j.{Logger, LoggerFactory}
+
 /**
   * Based on Davies' method (1980)
   * The code is quite old, containing a lot of
   * global variables and side effects
   * Be careful!
+  *
+  * This is NOT a full implementation of the original method
+  * in some functions, non-centralities == 0 is assumed.
+  * Maybe I will solve this later.
+  *
   */
 object LCCSDavies {
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  case class DaviesError(message: String = null, cause: Throwable = null)
+    extends RuntimeException(defaultMessage(message, cause), cause)
+
+  private def defaultMessage(message: String, cause: Throwable): String = {
+    if (message != null) message
+    else if (cause != null) cause.toString
+    else null
+  }
+
   private val limit: Double = 1e4
   private val errorTolerance = 1e-6
   private val ln28 = math.log(2)/8
@@ -20,7 +54,7 @@ object LCCSDavies {
     if (x < -50.0) 0.0 else exp(x)
   }
 
-  implicit class RichDouble(r: Double) {
+  implicit class RichDouble(val r: Double) extends AnyVal {
     def square = r * r
     def cube = r * r * r
   }
@@ -158,7 +192,7 @@ trait LCCSDavies extends LCCS {
                  tausq: Double)(implicit counter: () => Int): Double = {
     /** bound integration error due to truncation at u */
     counter()
-    //println(s"truncation input -- u: $u tausq: $tausq")
+    //logger.debug(s"truncation input -- u: $u tausq: $tausq")
     val sum2 = (sigsq + tausq) * u.square
     val prod1_init = 2.0 * sum2
     val u2 = 2.0 * u
@@ -169,19 +203,22 @@ trait LCCSDavies extends LCCS {
     val prod1 = prod1_init + (
       degreeOfFreedom dot tmpX.map(x => if (x > 1.0) 0.0 else log1(x, first = true))
       )
-    val totalDoF = sum(degreeOfFreedom)
+    val totalDoF = degreeOfFreedom dot tmpX.map(x => if (x > 1.0) 1.0 else 0.0)
     val prod2 = prod1 + prod2_tmp
     val prod3 = prod1 + prod3_tmp
-    //println(s"truncation tmps -- prod1: $prod1 prod2: $prod2 prod3: $prod3 sum1: $sum1")
+    //logger.debug(s"tmpX: ${tmpX.toArray.mkString("\n")}")
+    //logger.debug(s"log1X: ${tmpX.map(x => log1(x, true)).toArray.mkString("\n")}")
+    //logger.debug(s"truncation tmps -- prod1: $prod1 prod2: $prod2 prod3: $prod3 sum1: $sum1")
     val x = exp1(-sum1 - 0.25 * prod2)/Pi
     val y = exp1(-sum1 - 0.25 * prod3)/Pi
     val err1 = if (totalDoF == 0.0) 1.0 else x * 2.0/totalDoF
     val err2 = if (prod3 > 1.0) 2.5 * y else 1.0
+    //logger.debug(s"err1: $err1 err2: $err2")
     val x2 = 0.5 * sum2
     val err3 = min(err1, err2)
     val err4 = if (x2 <= y) 1.0 else y/x2
     val res = min(err3, err4)
-    //println(s"truncation output -- res: $res")
+    //logger.debug(s"truncation output -- res: $res")
     res
   }
 
@@ -189,28 +226,34 @@ trait LCCSDavies extends LCCS {
     /** find u such that truncation(u) < accx
       * and truncation(u/1.2) > accx
       * */
-    //print(s"findu -- utx: $utx accx: $accx")
+    //logger.debug(s"findu -- utx: $utx accx: $accx")
     val divis = Array(2.0, 1.4, 1.2, 1.1)
     var ut: Double = utx
     var u = ut/4.0
     if (truncation(u, 0.0) > accx) {
+      //logger.debug("1")
       u = ut
       while (truncation(u, 0.0) > accx) {
         ut *= 4.0
         u = ut
       }
     } else {
+      //logger.debug("2")
+      ut = u
       u = u/4.0
       while (truncation(u, 0.0) <= accx) {
         ut = u
         u = u/4.0
+        //logger.debug(s"2 u: $u ut:$ut")
       }
     }
+    //logger.debug(s"ut: $ut")
     for (i <- divis.indices) {
       u = ut/divis(i)
       if (truncation(u, 0.0) <= accx) ut = u
+      //logger.debug(s"u: $u ut:$ut")
     }
-    //println(s" ut: $ut")
+    //logger.debug(s" ut: $ut")
     ut
   }
 
@@ -311,6 +354,9 @@ trait LCCSDavies extends LCCS {
     }
     implicit val setTrue = toggler(true)
 
+    /** re-init sigsq */
+    sigsq = sigma.square
+
     val trace: Array[Double] = Array.fill(7)(0.0)
     var ifault: Int = 0
     val rats = Array(1, 2, 4, 8)
@@ -318,6 +364,7 @@ trait LCCSDavies extends LCCS {
     var (intl, ersm) = (0.0, 0.0)
     val sdLambda: Double = sqrt(pow(lambda, 2) dot DenseVector.fill(size)(2.0))
     var xlim = limit
+    //logger.debug(s"sd: $sdLambda")
     if (sdLambda == 0.0) {
       return if (cutoff > 0.0) CDFResult(1.0, ifault, trace) else CDFResult(0.0, ifault, trace)
     }
@@ -327,15 +374,19 @@ trait LCCSDavies extends LCCS {
     var up = 4.5/sdLambda
     var un = -up
     /** truncation point with no convergence factor */
+    //logger.debug(s"utx before: $utx, tol: $errorTolerance")
     utx = findu(utx, 0.5 * errorTolerance)
+    //logger.debug(s"utx: $utx")
     /** does convergence factor help? */
     if (cutoff != 0.0 && (almx > 0.07 * sdLambda)) {
-      val tausq = 0.25 * errorTolerance
+      val tausq = 0.25 * errorTolerance / cfe(cutoff)
       if (fail) {
         fail = false
       } else if (truncation(utx, tausq) < 0.2 * errorTolerance) {
         sigsq += tausq
+        //logger.debug(s"utx: $utx acc1: $errorTolerance")
         utx = findu(utx, 0.25 * errorTolerance)
+        //logger.debug(s"utx: $utx")
         trace(5) = sqrt(tausq)
       }
     }
@@ -347,15 +398,18 @@ trait LCCSDavies extends LCCS {
     /** l1 label in original source code, changed to while */
     while (continue) {
       val tmp1 = ctff(acc1, up)
-      val d1 = tmp1._1
+      val d1 = tmp1._1 - cutoff
       up = tmp1._2
+      //logger.debug(s"d1: $d1 up: $up")
       if (d1 < 0.0) {
         trace(6) = cnt
         return CDFResult(1.0, ifault, trace)
       }
+      //logger.debug(s"acc1: $acc1 un: $un")
       val tmp2 = ctff(acc1, un)
-      val d2 = tmp2._1
+      val d2 = cutoff - tmp2._1
       un = tmp2._2
+      //logger.debug(s"d2: $d2 un: $un")
       if (d2 < 0.0) {
         trace(6) = cnt
         return CDFResult(0.0, ifault, trace)
@@ -364,6 +418,7 @@ trait LCCSDavies extends LCCS {
       /** calculate number of terms required for main and auxillary integrations */
       xnt = utx/intv
       xntm = 3.0 / sqrt(acc1)
+      //logger.debug(s"utx: $utx intv: $intv xnt: $xnt xntm: $xntm")
       if (xnt > xntm * 1.5) {
         /** parameters for auxillary integration */
         if (xntm > xlim) {

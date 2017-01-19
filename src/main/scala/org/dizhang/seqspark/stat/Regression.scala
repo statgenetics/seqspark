@@ -1,8 +1,24 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.stat
 
 import breeze.linalg._
 import breeze.numerics._
-import breeze.optimize.{DiffFunction, LBFGS}
+import breeze.optimize.{DiffFunction, LBFGS, LBFGSB, GradientTester}
 
 /**
   * linear and logistic regression
@@ -47,9 +63,9 @@ case class LinearRegression(responses: DenseVector[Double], independents: DenseM
 
   val estimates = xs * coefficients
 
-  lazy val residualsVariance = sum(pow(residuals, 2))/residuals.length.toDouble
+  lazy val residualsVariance = sum(pow(residuals, 2))/(residuals.length - xs.cols).toDouble
   lazy val xsRotated = xs //if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
-  lazy val information: DenseMatrix[Double] = xsRotated.t * xsRotated * residualsVariance
+  lazy val information: DenseMatrix[Double] = xsRotated.t * xsRotated / residualsVariance
 
 }
 
@@ -71,26 +87,31 @@ case class LogisticRegression(responses: DenseVector[Double],
   /** beta contains p elements (variable numbers plus 1 intercept)
     * g [n]: probability of n samples
     * */
-  val cost = new DiffFunction[Vector[Double]] {
-    def calculate(beta: Vector[Double]) = {
+  val cost = new DiffFunction[DenseVector[Double]] {
+    def calculate(beta: DenseVector[Double]) = {
       val num = ones.length
       val g = sigmoid(xs * beta)
 
-      /** deviance: -2 * sum(y*log(g) + (1 - y)*log(1 - g)) */
-      val value: Double = -2.0 * (responses.t * log(g) + (ones - responses).t * log(ones - g))
+      /** deviance: -(1/m) * sum(y*log(g) + (1 - y)*log(1 - g)) */
+      val value: Double = -1.0/xs.rows * (responses.t * log(g) + (ones - responses).t * log(ones - g))
 
-      /** gradient on beta: -2 * sum(x * (y - g)) */
-      //val gradient: Vector[Double] = -2.0 * (xs.t * (response.:*(ones - g) - g.:*(ones - response)))
-      val gradient: Vector[Double] = -2.0 * (xs.t * (responses - g))
+      /** gradient on beta: -(1/m) * sum(x * (y - g)) */
+      val gradient: DenseVector[Double] = -1.0/xs.rows * (xs.t * (responses - g))
 
       (value, gradient)
     }
   }
 
-  val model = new LBFGS[Vector[Double]]
+  //val model3 = new TruncatedNewtonMinimizer[DenseVector[Double], ]()
+
+  val model2 = new LBFGS[DenseVector[Double]](maxIter = 1000, tolerance = 1e-5)
+
+  val model = new LBFGSB(DenseVector.fill(xs.cols)(-1.0), DenseVector.fill(xs.cols)(1.0))
+
+  def test(p: DenseVector[Double]) = GradientTester.test[Int, DenseVector[Double]](cost, p)
 
   /** the estimated betas */
-  val coefficients = model.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.01)).toDenseVector
+  val coefficients = model2.minimize(cost, DenseVector.fill[Double](independents.cols + 1)(0.001))
 
   /** the estimated probabilities of responses equal to 1 */
   val estimates = sigmoid(xs * coefficients)
@@ -103,5 +124,4 @@ case class LogisticRegression(responses: DenseVector[Double],
     /** this is essentially (xs.t * diag(residualsVariance) * xs) */
     xsRotated.t * (xsRotated(::, *) :* residualsVariance)
   }
-
 }

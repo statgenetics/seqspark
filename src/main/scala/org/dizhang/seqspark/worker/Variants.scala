@@ -1,12 +1,29 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
 
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
 /**
@@ -14,9 +31,12 @@ import scala.language.implicitConversions
   */
 object Variants {
 
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
   def decompose(self: Data[String]): Data[String] = {
+    logger.info("decompose multi-allelic variants")
     self.flatMap(v => decomposeVariant(v))
   }
 
@@ -34,6 +54,14 @@ object Variants {
       pw.write(s"${k.toString}: $v\n")
     }
     pw.close()
+    val genes = self.flatMap(v =>
+      v.parseInfo(InfoKey.anno).split(",,").map(g => g.split("::")(0))
+    ).countByValue()
+    val pw2 = new PrintWriter(new File("output/variants_genes.txt"))
+    for ((k, v) <- genes) {
+      pw2.write(s"$k: $v\n")
+    }
+    pw2.close()
   }
 
   def decomposeVariant(v: Variant[String]): Array[Variant[String]] = {
@@ -45,15 +73,22 @@ object Variants {
       (1 until v.alleleNum).toArray.map{i =>
         val newV = v.map{g =>
           val s = g.split(":")
-          val gt = s(0).split("[|/]")
-          if (gt.length == 1) {
-            if (gt(0) == "0") "0" else "1"
+          if (s(0).contains(".")) {
+            s(0)
           } else {
-            gt.map(j => if (j.toInt == i) "1" else "0").mkString(s(0).substring(1,2))
+            val gt = s(0).split("[|/]")
+            if (gt.length == 1) {
+              if (gt(0) == "0") "0" else "1"
+            } else {
+              gt.map(j => if (j.toInt == i) "1" else "0").mkString(s(0).substring(1,2))
+            }
           }
         }
         newV.meta(4) = alleles(i)
         newV
+      }.filter{
+        case SparseVariant(_,e,_,_) => e.nonEmpty
+        case _ => true
       }
     }
   }

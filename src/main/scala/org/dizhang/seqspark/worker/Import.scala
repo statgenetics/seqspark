@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.annot.Regions
@@ -10,10 +26,48 @@ import org.slf4j.LoggerFactory
 /**
   * Created by zhangdi on 8/13/16.
   */
+sealed trait Import[A <: Import.Source, B] {
+  def load(ssc: SingleStudyContext): Data[B]
+}
 
 object Import {
 
+  sealed trait Source
+  case object PlainVCF extends Source
+  case object CacheVCF extends Source
+  case object Impute2 extends Source
+  case object CachedImpute2 extends Source
+
+
   val logger = LoggerFactory.getLogger(getClass)
+
+  type Imp = (Double, Double, Double)
+
+  implicit object RawVCF extends Import[PlainVCF.type , String] {
+    def load(ssc: SingleStudyContext): Data[String] = {
+      fromVCF(ssc)
+    }
+  }
+
+  implicit object CachedVCF extends Import[CacheVCF.type , Byte] {
+    def load(ssc: SingleStudyContext): Data[Byte] = {
+      val path = ssc.userConfig.input.genotype.path + ".cache"
+      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Byte]]
+    }
+  }
+
+  implicit object Imputed extends Import[Impute2.type , Imp] {
+    def load(ssc: SingleStudyContext): Data[Imp] = {
+      fromImpute2(ssc)
+    }
+  }
+
+  implicit object CachedImputed extends Import[CachedImpute2.type , Imp] {
+    def load(ssc: SingleStudyContext): Data[Imp] = {
+      val path = ssc.userConfig.input.genotype.path + ".cache"
+      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Imp]]
+    }
+  }
 
   def fromVCF(ssc: SingleStudyContext): Data[String] = {
 
@@ -26,7 +80,7 @@ object Import {
         * before parse the whole line
         * */
       val isNotComment: Boolean = !l.startsWith("#")
-      val cond = {
+      isNotComment && {
         if (logExpr == LogicalParser.T) {
           true
         } else {
@@ -36,11 +90,14 @@ object Import {
           val metaMatcher = """^([^\t]*\t){7}[^\t]*""".r
           val meta: Array[String] = metaMatcher.findFirstIn(l).get.split("\t")
           /** prepare the var map for the logical expression */
-          val vmf = Map("FILTER" -> meta(6)) //the FORMAT field
+          val vmf = Map("FILTER" -> List(meta(6))) //the FORMAT field
           val vmi = if (names.exists(p => p.startsWith("INFO."))) {
-            Variant.parseInfo(meta(7)).map { case (k, v) => s"INFO.$k" -> v }
+            Variant.parseInfo(meta(7)).map {
+              case (k, v) =>
+                s"INFO.$k" -> v.split(",").toList
+            }
           } else {
-            Map.empty[String, String]
+            Map.empty[String, List[String]]
           } //the info filed
           val in = if (regions.isEmpty) {
             /** none is yes, no need to do the interval tree search */
@@ -51,34 +108,43 @@ object Import {
             val r = Region(meta(0), start, end)
             regions.get.overlap(r)
           }
-          LogicalParser.eval(logExpr)(vmf ++ vmi) && in
+          LogicalParser.evalExists(logExpr)(vmf ++ vmi) && in
         }
       }
-      isNotComment && cond
+
+
     }
     logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    val coord = conf.annotation.RefSeq.getString("coord")
-    val exome = sc.broadcast(Regions.makeExome(coord)(sc))
+
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
       case Left(UC.Samples.none) => true
       case _ => false
     }
-    val filter = imConf.filter
+    val filter = imConf.filters
     val terms = LogicalParser.names(filter)
     val raw = sc.textFile(imConf.path, conf.jobs)
     val default = "0/0"
     /** prepare a regions tree to filter variants */
     val regions = sc.broadcast(imConf.variants match {
-      case Left(UC.Variants.all) => None
+      case Left(UC.Variants.all) =>
+        logger.info("using all variants")
+        None
       case Left(UC.Variants.exome) =>
+        logger.info("using variants on exome")
+        //val coord = conf.annotation.RefSeq.getString("coord")
+        //val exome = sc.broadcast(Regions.makeExome(coord)(sc))
         val coord = conf.annotation.RefSeq.getString("coord")
         Some(Regions.makeExome(coord)(sc))
-      case Left(_) => None
-      case Right(tree) => Some(tree)
+      case Left(_) =>
+        logger.info("using all variants")
+        None
+      case Right(tree) =>
+        logger.info(s"using user specified regions")
+        Some(tree)
     })
     /** filter variants based on meta information
       * before making the actual genotype data for each sample
@@ -96,6 +162,7 @@ object Import {
         case Left(_) => s1
         case Right(s) =>
           val samples = pheno.indicate(s)
+          Phenotype.select(s, "phenotype")(ssc.sparkSession)
           s1.samples(samples)(sc)
       }
     }

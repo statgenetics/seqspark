@@ -1,10 +1,25 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.util
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-
 import scala.collection.JavaConverters._
 import scala.io.Source
 
@@ -24,8 +39,9 @@ object UserConfig {
 
   object ImportGenotypeType extends Enumeration {
     val vcf = Value("vcf")
-    val imputed = Value("imputed")
-    val cache = Value("cache")
+    val imputed = Value("impute2")
+    val cachevcf = Value("cachedVcf")
+    val cacheimputed = Value("cachedImpute2")
   }
 
   object Samples extends Enumeration {
@@ -65,7 +81,7 @@ object UserConfig {
 
   object TestMethod extends Enumeration {
     val score = Value("score")
-    val lhr = Value("lhr")
+    //val lhr = Value("lhr")
     val wald = Value("wald")
   }
 
@@ -78,6 +94,7 @@ object UserConfig {
     val pipeline = config.getStringList("pipeline").asScala.toList
     val jobs = config.getInt("jobs")
     val benchmark = config.getBoolean("benchmark")
+    val debug = config.getBoolean("debug")
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
@@ -95,15 +112,14 @@ object UserConfig {
 
     val format = ImportGenotypeType.withName(config.getString("format"))
 
-
     val path = config.getString("path")
 
 
     //val filters = config.getStringList("filters").asScala.toArray
 
-    val filter: LogExpr = LogicalParser.parse(config.getStringList("filter").asScala.toList)
+    val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
-    val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+    //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
     val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {
@@ -133,6 +149,17 @@ object UserConfig {
     val genotypes: LogExpr = LogicalParser.parse(config.getStringList("genotypes").asScala.toList)
     val variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
     val summaries = config.getStringList("summaries").asScala.toList
+    val save = config.getBoolean("save")
+    val export = config.getBoolean("export")
+    val pca = PCAConfig(config.getConfig("pca"))
+  }
+
+  case class PCAConfig(config: Config) extends UserConfig {
+    def variants: LogExpr = LogicalParser.parse(config.getStringList("variants").asScala.toList)
+    def impute: String = config.getString("impute")
+    def noprune: Boolean = config.getBoolean("noprune")
+    def normalize: Boolean = config.getBoolean("normalize")
+    def prune: Config = config.getConfig("prune")
   }
 
   case class AnnotationConfig(config: Config) extends UserConfig {
@@ -150,10 +177,18 @@ object UserConfig {
     def methodList = config.getStringList("method.list").asScala.toArray
     def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
     def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
-    def filters = config.getStringList("filters").asScala.toArray
+    def sites: String = config.getString("method.sites")
+
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
+    val varLimit: (Int, Int) = {
+      if (config.hasPath("varLimit")) {
+        val res = config.getIntList("varLimit").asScala.toList
+        (res(0), res(1))
+      } else
+        (0, 2000)
+    }
     val groupBy: List[String] = {
       if (config.hasPath("groupBy"))
         config.getStringList("groupBy").asScala.toList
@@ -172,9 +207,15 @@ object UserConfig {
       else
         "liu.mod"
     }
-    val rCorr: Array[Double] = {
-      if (config.hasPath("rCorr"))
-        config.getDoubleList("rCorr").asScala.toArray.map(_.toDouble)
+    val rho: Double = {
+      if (config.hasPath("rho"))
+        config.getDouble("rho")
+      else
+        0.0
+    }
+    val rhos: Array[Double] = {
+      if (config.hasPath("rhos"))
+        config.getDoubleList("rhos").asScala.toArray.map(_.toDouble)
       else
         Array[Double]()
     }
@@ -203,7 +244,10 @@ object UserConfig {
     val weight = WeightMethod.withName(config.getString("weight"))
     val maf = config.getConfig("maf")
     val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
-    val test = TestMethod.withName("score")
+    val test = if (config.hasPath("test"))
+      TestMethod.withName(config.getString("test"))
+    else
+      TestMethod.score
     val misc: MiscConfig = MiscConfig(config.getConfig("misc"))
   }
 

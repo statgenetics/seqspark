@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.util
 
 import org.dizhang.seqspark.util.LogicalParser._
@@ -16,12 +32,12 @@ class LogicalParser extends JavaTokenParsers with Serializable {
   def factor: Parser[LogExpr] = comparison | ("("~expr~")" ^^ { case "("~x~")" => x })
   def comparison: Parser[LogExpr] = stringComparison | numberComparison | existence
   def stringComparison: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r~("=="|"!=")~stringLiteral ^^ {
+    """[a-zA-Z_](\w|\.)*""".r~("=="|"!=")~stringLiteral ^^ {
       case name~"=="~value => SEQ(name, value.substring(1,value.length - 1))
       case name~"!="~value => SNE(name, value.substring(1,value.length - 1))
     }
   def numberComparison: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r~(">="|"<="|"=="|"!="|">"|"<")~floatingPointNumber ^^ {
+    """[a-zA-Z_](\w|\.)*""".r~(">="|"<="|"=="|"!="|">"|"<")~floatingPointNumber ^^ {
       case name~">"~value => GT(name, value.toDouble)
       case name~">="~value => GE(name, value.toDouble)
       case name~"<"~value => LT(name, value.toDouble)
@@ -64,6 +80,26 @@ object LogicalParser {
   case class SNE(id: String, v: String) extends LogExpr
   case class AND(e1: LogExpr, e2: LogExpr) extends LogExpr
   case class OR(e1: LogExpr, e2: LogExpr) extends LogExpr
+
+  def evalExists(logExpr: LogExpr)(vm: Map[String, List[String]]): Boolean ={
+    logExpr match {
+      case T => true
+      case F => false
+      case EX(id) => vm.contains(id)
+      case LT(id, v) => vm(id).exists(_.toDouble < v)
+      case LE(id, v) => vm(id).exists(_.toDouble <= v)
+      case GT(id, v) => vm(id).exists(_.toDouble > v)
+      case GE(id, v) => vm(id).exists(_.toDouble >= v)
+      case EQ(id, v) => vm(id).exists(_.toDouble == v)
+      case NE(id, v) => vm(id).exists(_.toDouble != v)
+      case SEQ(id, v) => vm(id).contains(v)
+      case SNE(id, v) => vm(id).exists(_ != v)
+      case AND(_, F) => false
+      case AND(e1, e2) => evalExists(e1)(vm) && evalExists(e2)(vm)
+      case OR(_, T) => true
+      case OR(e1, e2) => evalExists(e1)(vm) || evalExists(e2)(vm)
+    }
+  }
 
   def eval(logExpr: LogExpr)(vm: Map[String, String]): Boolean = {
     logExpr match {

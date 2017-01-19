@@ -1,9 +1,27 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
+import breeze.stats.{mean, stddev}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.dizhang.seqspark.ds.Phenotype._
 import org.dizhang.seqspark.util.Constant.Pheno
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success, Try}
 
@@ -12,26 +30,33 @@ import scala.util.{Failure, Success, Try}
   */
 object Phenotype {
 
+   val logger: Logger = LoggerFactory.getLogger(getClass)
+   val options = Map(
+     "nullValue" -> Pheno.mis,
+     "sep" -> Pheno.delim,
+     "header" -> "true"
+   )
+
    def update(path: String, table: String)(spark: SparkSession): Phenotype = {
-     val options = Map(
-       "nullValue" -> Pheno.mis,
-       "sep" -> Pheno.delim,
-       "header" -> "true"
-     )
      val dataFrame = spark.read.options(options).csv(path)
+     logger.info(s"add ${dataFrame.columns.mkString(",")} to phenotype dataframe")
      val old = spark.table(table)
      val newdf = old.join(dataFrame, usingColumn = "iid")
      newdf.createOrReplaceTempView(table)
      Distributed(newdf)
    }
 
-  def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
+   def select(field: String, table: String)(spark: SparkSession): Phenotype = {
+     logger.info(s"select samples that have ${field} values")
+     val old = spark.table(table)
+     val newdf = spark.sql(s"SELECT * from $table where $field is not null")
+     newdf.createOrReplaceTempView(table)
+     Distributed(newdf)
+   }
 
-    val options = Map(
-      "nullValue" -> Pheno.mis,
-      "sep" -> Pheno.delim,
-      "header" -> "true"
-    )
+   def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
+
+    logger.info(s"creating phenotype dataframe from $path")
 
     val dataFrame = spark.read.options(options).csv(path)
 
@@ -48,6 +73,8 @@ object Phenotype {
   case class Distributed(df: DataFrame) extends Phenotype {
 
     private lazy val cols = df.columns
+
+    def contains(field: String): Boolean = cols.contains(field)
 
     def select(field: String): Array[Option[String]] = {
       if (cols.contains(field)) {
@@ -100,6 +127,7 @@ object Phenotype {
 trait Phenotype {
 
   def select(field: String): Array[Option[String]]
+  def contains(field: String): Boolean
   def sampleNames = this.select("iid").map(_.getOrElse("NA"))
   def batch(field: String): Array[String] = {
     this.select(field).map{
@@ -140,7 +168,11 @@ trait Phenotype {
           winsorize(raw, limit)
       }
       if (res.forall(_.isDefined)) {
-        Right(DV.horzcat(res.map(x => DV(x.get)): _*))
+        val scaled = DV.horzcat(res.map{x =>
+          val u = DV(x.get)
+          (u - mean(u))/stddev(u)
+        }: _*)
+        Right(scaled)
       } else {
         val msg = cov.zip(res).filter(p => p._2.isEmpty).map(p => s"invalid value in covariate ${p._1}")
         Left(msg.mkString(";"))

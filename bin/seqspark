@@ -21,13 +21,15 @@ if [ -z $SEQSPARK_HOME ]
 then
 	SEQSPARK_HOME=$(dirname $(dirname $0))
 fi
-export CLASSPATH=${SEQSPARK_HOME}/conf:$CLASSPATH
+CONFDIR=${SEQSPARK_HOME}/conf
 
 
 echo "run mode:        $Mode"
 echo "conf file:       $Conf"
 echo "spark options:   $Opts"
 
-spark-submit --class org.dizhang.seqspark.$Mode $Opts $SEQSPARK_HOME/SeqSpark.jar $Conf
+spark-submit --driver-class-path $CONFDIR\
+    --class org.dizhang.seqspark.$Mode $Opts \
+    $SEQSPARK_HOME/SeqSpark.jar $Conf
 
 exit 0

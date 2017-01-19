@@ -1,6 +1,22 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.stat
 
-import breeze.linalg.{DenseMatrix => BDM}
+import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.spark.mllib.feature.{PCA => SPCA}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
@@ -13,22 +29,13 @@ import org.slf4j.LoggerFactory
   * perform PCA for
   */
 @SerialVersionUID(103L)
-class PCA[A: Genotype](vcf: Data[A]) extends Serializable {
+class PCA(input: RDD[Array[Double]]) extends Serializable {
 
   val logger = LoggerFactory.getLogger(getClass)
 
-  def geno = implicitly[Genotype[A]]
-
   def prepare: RDD[Vector] = {
 
-    vcf.map{v =>
-      val af = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce.ratio
-      val cnt = v.toCounter(geno.toBRV(_, af), 0.0)
-      cnt match {
-        case DenseCounter(elems, _) => Vectors.dense(elems.toArray)
-        case SparseCounter(elems, _, n) => Vectors.sparse(n, elems.toSeq.sortBy(_._1))
-      }
-    }
+    input.map(a => Vectors.dense(a))
 
     /**
       * val input = vcf

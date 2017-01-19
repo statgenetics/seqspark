@@ -1,12 +1,28 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.ds
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
+import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType}
 import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.language.implicitConversions
 
 /**
@@ -28,6 +44,19 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
   }
   def toDummy: RDD[Variant[A]] = {
     self.map(v => v.toDummy)
+  }
+
+  def groupByVarNum: RDD[(String, Iterable[Variant[A]])] = {
+    val sampleSize = self.first().length
+    val varNum = if (sampleSize == 0) 1000 else 1000000/sampleSize //the matrix should only have 1000000 elements
+    val binSize = self.mapPartitions(i => Array(i.size).toIterator).max/varNum + 1
+    val pars = self.partitions.length
+    self.zipWithUniqueId().map{
+      case (v, idx) =>
+        val k = idx%pars
+        val i = idx/pars/varNum
+        (k * binSize + i).toString -> v
+    }.groupByKey()
   }
 
   def variants(cond: LogicalParser.LogExpr)(ssc: SingleStudyContext): RDD[Variant[A]] = {
@@ -53,16 +82,47 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
       self.filter{v =>
         val varMap = names.toArray.map{
           case "chr" => "chr" -> v.chr
-          case "maf" => "maf" -> v.maf(ctrlInd).toString
-          case "informative" => "informative" -> (if (v.informative) "1" else "0")
+          case "maf" =>
+            val maf = v.maf(ctrlInd).toString
+            v.addInfo("SS_maf", maf)
+            "maf" -> maf
+          case "informative" =>
+            if (v.informative) {
+              v.addInfo("SS_informative", "true")
+              "informative" -> "1"
+            } else {
+              v.addInfo("SS_informative", "false")
+              "notInformative" -> "1"
+            }
           //case "batchMaf" => "batchMaf" -> v.batchMaf(ctrlInd, batch).values.min.toString
-          case "missingRate" => "missingRate" -> (1 - v.callRate).toString
-          case "batchMissingRate" => "batchMissingRate" -> (1 - v.batchCallRate(batch).values.min).toString
-          case "alleleNum" => "alleleNum" -> v.alleleNum.toString
-          case "batchSpecific" => "batchSpecific" -> v.batchSpecific(batch).values.max.toString
-          case "hwePvalue" => "hwePvalue" -> v.hwePvalue(ctrlInd).toString
-          case "isFunctional" => "isFunctional" -> v.isFunctional.toString
-          case x => x -> v.parseInfo.getOrElse(x, "0")
+          case "missingRate" =>
+            val mr = (1 - v.callRate).toString
+            v.addInfo("SS_missingRate", mr)
+            "missingRate" -> mr
+          case "batchMissingRate" =>
+            val bmr = (1 - v.batchCallRate(batch).values.min).toString
+            v.addInfo("SS_minBatchMissingRate", bmr)
+            "batchMissingRate" -> bmr
+          case "alleleNum" =>
+            val an = v.alleleNum.toString
+            v.addInfo("SS_alleleNum", an)
+            "alleleNum" -> an
+          case "batchSpecific" =>
+            val bs = v.batchSpecific(batch).values.max.toString
+            v.addInfo("SS_batchSpecific", bs)
+            "batchSpecific" -> bs
+          case "hwePvalue" =>
+            val hwe = v.hwePvalue(ctrlInd).toString
+            v.addInfo("SS_hwePvalue", hwe)
+            "hwePvalue" -> hwe
+          case "isFunctional" =>
+            val func = v.isFunctional.toString
+            v.addInfo("isFunctional", func)
+            "isFunctional" -> func
+          case x =>
+            val other = v.parseInfo.getOrElse(x, "0")
+            v.addInfo(s"SS_${x}", other)
+            x -> other
         }.toMap
         LogicalParser.eval(cond)(varMap)
       }

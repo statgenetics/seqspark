@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{DenseVector, SparseVector, VectorBuilder}
@@ -21,6 +37,18 @@ object Counter {
     type PairDouble = (Double, Double)
     type TripleDouble = (Double, Double, Double)
     type MapCounter = Map[PairInt, Int]
+    type MapCounterLong = Map[Int, Long]
+
+    case class Longs(n: Int) extends CounterElementSemiGroup[IndexedSeq[Long]] {
+      val zero: IndexedSeq[Long] = Vector.fill(n)(0L)
+      def op(x: IndexedSeq[Long], y: IndexedSeq[Long]): IndexedSeq[Long] = {
+        for (i <- x.indices) yield x(i) + y(i)
+      }
+      def pow(x: IndexedSeq[Long], k: Int): IndexedSeq[Long] = {
+        for (i <- x.indices) yield x(i) * k
+      }
+    }
+
     implicit object AtomInt extends CounterElementSemiGroup[Int] {
       def zero = 0
       def op (x: Int, y: Int) = x + y
@@ -62,6 +90,16 @@ object Counter {
         x ++ (for ((k, v) <- y) yield k -> (v + x.getOrElse(k, 0)))
       def pow (x: MapCounter, i: Int) =
         for ((k,v) <- x) yield k -> (v * i)
+    }
+
+    implicit object MapCounterLong extends CounterElementSemiGroup[MapCounterLong] {
+      def zero: MapCounterLong = Map.empty[Int, Long]
+      def op (x: MapCounterLong, y: MapCounterLong): MapCounterLong = {
+        x ++ (for ((k, v) <- y) yield k -> (v + x.getOrElse(k, 0L)))
+      }
+      def pow(x: MapCounterLong, n: Int): MapCounterLong = {
+        for ((k,v) <- x) yield k -> (v * n)
+      }
     }
 
     implicit object MapI2I extends CounterElementSemiGroup[IMap] {
@@ -119,7 +157,7 @@ object Counter {
   /** Start define some functions for Counter */
 
   val THRESHOLD = 0.25
-  val MINIMIUM = 10000
+  val MINIMIUM = 1000
   def fill[A](size: Int)(sparseValue: A): Counter[A] = SparseCounter[A](Map.empty[Int, A], sparseValue, size)
   def fromIndexedSeq[A](iseq: IndexedSeq[A], default: A): Counter[A] = {
     if (iseq.isEmpty) {
@@ -183,6 +221,8 @@ sealed trait Counter[A] extends Serializable {
 
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A]
 
+  def map[B](f: A => B): Counter[B]
+
   def toDenseVector(make: A => Double): DenseVector[Double] = {
     DenseVector(toIndexedSeq.map(make(_)): _*)
   }
@@ -217,6 +257,10 @@ case class DenseCounter[A](elems: IndexedSeq[A], default: A)
     ).map(identity)
   }
 
+  def map[B](f: A => B): Counter[B] = {
+    Counter.fromIndexedSeq(elems.map(f), f(default))
+  }
+
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {
     require(this.length == that.length)
     val newElems = this.elems.zip(that.toIndexedSeq).map(x => sg.op(x._1, x._2))
@@ -235,7 +279,7 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
     elems.getOrElse(i, default)
   }
   def reduce(implicit sg: CounterElementSemiGroup[A]): A = {
-    val dense = elems.values.reduce((a, b) => sg.op(a, b))
+    val dense = elems.values.fold(sg.zero)((a, b) => sg.op(a, b))
     val sparse = sg.pow(default, size - elems.size)
     sg.op(dense, sparse)
   }
@@ -249,6 +293,10 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
       for ((k, s) <- sizes) yield k -> (s - denseSizes.getOrElse(k, 0))
     val sparse = sparseSizes.map(x => x._1 -> sg.pow(default, x._2))
     dense ++ (for ((k, v) <- sparse) yield k -> sg.op(v, dense.getOrElse(k, sg.zero)))
+  }
+
+  def map[B](f: A => B): Counter[B] = {
+    Counter.fromMap(elems.map(p => p._1 -> f(p._2)), f(default), size)
   }
 
   def ++(that: Counter[A])(implicit sg: CounterElementSemiGroup[A]): Counter[A] = {

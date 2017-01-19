@@ -1,34 +1,61 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.assoc
 
 import breeze.numerics._
 import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
 import breeze.numerics.{lgamma, pow}
 import breeze.stats.distributions.ChiSquared
-import org.apache.spark.ml.linalg.DenseVector
 import org.dizhang.seqspark.assoc.SKATO._
-import org.dizhang.seqspark.stat.ScoreTest.{LinearModel => STLinear, LogisticModel => STLogistic, NullModel => STNull}
+import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.numerics.Integrate
+import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
 import scala.language.existentials
+
 /**
   * optimal SKAT test
   *
-  * follow the R package implementation
   *
   */
 
 object SKATO {
+  val logger = LoggerFactory.getLogger(getClass)
   val RhosOld = (0 to 9).map(x => x * 1.0/10.0).toArray :+ 0.999
   val RhosAdj = Array(0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.5, 0.999)
+  /** the GK integration size */
+  val GKSize: Int = 21
 
-  def apply(nullModel: NullModel,
-            x: Encode[_],
+  def apply(nullModel: NM,
+            x: Encode.Coding,
             method: String): SKATO = {
+    val nmf = nullModel match {
+      case NM.Simple(y, b) => NM.Fit(y, b)
+      case NM.Mutiple(y, c, b) => NM.Fit(y, c, b)
+      case nm: NM.Fitted => nm
+    }
     method match {
-      case "davies" => Davies(nullModel, x, method)
-      case _ => LiuModified(nullModel, x, method)
+      case "liu"|"liu.mod"|"optimal.moment"|"optimal.moment.adj" =>
+        LiuModified(nmf, x.asInstanceOf[Encode.Rare], method)
+      case _ =>
+        Davies(nmf, x.asInstanceOf[Encode.Rare], method)
+
     }
   }
 
@@ -47,36 +74,38 @@ object SKATO {
 
     val iterm1 = meanZmat * diag(cof1)
     val iterm2 = p0sqrtZ - iterm1
-    /** w3 is the mixture chisq term
+    /**
+      * w3 is the mixture chisq term
       * */
     val w3 = iterm2.t * iterm2
 
     val varZeta = sum((iterm1.t * iterm1) :* w3) * 4
-
-    val (lambda, u) = SKAT.getLambdaU(w3)
-
-    (lambda, u) match {
-      case (Some(l), Some(u1)) =>
-        val muQ = sum(l)
-        val (varQ, kurQ) = resampled match {
-          case None =>
+    val moments: Option[(Double, Double, Double, DV[Double])] =
+      if (resampled.isEmpty) {
+        SKAT.getLambda(w3).map{l =>
+            val m = sum(l)
             val v = 2 * sum(pow(l, 2)) + varZeta
             val k = sum(pow(l, 4))/sum(pow(l, 2)).square * 12
-            (v, k)
-          case Some(res) =>
-            val qTmp = pow(res * iterm2, 2)
-            val qs = sum(qTmp(*, ::))
-            val dis = new LCCSResampling(l, u1, pi.get, qs)
-            (dis.varQ + varZeta, dis.kurQ)
+            (m,v,k, l)
         }
+      } else {
+        SKAT.getLambdaU(w3).map{
+          case (l, u) =>
+            val m = sum(l)
+            val qTmp = pow(resampled.get * iterm2, 2)
+            val qs = sum(qTmp(*, ::))
+            val dis = new LCCSResampling(l, u, pi.get, qs)
+            (m, dis.varQ + varZeta, dis.kurQ, l)
+        }
+      }
+    moments.map{
+      case (m, v, k, l) =>
         val sumCof2 = sum(pow(cof1, 2))
         val meanZ2 = sum(pow(meanZ, 2))
         lazy val taus = rs.map{r =>
           meanZ2 * (numVars.toDouble.square * r + (1 - r) * sumCof2)}
-        Some(Parameters(muQ, varQ, kurQ, l, varZeta, taus))
-      case (_, _) => None
+        Parameters(m, v, k, l, varZeta, taus)
     }
-
   }
 
   /**
@@ -103,41 +132,6 @@ object SKATO {
     if (k < 0) 0.0001 else k
   }
 
-  @SerialVersionUID(302L)
-  trait NullModel extends Regression.Result with Serializable {
-    val informationInverse: DM[Double] = inv(information)
-    def STNullModel: STNull
-  }
-
-  object NullModel {
-    def apply(reg: Regression): NullModel = {
-      reg match {
-        case _: LogisticRegression =>
-          LogisticModel(reg.responses, reg.estimates, reg.xs, reg.information)
-        case _ =>
-          LinearModel(reg.responses, reg.estimates, reg.xs, reg.information)
-      }
-    }
-  }
-
-  case class LinearModel(responses: DV[Double],
-                         estimates: DV[Double],
-                         xs: DM[Double],
-                         information: DM[Double]) extends NullModel {
-    val STNullModel: STLinear = STLinear(responses, estimates, xs, information)
-    val sigma = STNullModel.residualsVariance.sqrt
-    val xsInfoInv = xs * informationInverse * STNullModel.residualsVariance
-  }
-  case class LogisticModel(responses: DV[Double],
-                           estimates: DV[Double],
-                           xs: DM[Double],
-                           information: DM[Double]) extends NullModel {
-    val STNullModel: STLogistic = STLogistic(responses, estimates, xs, information)
-    def variance = STNullModel.residualsVariance
-    val sigma = variance.map(p => p.sqrt)
-    val xsInfoInv = (xs(::, *) :* sigma) * informationInverse
-  }
-
   @SerialVersionUID(303L)
   case class Parameters(muQ: Double,
                         varQ: Double,
@@ -160,30 +154,44 @@ object SKATO {
 
   final case class Moments(muQ: Double, varQ: Double, df: Double)
 
-
   trait AsymptoticKur extends SKATO {
 
-    def paramOpt = getParameters(P0SqrtZ, rhos)
+    lazy val paramOpt = getParameters(P0SqrtZ, rhos)
+
+    lazy val lambdasOpt: Option[Array[DV[Double]]] = {
+      val res = vcs.map(vc => SKAT.getLambda(vc))
+      if (res.exists(_.isEmpty)) {
+        None
+      } else {
+        Some(res.map(_.get))
+      }
+    }
+
+    def isDefined = paramOpt.isDefined && lambdasOpt.isDefined
+
+    def lambdas = lambdasOpt.get
+
 
     def pValues = {
-
-      lambdas.zip(qScores).map{case (l, q) =>
-        1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+      method match {
+        case "optimal.mod"|"optimal.adj"|"optimal.moment.adj" =>
+          lambdas.zip(qScores).map{
+            case (l, q) =>
+              val cdf = LCCSDavies.Simple(l).cdf(q)
+              if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
+                1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+              } else {
+                1.0 - cdf.pvalue
+              }
+          }
+        case _ =>
+          lambdas.zip(qScores).map{case (l, q) =>
+            1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
+          }
       }
-      /**
-        * The Davies method implementation here is bugy
-        * use the liu modified instead
-        *
-      val cdf = lambdas.zip(qScores).map{case (l, q) =>
-        (l, q, LCCSDavies.Simple(l).cdf(q))}
-      for ((l, q, c) <- cdf) yield
-        if (c.pvalue < 0.0 || c.pvalue >1.0) {
-          1.0 - LCCSLiu.Modified(l).cdf(q).pvalue
-        } else {
-          1.0 - c.pvalue
-        }
-        */
     }
+
+
     def pMinQuantiles = {
       lambdas.map{lb =>
         val lm = LCCSLiu.Modified(lb)
@@ -196,45 +204,32 @@ object SKATO {
   }
 
   @SerialVersionUID(7727760101L)
-  case class Davies(nullModel: NullModel,
-                    x: Encode[_],
+  case class Davies(nullModel: NM.Fitted,
+                    x: Encode.Rare,
                     method: String) extends SKATO with AsymptoticKur {
-    lazy val term2 = new ChiSquared(1.0)
 
-    def integralFunc(x: Double): Double = {
-      val tmp1 = DV(param.taus: _*) * x
-      val tmp = (DV(pMinQuantiles: _*) - tmp1) :/ DV(rhos.map(1.0 - _): _*)
-      val kappa = min(tmp)
-      val term1 =
-        if (kappa > sum(param.lambda) * 1e4) {
+    def integrand(x: DV[Double]): DV[Double] = {
+      require(x.length == GKSize)
+      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
+      val kappa = min(tmp(::, *)).t
+      val F = kappa.map{k =>
+        if (k > sum(param.lambda) * 1e4) {
           1.0
         } else {
-          val tmpQ = (kappa - param.muQ) * (param.varQ - param.varZeta).sqrt / param.varQ.sqrt + param.muQ
-          LCCSDavies.Simple(param.lambda).cdf(tmpQ).pvalue
+          val cutoff = (k - param.muQ) * (param.varQ - param.varZeta).sqrt/param.varQ.sqrt + param.muQ
+          LCCSDavies.Simple(param.lambda).cdf(cutoff).pvalue
         }
-      term1 * term2.pdf(x)
-    }
-    def pValue: Option[Double] = {
-
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadrature(integralFunc, 1e-10, 40.0 + 1e-10)
-          re.map(1.0 - _)
       }
+      //logger.info(s"F: $F")
+      F :* df1pdf(x)
     }
+
   }
 
   @SerialVersionUID(7727760201L)
   trait LiuPValue extends SKATO {
 
-    lazy val term1 = new ChiSquared(df)
-    lazy val term2 = new ChiSquared(1)
-    lazy val tauDV = DV(param.taus: _*)
-    lazy val pmqDV = DV(pMinQuantiles: _*)
-    lazy val rDV = DV(rhos.map(1.0 - _): _*)
-
+    /**
     def integralFunc(x: Double): Double = {
       val tmp1 = tauDV * x
       val tmp = (pmqDV - tmp1) :/ rDV
@@ -242,90 +237,70 @@ object SKATO {
       val tmpQ = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
       term1.cdf(tmpQ) * term2.pdf(x)
     }
+    */
 
-    def df1pdf(x: DV[Double]): DV[Double] = {
-      (pow(x, -0.5) :* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
-    }
-    def dfcdf(x: DV[Double]): DV[Double] = {
-      gammp(df/2, x/2.0)
-    }
 
-    def integralFunc2(x: DV[Double]): DV[Double] = {
-      val tmp1: DM[Double] = tile(tauDV, 1, x.length) * diag(x)
-      val tmp: DM[Double] = (tile(pmqDV, 1, x.length) - tmp1) :/ tile(rDV, 1, x.length)
-      val tmpMin: DV[Double] = min(tmp(::, *)).t
-      val tmpQ: DV[Double] = (tmpMin - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
-      (dfcdf(tmpQ) :* df1pdf(x)).map(i => if (i.isNaN || i < 0.0) 0.0 else i)
-    }
-    def pValue3: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadratureN(integralFunc2, 1e-6, 40.0 + 1e-6, 320)
-          re.map(1.0 - _)
+    def integrand(x: DV[Double]): DV[Double] = {
+      require(x.length == GKSize)
+      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
+      val kappa = min(tmp(::, *)).t
+      //val cutoff = (kappa - param.muQ) * (param.varQ - param.varZeta).sqrt/param.varQ.sqrt + param.muQ
+      val cutoff = (kappa - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
+      //logger.debug(s"x: $x")
+      //logger.debug(s"tmpMin: $tmpMin")
+      //logger.debug(s"tmpQ: $tmpQ")
+      /**
+      if (tmpQ.exists(_.isInfinity)) {
+        (s"x:${x.toArray.mkString(",")}\n" +
+          s"lambdas: ${lambdas.map(_.toArray.mkString(",")).mkString("\n")}\n" +
+          s"lambdas2: ${lambdas2.map(_.toArray.mkString(",")).mkString("\n")}\n" +
+          s"qscores: ${qScores.mkString(",")}\n" +
+          s"pvalues: ${pValues.mkString(",")}\n" +
+          s"pmqDV: ${pmqDV.toArray.mkString(",")}\n" +
+          s"rDV: ${rDV.toArray.mkString(",")}\n" +
+          s"tauDV: ${tauDV.toArray.mkString(",")}\n" +
+          s"tmpMin: ${tmpMin.toArray.mkString(",")}\n" +
+          s"param: ${param.toString}\n" +
+          s"tmpQ: ${tmpQ.toArray.mkString(",")}\n").toDouble
       }
-    }
-
-    /** adaptive pvalue
-      * integration is a little bit heavy here
-      * */
-    def pValue: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          var continue: Boolean = true
-          var i: Int = 0
-          var last: Option[Double] = None
-          var cur: Option[Double] = None
-          while (continue) {
-            //println(s"here we go: $i")
-            cur = quadratureScan(integralFunc2, 1e-6, 40.0 + 1e-6, 320, (i + 1) * 1000, 1e-5 * pow(10, -i * 2))
-            continue =
-              cur match {
-                case None =>
-                  cur = last
-                  false //if no pvalue,
-                case Some(v) =>
-                  last = cur
-                  (1.0 - v) < 1e-4 * pow(10, -i * 2)
-              }
-            i += 1
-          }
-          cur.map(1.0 - _)
-      }
+        */
+      val res = dfcdf(cutoff.map(q => if (q < 0) 0.0 else q)) :* df1pdf(x)
+      //logger.debug(s"res: $res")
+      res
     }
 
 
-    def pValue2: Option[Double] = {
-      (paramOpt, lambdaUsOpt) match {
-        case (None, _) => None
-        case (_, (None, _)) => None
-        case (_, _) =>
-          val re = quadrature(integralFunc, 1e-6, 40.0 + 1e-6)
-          re.map(1.0 - _)
-      }
-    }
   }
 
   @SerialVersionUID(7727760301L)
-  case class LiuModified(nullModel: NullModel,
-                         x: Encode[_],
-                         method: String) extends LiuPValue with AsymptoticKur
+  case class LiuModified(nullModel: NM.Fitted,
+                         x: Encode.Rare,
+                         method: String)
+    extends LiuPValue with AsymptoticKur
 
-  {
-    //lazy val kurQ = {
-    //  12.0 * sum(pow(param.lambda, 4))/sum(pow(param.lambda, 2)).square
-    //}
-  }
-
-  case class SmallSampleAdjust(nullModel: LogisticModel,
-                               x: Encode[_],
+  case class SmallSampleAdjust(nullModel: NM.Fitted,
+                               x: Encode.Rare,
                                resampled: DM[Double],
-                               method: String) extends LiuPValue {
+                               method: String)
+    extends LiuPValue
+  {
+    lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.b), Some(resampled))
 
-    lazy val paramOpt = getParameters(P0SqrtZ, rhos, Some(nullModel.variance), Some(resampled))
+    lazy val lambdasUsOpt = {
+      val res = vcs.map { vc => SKAT.getLambdaU(vc) }
+      if (res.exists(_.isEmpty)) {
+        None
+      } else {
+        Some((res.map(_.get._1), res.map(_.get._2)))
+      }
+    }
+
+    def isDefined = paramOpt.isDefined && lambdasUsOpt.isDefined
+
+    lazy val lambdas = lambdasUsOpt.get._1
+    lazy val us = lambdasUsOpt.get._2
+
+
 
     lazy val simScores = resampled * geno
 
@@ -333,7 +308,7 @@ object SKATO {
     lazy val pValues = {
       rhos.indices.map{i =>
         val simQs = simScores(*, ::).map(s => s.t * kernels(i) * s)
-        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.variance, simQs).cdf(qScores(i)).pvalue
+        1.0 - new LCCSResampling(lambdas(i), us(i), nullModel.b, simQs).cdf(qScores(i)).pvalue
       }.toArray
     }
 
@@ -351,35 +326,28 @@ object SKATO {
 
 @SerialVersionUID(7727760001L)
 trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
-  def nullModel: NullModel
-  def x: Encode[_]
-  lazy val geno: CM[Double] = x.getRare().get.coding
-  lazy val weight = DV(x.weight.toArray.zip(x.maf)
-    .filter(p => p._2 < x.fixedCutoff || p._2 > (1 - x.fixedCutoff))
-    .map(_._1))
-  def numVars: Int = weight.length
+  def nullModel: NM.Fitted
+  def x: Encode.Rare
+  def geno: CM[Double] = x.coding
+
+  def numVars: Int = x.coding.cols
   //lazy val misc = x.config.misc
   def method: String
   lazy val rhos: Array[Double] = {
     method match {
       case "optimal.adj" => RhosAdj
-      case _ => RhosOld
+      case "optimal" => RhosOld
+      case _ => RhosAdj
       //case _ => misc.rCorr
     }
   }
-  /**
-    * we don't store P0 or P0sqrt, because n x n matrix could be too large
-    * instead, we always directly compute and store P0sqrt * Z
-    *
-    *  */
+
   lazy val P0SqrtZ: DM[Double] = {
-    val z: CM[Double] = rowMultiply(geno, weight)
-    nullModel match {
-      case lm: LinearModel =>
-        (- lm.xsInfoInv * (lm.xs.t * z) + z)/lm.sigma
-      case lm: LogisticModel =>
-        colMultiply(z, lm.sigma).toDense - lm.xsInfoInv * (lm.xs.t * colMultiply(z, lm.variance))
-    }
+    val z: CM[Double] = geno
+    val nm = nullModel
+    val sigma = sqrt(nm.b)
+    val xsInfoInv = (nm.xs(::, *) :* sigma) * nm.invInfo * nm.a
+    (- xsInfoInv * (nm.xs.t * colMultiply(z, nm.b)) + z) / sqrt(nm.a)
   }
 
   def paramOpt: Option[Parameters]
@@ -388,48 +356,104 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
 
   def df = param.df
 
-  lazy val scoreTest = ScoreTest(nullModel.STNullModel, geno)
+  lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
 
   lazy val score = scoreTest.score
-
-  lazy val scoreSigma = symMatrixSqrt(scoreTest.variance)
 
   lazy val kernels: Array[DM[Double]] = {
     val i = DM.eye[Double](numVars)
     val o = DM.ones[Double](numVars, numVars)
-    rhos.map(r => diag(weight) * ((1 - r) * i + r * o) * diag(weight))
+    rhos.map(r => (1 - r) * i + r * o)
   }
+
+  lazy val LTs: Array[DM[Double]] = kernels.map(x => cholesky(x))
+
 
   lazy val qScores: Array[Double] = kernels.map(k => score.t * k * score)
 
-  lazy val vcs = kernels.map(k => scoreSigma * k * scoreSigma)
+  lazy val P0Z = P0SqrtZ.t * P0SqrtZ
 
-  lazy val lambdaUsOpt: (Option[Array[DV[Double]]], Option[Array[DM[Double]]]) = {
-    val res = vcs.map(v => SKAT.getLambdaU(v))
-    if (res.exists(_._1.isEmpty)) {
-      (None, None)
-    } else {
-      (Some(res.map(_._1.get)), Some(res.map(_._2.get)))
-    }
+  lazy val vcs = LTs.map(lt => lt.t * P0Z * lt)
+  /**
+  lazy val vcs2 = kernels.map{k =>
+    ScoreTest(nullModel.STNullModel, geno * cholesky(k).t).variance
   }
 
-  lazy val (lambdas, us) = (lambdaUsOpt._1.get, lambdaUsOpt._2.get)
+  lazy val lambdas2 = vcs2.map(vc =>
+    eigSym.justEigenvalues(vc)
+  )
+  */
+  def isDefined: Boolean
 
   def pValues: Array[Double]
 
   def pMin = min(pValues)
 
+  def lambdas: Array[DV[Double]]
+
   def pMinQuantiles: Array[Double]
 
-  def pValue: Option[Double]
-
-  def result = {
-    val vs = x.getRare().get.vars
-    paramOpt match {
-      case None => AssocMethod.AnalyticResult(vs, -1.0, None)
-      case Some(_) => AssocMethod.AnalyticResult(vs, pMin, pValue)
+  def result: AssocMethod.SKATOResult = {
+    if (isDefined) {
+      try {
+        val res = Integrate(integrand, 0.0, 40.0, 1e-25, 1e-4, 200)
+        val info = s"pvalues=${pValues.mkString(",")};abserr=${res.abserr};ier=${res.iEr};nsub=${res.nSub};neval=${res.nEval}"
+        AssocMethod.SKATOResult(x.vars, Some(pMin), Some(1 - res.value), info)
+      } catch {
+        case e: Exception =>
+          val info = s"InegrationError;pvalues=${pValues.mkString(",")}"
+          AssocMethod.SKATOResult(x.vars, Some(pMin), None, info)
+      }
+    } else {
+      AssocMethod.SKATOResult(x.vars, None, None, "failed to get the p values")
     }
-
   }
+
+  /**
+    * help variables for the integrand function
+    * basically
+    *
+    * */
+  //lazy val term1 = new ChiSquared(df)
+  //lazy val term2 = new ChiSquared(1)
+  //lazy val tauDV = DV(param.taus)
+  //lazy val pmqDV = DV(pMinQuantiles)
+  //lazy val rDV = DV(rhos.map(1.0 - _))
+  lazy val tauDM = tile(DV(param.taus), 1, GKSize)
+  lazy val pmqDM = tile(DV(pMinQuantiles), 1, GKSize)
+  lazy val rhoDM = tile(DV(rhos.map(1.0 - _)), 1, GKSize)
+
+  def df1pdf(x: DV[Double]): DV[Double] = {
+    (pow(x, -0.5) :* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
+  }
+
+  def dfcdf(x: DV[Double]): DV[Double] = {
+    try {
+      gammp(df/2, x/2.0)
+    } catch {
+      case e: Exception =>
+        val xs = x.toArray.mkString(",")
+        println(s"error: param: ${param.toString}")
+        DV[Double](s"param: ${param.toString}".toDouble)
+    }
+  }
+
+  def integrand(x: DV[Double]): DV[Double]
+
+  /** adaptive pvalue
+    * use the quadpack QAGS now
+  def pValue: Option[Double] = {
+    if (isDefined) {
+      val res = Integrate(integrand, 0.0, 40.0, 1e-25, 1e-6, 200)
+      if (res.iEr == 0) {
+        Some(1.0 - res.value)
+      } else {
+        None
+      }
+    } else {
+      None
+    }
+  }
+    */
 
 }

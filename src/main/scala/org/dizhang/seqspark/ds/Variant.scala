@@ -1,8 +1,24 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.ds
 
 import org.dizhang.seqspark.util.UserConfig.MutType
 
-import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 /**
@@ -136,6 +152,7 @@ abstract class Variant[A: Genotype] extends Serializable {
   def denseSize: Int
   def length: Int = size
 
+  private def gt = implicitly[Genotype[A]]
   def chr: String = meta(0)
   def pos: String = meta(1)
   def id: String = meta(2)
@@ -152,8 +169,8 @@ abstract class Variant[A: Genotype] extends Serializable {
 
   def mutType: MutType.Value = Variant.mutType(ref, alt)
 
-  def geno(implicit make: A => String): IndexedSeq[String] =
-    Variant.toIndexedSeq(this.map(g => make(g)))
+  def geno: IndexedSeq[String] =
+    Variant.toIndexedSeq(this.map(g => gt.toVCF(g)))
 
   def map[B: Genotype](f: A => B): Variant[B]
 
@@ -177,7 +194,7 @@ abstract class Variant[A: Genotype] extends Serializable {
 
   def toCounter[B](make: A => B, d: B): Counter[B] = Variant.toCounter(this, make, d)
 
-  def toString(implicit make: A => String) = {
+  override def toString = {
     s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info\t$format\t${geno.mkString('\t'.toString)}"
   }
 
@@ -324,13 +341,38 @@ case class SparseVariant[A: Genotype](var meta: Array[String],
 
   def select(indicator: Array[Boolean]): Variant[A] = {
 
+    val oldMap = elems.toIndexedSeq.sortBy(_._1)
+    if (oldMap.isEmpty) {
+      /** if dense empty, just change the size */
+      Variant.fromMap(meta, elems, default, indicator.count(_ == true))
+    } else {
+      /** new index initial value */
+      var newIdx = (0 until oldMap.head._1).count(i => indicator(i))
+      /** use map builder to hold the result */
+      val builder = new mutable.MapBuilder[Int, A, Map[Int, A]](Map[Int, A]())
+      for (i <- oldMap.indices) {
+        /** include the non-default value if it's in the indicator */
+        if (indicator(oldMap(i)._1))
+          builder.+=(newIdx -> oldMap(i)._2)
+        /** re-compute the new index by adding the number of defaults between two dense values (or the end) */
+        if (i == oldMap.length - 1) {
+          newIdx += (oldMap(i)._1 until length).count(i => indicator(i))
+        } else {
+          newIdx += (oldMap(i)._1 until oldMap(i+1)._1).count(i => indicator(i))
+        }
+      }
+      val newMap = builder.result()
+      Variant.fromMap(meta, newMap, default, newIdx)
+    }
+    /**
+    /** this implementation is problematic */
     /** use recursive function to avoid map key test every time */
     val sortedKeys = elems.keys.toList.sorted
     @tailrec def labelsFunc(cur: Int, keys: List[Int], idx: Int, res: Map[Int, A]): (Map[Int, A], Int) = {
       if (keys == Nil) {
-        val mid = ((cur + 1) until length) count (i => indicator(i))
+        val mid = (cur until length) count (i => indicator(i))
         if (indicator(cur))
-          (res + (idx -> apply (cur)), idx + 1 + mid)
+          (res + (idx -> apply (cur)), idx + mid)
         else
           (res, idx + mid)
       } else {
@@ -353,5 +395,6 @@ case class SparseVariant[A: Genotype](var meta: Array[String],
     }
     val res = labelsFunc(0, sortedKeys, 0, Map[Int, A]())
     Variant.fromMap(meta, res._1, default, res._2)
+    */
   }
 }

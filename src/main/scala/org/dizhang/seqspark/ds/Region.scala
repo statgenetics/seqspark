@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{max, min}
@@ -85,6 +101,14 @@ case class Variation(chr: Byte, start: Int, end: Int,
       case Some(i) => this.info = Some(s"$i;$k=$v")
     }
     this
+  }
+  def parseInfo: Map[String, String] = info match {
+    case None => Map[String, String]()
+    case Some(s) =>
+      s.split(";").map{x =>
+        val is = x.split("=")
+        is(0) -> is(1)
+      }.toMap
   }
 }
 

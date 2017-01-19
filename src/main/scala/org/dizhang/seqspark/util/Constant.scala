@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark.util
 
 import org.dizhang.seqspark.annot.IntervalTree
@@ -10,13 +26,15 @@ import org.dizhang.seqspark.ds.Region
 object Constant {
   object Permutation {
     val alpha = 0.05
+    def max2(sites: Int) =  500 * sites - 25
+    def min2(sites: Int) = if (sites == 1) 34 else 36
     def max(sites: Int) = 2000 * sites - 100
     def min(sites: Int) = sites match {
       case x if x == 1 => 115
       case x if x <= 5 => 120
       case _ => 121
     }
-    val base = 10
+    val base = 2
 
   }
 
@@ -28,7 +46,7 @@ object Constant {
       val mid = "mid"
       val sex = "sex"
       val control = "control"
-      val pcPrefix = "pc"
+      val pcPrefix = "_pc"
       val batch = "batch"
     }
     val delim = "\t"
@@ -135,32 +153,7 @@ object Constant {
       val mis = (0.0, 0.0, 0.0)
       val ref = (1.0, 0.0, 0.0)
     }
-    def rawToSimple(g: String): Byte = {
-      /**
-      """
-        |the simple genotype system uses 5 bits to represent a genotype
-        |b00010000: is diploid
-        |b00001000: is phased, notice that there is no 8, but 24
-        |b00000100: is missing
-        |00-11 represent the four possible genotypes
-      """.stripMargin
-        */
-      val diploidPhased = if (g.contains('|')) {
-        24 //b00011000
-      } else if (g.contains('/')) {
-        16 //b00010000
-      } else {
-        0
-      }
-      val gt = try {
-        g.split("[/|]").map(_.toInt).sum //0-3 for normal genotype
-      } catch {
-        case e: Exception => 4 //b00000100 for missing
-      }
 
-      (diploidPhased | gt).toByte
-
-    }
   }
 
   object Hg19 {

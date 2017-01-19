@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017 Zhang Di
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dizhang.seqspark
 
 import java.io.File
@@ -54,15 +70,25 @@ object SingleStudy {
   def readConf(file: String): RootConfig = {
     val userConfFile = new File(file)
     require(userConfFile.exists())
+
+    ConfigFactory.invalidateCaches()
+    System.setProperty("config.file", file)
+    val userConf = ConfigFactory.load().getConfig("seqspark")
+
+    /**
     val userConf = ConfigFactory
       .parseFile(userConfFile)
       .withFallback(ConfigFactory.load().getConfig("seqspark"))
       .resolve()
-
+    */
     val show = userConf.root().render()
 
-    logger.debug("Conf detail:\n" + show)
     val rootConfig = RootConfig(userConf)
+
+    if (rootConfig.debug) {
+      logger.debug("Conf detail:\n" + show)
+    }
+
     rootConfig
   }
 
@@ -83,7 +109,11 @@ object SingleStudy {
     }
   }
 
+
   def run(cnf: RootConfig) {
+
+
+
     val project = cnf.project
 
     /** Spark configuration */
@@ -102,15 +132,38 @@ object SingleStudy {
 
     implicit val ssc = SingleStudyContext(cnf, sc, ss)
 
+    /**
+    if (cnf.pipeline.isEmpty) {
+      logger.error("no pipeline specified, exit")
+    } else if (cnf.pipeline.length > 2) {
+      logger.error("too many tasks")
+    } else if (cnf.pipeline.length == 1) {
+      if (cnf.pipeline.head == "qualityControl") {
+
+      }
+    }
+    */
+
+
     if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
       val clean = try {
-        val res = sc.objectFile(cnf.project).asInstanceOf[worker.Data[Byte]]
+        val cachePath = cnf.input.genotype.path + s".$project"
+        val res = sc.objectFile(cachePath).asInstanceOf[worker.Data[Byte]].map(identity)
+        res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res
       } catch {
         case e: Exception =>
           logger.info("no cache, compute from start")
-          val res = QualityControl.cleanVCF(Import.fromVCF(ssc))
+          val raw = Import.fromVCF(ssc)
+
+          if (cnf.benchmark) {
+            raw.cache()
+            raw.foreach(_ => Unit)
+            logger.info("VCF imported")
+          }
+
+          val res = QualityControl.cleanVCF(raw)
           res.cache()
           //res.saveAsObjectFile(cnf.project)
           res
@@ -118,7 +171,9 @@ object SingleStudy {
       runAssoc(clean)
     } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
       val clean = try {
-        val res =sc.objectFile(cnf.project).asInstanceOf[worker.Data[(Double, Double, Double)]]
+        val cachePath = cnf.input.genotype.path + s".$project"
+        val res =sc.objectFile(cachePath).asInstanceOf[worker.Data[(Double, Double, Double)]].map(identity)
+        res.cache()
         logger.info(s"read from cache, rec: ${res.count()}")
         res
       } catch {
@@ -152,14 +207,29 @@ object SingleStudy {
     //PropertyConfigurator.configure("log4j.properties")
   }
 
+  /**
+  def runImport[A, B](src: A, ssc: SingleStudyContext)(implicit imp: Import[A, B]): worker.Data[B] = {
+    imp.load(ssc)
+  }
+
+  def runQC[A, B](input: worker.Data[A])(implicit qc: QualityControl[A, B], ssc: SingleStudyContext): worker.Data[B] = {
+    qc.clean(input)
+  }
+*/
   def runAssoc[A: Genotype](input: worker.Data[A])
                            (implicit ssc: SingleStudyContext): Unit = {
-    if (ssc.userConfig.pipeline.length > 1) {
+    if (ssc.userConfig.pipeline.length == 2 || ssc.userConfig.pipeline.head == "association") {
       val assocConf = ssc.userConfig.association
       val methods = assocConf.methodList
       val annotated = if (methods.exists(m =>
         assocConf.method(m).misc.groupBy.contains("gene"))) {
-        annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+        if (input.first().parseInfo.contains(util.Constant.Variant.InfoKey.anno)) {
+          logger.info("functional annotation already done")
+          input
+        } else {
+          logger.info("start functional annotation")
+          annot.linkGeneDB(input)(ssc.userConfig, ssc.sparkContext)
+        }
       } else {
         input
       }

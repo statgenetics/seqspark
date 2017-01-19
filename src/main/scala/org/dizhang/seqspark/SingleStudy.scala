@@ -115,7 +115,7 @@ object SingleStudy {
 
 
     val user = System.getenv("USER")
-    val hdfsHome = s"/user/$user"
+    val hdfsHome = s"hdfs:///user/$user"
 
     val project = cnf.project
 

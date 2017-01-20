@@ -114,6 +114,9 @@ object SingleStudy {
 
 
 
+    val user = System.getenv("USER")
+    val hdfsHome = s"hdfs:///user/$user"
+
     val project = cnf.project
 
     /** Spark configuration */
@@ -121,11 +124,14 @@ object SingleStudy {
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
-    sc.setCheckpointDir(cnf.dbDir + "/checkpoint")
+
+    /** set checkpoint folder to hdfs home*/
+    sc.setCheckpointDir(hdfsHome + "/checkpoint")
 
     val ss: SparkSession = SparkSession
       .builder()
       .appName("SeqSpark Phenotype")
+      .config("spark.sql.warehouse", hdfsHome)
       .getOrCreate()
 
     Phenotype(cnf.input.phenotype.path, "phenotype")(ss)

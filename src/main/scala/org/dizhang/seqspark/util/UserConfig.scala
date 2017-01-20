@@ -185,7 +185,11 @@ object UserConfig {
     val varLimit: (Int, Int) = {
       if (config.hasPath("varLimit")) {
         val res = config.getIntList("varLimit").asScala.toList
-        (res(0), res(1))
+        if (res.isEmpty) {
+          (0, Int.MaxValue)
+        } else {
+          (res(0), res(1))
+        }
       } else
         (0, 2000)
     }

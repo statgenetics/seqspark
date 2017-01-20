@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
+use Cwd 'abs_path';
 
 my $dbmap = {
 	RefSeq => "refFlat_table,refGene_seq",
@@ -26,40 +27,55 @@ sub download_file {
 		print STDERR "$file already exists, skip\n";
 		return;
 	}
-	my $res = system("curl http://seqspark.dizhang.org/$file | hdfs dfs -appendToFile - $dir/$file");
+	my $res = system("curl http://seqspark.statgen.us/$file | hdfs dfs -appendToFile - $dir/$file");
 	if ($res) {
 		print STDERR "Something wrong when downloading $file, exit code: $res\n";
 	}
 }
-
+sub get_path {
+	my $fn = abs_path($0);
+	print "$fn\n";
+	my $conf_dir;
+	if ($fn =~ m#/bin/seqspark-db$#) {
+		$conf_dir = $` . "/conf";
+	}
+	print "$conf_dir\n";
+	open my $fh, "$conf_dir/reference.conf" or die "cannot open $conf_dir/reference.conf: $!\n";
+	while (<$fh>) {
+		if (m/dbDir\s*=\s*(\S+)/) {
+			return $1;
+		}
+	}
+}
 sub main {
 	my $dir = shift;
 	my $list = shift;
 	if (! $dir) {
 		print STDERR "You need to specify the HDFS path to store the databases.\n";
-		&usage;
+		&usage($dir);
 		exit;
 	}
 	! system("hdfs dfs -mkdir -p $dir") or die "Cannot create HDFS path $dir\n";
 	if (! $list) {
 		print STDERR "You need to specify at least one database to download.\n";
-		&usage;
+		&usage($dir);
 		exit;
 	}
+	print "the database files $list will be download to hdfs://$dir\n";
 	my @db = split /,/, $list;
 	for my $db (@db) {
 		if (exists $dbmap->{$db}) {
 			&download_db($dir, $db);
 		} else {
 			print STDERR "Unrecognized database $db\, skip\n";
-			&usage;
+			&usage($dir);
 		}
 	}
 }
 
 sub usage {
-	print STDERR "Usage: seqspark-db hdfs_path db_list
-  hdfs_path:  HDFS path to store the databases. This script will try to create it.
+	my $dir = shift;
+	print STDERR "Usage: seqspark-db db_list
   db_list:    comma separated database names. Existing databases will be skipped.
               If you really want to download them, please mannually delete them first.
                 RefSeq -- Reference Sequence
@@ -67,10 +83,10 @@ sub usage {
                 dbNSFP -- Non-synonymous SNVs and their Functional Predictions
                 ExAC   -- Exome Aggregation Consortium
                 CADD   -- Combined Annotation Dependent Depletion
-  example:    seqspark-db ref dbNSFP,ExAC
+  example:    seqspark-db dbNSFP,ExAC
 ";
 }
-my $dir = shift;
+my $dir = &get_path();
 my $list = shift;
 
 &main($dir, $list);

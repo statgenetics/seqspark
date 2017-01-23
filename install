@@ -27,7 +27,9 @@ unless ($db_dir =~ m#^/#) {
 }
 
 sub build {
-	!system("sbt", "assembly") or die "Failed to build jar: $!\n";
+	print STDERR "Building seqspark ...\n";
+	!system("sbt assembly 2>&1 > build.log") or die "Failed to build jar: $!\n";
+	print STDERR "Finished building seqspark.\n";
 }
 
 sub install {
@@ -56,7 +58,7 @@ sub install {
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
 	##prepare conf
 	open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
-	open my $o_conf, ">$prefix/reference.conf" or die "Failed to open $prefix/reference.conf for write: $!\n";
+	open my $o_conf, ">$prefix/conf/reference.conf" or die "Failed to open $prefix/conf/reference.conf for write: $!\n";
 	while (<$i_conf>) {
 		if (m/dbDir_unset/) {
 			print $o_conf "dbDir = $db_dir\n";
@@ -103,7 +105,7 @@ Options:
 sub main {
 	print STDERR "Going to install seqspark with the following options:
 	--prefix         $prefix
-	--db-dir		 $db_dir\n";	
+	--db-dir         $db_dir\n";	
 	
 	&build;
 	&install;

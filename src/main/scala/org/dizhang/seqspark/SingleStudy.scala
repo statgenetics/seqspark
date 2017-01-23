@@ -145,7 +145,6 @@ object SingleStudy {
       logger.error("too many tasks")
     } else if (cnf.pipeline.length == 1) {
       if (cnf.pipeline.head == "qualityControl") {
-
       }
     }
     */

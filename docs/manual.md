@@ -79,7 +79,6 @@ seqspark {
   	genotype.path = "simulated.vcf.bz2"
   	phenotype.path = "simulated.tsv"
   }
-  qualityControl.genotypes = ["DP >= 8"]
   qualityControl {
     genotypes = ["DP >= 8 and GQ >= 20"]
   }

@@ -76,7 +76,7 @@ object Genotypes {
     } else {
       //val first = self.first()
       val fs = LogicalParser.names(cond)
-
+      logger.info(s"genotype QC criteria: ${LogicalParser.view(cond)}")
       self.map { v =>
         val fm = v.parseFormat.toList
         val phased = Genotype.Raw.isPhased(v(0))

@@ -54,23 +54,30 @@ object QualityControl {
     logger.info("start quality control")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val annotated = linkVariantDB(decompose(input))(conf, sc)
+    //val annotated = linkVariantDB(decompose(input))(conf, sc)
 
     //annotated.cache()
     val sums = ssc.userConfig.qualityControl.summaries
     if (sums.contains("gdgq")) {
-      annotated.checkpoint()
+      input.checkpoint()
       if (conf.benchmark) {
         //annotated.foreach(_ => Unit)
-        logger.info(s"annotated data ready: ${annotated.count()} variants")
+        logger.info(s"raw data: ${input.count()} variants")
       }
-      statGdGq(annotated)(ssc)
+      statGdGq(input)(ssc)
     }
 
+    /** 1. Genotype level QC */
+    val cleaned = genotypeQC(input, conf.qualityControl.genotypes)
 
-    val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
+    /** 2. decompose */
+    val decomposed = decompose(cleaned)
 
-    val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
+    /** 3. link to variant database */
+    val linked = linkVariantDB(decomposed)(conf, sc)
+
+    /** 4. convert to Byte genotype */
+    val simpleVCF: Data[Byte] = toSimpleVCF(linked)
 
     simpleVCF.cache()
     simpleVCF.checkpoint()

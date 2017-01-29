@@ -149,6 +149,8 @@ object Import {
     /** filter variants based on meta information
       * before making the actual genotype data for each sample
       * */
+
+    logger.info(s"using filter: ${LogicalParser.view(filter)}")
     val s1 = raw.filter{l =>
       pass(l)(filter, terms, regions.value)
     }.map(l => Variant.fromString(l, default, noSample = noSample))

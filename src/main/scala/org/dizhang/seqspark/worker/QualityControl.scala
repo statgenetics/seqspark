@@ -69,51 +69,57 @@ object QualityControl {
 
     /** 1. Genotype level QC */
     val cleaned = genotypeQC(input, conf.qualityControl.genotypes)
-
+    if (conf.benchmark) {
+      logger.info(s"genotype QC completed: ${cleaned.count()} variants")
+    }
     /** 2. decompose */
     val decomposed = decompose(cleaned)
-
-    /** 3. link to variant database */
-    val linked = linkVariantDB(decomposed)(conf, sc)
-
-    /** 4. convert to Byte genotype */
-    val simpleVCF: Data[Byte] = toSimpleVCF(linked)
-
-    simpleVCF.cache()
-    simpleVCF.checkpoint()
     if (conf.benchmark) {
-      logger.info(s"genotype QC completed: ${simpleVCF.count()} variants")
+      decomposed.cache()
+      logger.info(s"${decomposed.count()} variants after decomposition")
     }
+
+    /** 3. convert to Byte genotype */
+    val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
+
+    /** 4. Variant level QC */
+    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
+    if (conf.benchmark) {
+      res.cache()
+      logger.info(s"${res.count()} variants after variant level QC")
+    }
+
+    /** 5. link to variant database */
+    val linked = linkVariantDB(res)(conf, sc)
+
+    linked.cache()
+    linked.checkpoint()
+
 
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
 
     if (sums.contains("sexCheck")) {
-      checkSex(simpleVCF)(ssc)
+      checkSex(linked)(ssc)
     }
 
     if (sums.contains("titv")) {
-      titv(simpleVCF)(ssc)
+      titv(linked)(ssc)
     }
 
     if (sums.contains("pca")) {
-      pca(simpleVCF)(ssc)
+      pca(linked)(ssc)
     }
-
-    /** Variant QC */
-    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
-    //annotated.unpersist()
-    //simpleVCF.unpersist()
 
     val geneAnnot = if (sums.contains("annotation")) {
       logger.info("start gene annotation")
-      val tmp = linkGeneDB(res)(conf, sc)
+      val tmp = linkGeneDB(linked)(conf, sc)
       logger.info("finished gene annotation")
       countByFunction(tmp)
       tmp
     } else {
-      res
+      linked
     }
 
     if (conf.qualityControl.save) {
@@ -124,8 +130,6 @@ object QualityControl {
       geneAnnot.cache()
       geneAnnot.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
     }
-
-
 
     geneAnnot
   }

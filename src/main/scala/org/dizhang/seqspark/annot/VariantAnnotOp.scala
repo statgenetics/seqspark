@@ -116,6 +116,10 @@ object VariantAnnotOp {
   def worstAnnotation(value: String): F.Value = {
     if (value == F.InterGenic.toString) {
       F.InterGenic
+    } else if (value == F.CNV.toString) {
+      F.CNV
+    } else if (value == F.Unknown.toString) {
+      F.Unknown
     } else {
       val genes = parseAnnotation(value)
       genes.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b)

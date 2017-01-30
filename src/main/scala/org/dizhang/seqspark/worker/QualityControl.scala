@@ -98,7 +98,6 @@ object QualityControl {
     res.cache()
     res.checkpoint()
 
-
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
@@ -115,7 +114,10 @@ object QualityControl {
       pca(res)(ssc)
     }
 
-    val geneAnnot = if (sums.contains("annotation")) {
+    val geneAssoc = conf.association.methodList.exists(m =>
+      conf.association.method(m).misc.groupBy.head == "gene"
+    )
+    val geneAnnot = if (sums.contains("annotation") || geneAssoc) {
       logger.info("start gene annotation")
       val tmp = linkGeneDB(res)(conf, sc)
       logger.info("finished gene annotation")

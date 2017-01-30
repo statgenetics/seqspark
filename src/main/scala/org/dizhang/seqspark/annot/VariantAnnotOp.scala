@@ -63,7 +63,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
 
     val anno = v.parseInfo(IK.anno)
     val genes =
-      if (anno == F.InterGenic.toString)
+      if (FM(worstAnnotation(anno)) >= FM(F.InterGenic))
         Array[(String, F.Value)]()
       else
         parseAnnotation(v.parseInfo(IK.anno))

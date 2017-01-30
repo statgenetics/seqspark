@@ -158,7 +158,7 @@ object RareMetalWorker {
 
 
   def getMaf(v: Variation): (Int, Int) = {
-    val regex = s"${IK.maf}=(\\d+),(\\d+)".r
+    val regex = s"${IK.mac}=(\\d+),(\\d+)".r
     v.info.get match {
       case regex(ac, an) => (ac.toInt, an.toInt)
       case _ => (0, 0)
@@ -186,7 +186,7 @@ object RareMetalWorker {
     val res = vm1 ++ (for ((v, m) <- vm2) yield if (vm1.contains(v)) v -> cesg.PairInt.op(m, vm1(v)) else v -> m)
     res.map{
       case (v, m) =>
-        v.info = Some(s"${IK.maf}=${m._1},${m._2}")
+        v.info = Some(s"${IK.mac}=${m._1},${m._2}")
         v
     }.toArray.sorted
   }

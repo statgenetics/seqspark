@@ -246,7 +246,7 @@ object Encode {
         val variations = idx.map{ i =>
           val mc = mafCount(i)
           val res = vars(i).toVariation()
-          res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
+          res.addInfo(InfoKey.mac, s"${mc._1},${mc._2}")
         }
         Fixed(dv, variations)
       }
@@ -266,7 +266,7 @@ object Encode {
         val variations = idx.map{ i =>
           val mc = mafCount(i)
           val res = vars(i).toVariation()
-          res.addInfo(InfoKey.maf, s"${mc._1},${mc._2}")
+          res.addInfo(InfoKey.mac, s"${mc._1},${mc._2}")
         }
         Fixed(dv, variations)
       }.getOrElse(DummyFixed)
@@ -437,7 +437,7 @@ abstract class Encode[A: Genotype] extends Serializable {
       case None => Encode.VT(Array(DummyDV), DummyVars)
       case Some((cnt, vs)) =>
         val mf = vs.map{v =>
-          val mc = v.parseInfo(Constant.Variant.InfoKey.maf).split(",")
+          val mc = v.parseInfo(Constant.Variant.InfoKey.mac).split(",")
           val af = mc(0).toDouble/mc(1).toDouble
           if (af < 0.5) af else 1.0 - af
         }
@@ -508,7 +508,7 @@ abstract class Encode[A: Genotype] extends Serializable {
       }
       val vs = for (i <- indices) yield {
         val mc = mafCount(i)
-        vars(i).toVariation().addInfo(Constant.Variant.InfoKey.maf, s"${mc._1.toInt},${mc._2.toInt}")
+        vars(i).toVariation().addInfo(Constant.Variant.InfoKey.mac, s"${mc._1.toInt},${mc._2.toInt}")
       }
       (cnt, vs)
     }

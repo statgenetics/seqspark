@@ -98,72 +98,119 @@ object Variants {
     def geno = implicitly[Genotype[A]]
     def maf(controls: Option[Array[Boolean]]): Double = {
       val cache = v.parseInfo
-      if (cache.contains(InfoKey.maf)) {
-        val res = cache(InfoKey.maf).split(",").map(_.toDouble)
+      if (cache.contains(InfoKey.mac)) {
+        val res = cache(InfoKey.mac).split(",").map(_.toDouble)
         res(0)/res(1)
       } else {
         controls match {
           case None =>
             val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
-            v.addInfo(InfoKey.maf,s"${res._1},${res._2}")
+            v.addInfo(InfoKey.mac,s"${res._1},${res._2}")
             res.ratio
           case Some(indi) =>
             val res = v.select(indi).toCounter(geno.toAAF, (0.0, 2.0)).reduce
-            v.addInfo(InfoKey.maf, s"${res._1},${res._2}")
+            v.addInfo(InfoKey.mac, s"${res._1},${res._2}")
             res.ratio
         }
       }
     }
     def informative: Boolean = {
-      val af = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
-      af._1 != 0.0 && af._1 != af._2
+      if (v.parseInfo.contains(InfoKey.informative)) {
+        v.parseInfo(InfoKey.informative) == "true"
+      } else {
+        val af = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
+        val res = af._1 != 0.0 && af._1 != af._2
+        v.addInfo(InfoKey.informative, res.toString)
+        res
+      }
     }
     def batchMaf(controls: Option[Array[Boolean]],
                  batch: Array[String]): Map[String, Double] = {
-      val keyFunc = (i: Int) => batch(i)
-      val rest = controls match {case None => v; case Some(c) => v.select(c)}
-      val res = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-      res.map{case (k, v) => k -> v.ratio}
+      if (v.parseInfo.contains(InfoKey.batchMaf)) {
+        v.parseInfo(InfoKey.batchMaf).split(",").map{kv =>
+          val s = kv.split("->")
+          s(0) -> s(1).toDouble
+        }.toMap
+      } else {
+        val keyFunc = (i: Int) => batch(i)
+        val rest = controls match {case None => v; case Some(c) => v.select(c)}
+        val cnt = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+        val res = cnt.map{case (k, v) => k -> v.ratio}
+        val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+        v.addInfo(InfoKey.batchMaf, value)
+        res
+      }
     }
     def callRate: Double = {
-      val res = v.toCounter(geno.callRate, (1.0, 1.0)).reduce
-      res.ratio
+      if (v.parseInfo.contains(InfoKey.callRate)) {
+        v.parseInfo(InfoKey.callRate).toDouble
+      } else {
+        val cnt = v.toCounter(geno.callRate, (1.0, 1.0)).reduce
+        val res = cnt.ratio
+        v.addInfo(InfoKey.callRate, res.toString)
+        res
+      }
     }
     def batchCallRate(batch: Array[String]): Map[String, Double] = {
-      val keyFunc = (i: Int) => batch(i)
-      val res = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
-      res.map{case (k, v) => k -> v.ratio}
+      if (v.parseInfo.contains(InfoKey.batchCallRate)) {
+        v.parseInfo(InfoKey.batchCallRate).split(",").map{kv =>
+          val s = kv.split("->")
+          s(0) -> s(1).toDouble
+        }.toMap
+      } else {
+        val keyFunc = (i: Int) => batch(i)
+        val cnt = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
+        val res = cnt.map{case (k, v) => k -> v.ratio}
+        val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+        v.addInfo(InfoKey.batchCallRate, value)
+        res
+      }
     }
     def hwePvalue(controls: Option[Array[Boolean]]): Double = {
-      val rest = controls match {
-        case Some(c) => v.select(c)
-        case None => v
+      if (v.parseInfo.contains(InfoKey.hwePvalue)) {
+        v.parseInfo(InfoKey.hwePvalue).toDouble
+      } else {
+        val rest = controls match {
+          case Some(c) => v.select(c)
+          case None => v
+        }
+        val cnt =  rest.toCounter(geno.toHWE, (1.0, 0.0, 0.0)).reduce
+        val n = cnt._1 + cnt._2 + cnt._3
+        val p = (cnt._1 + cnt._2/2)/n
+        val q = 1 - p
+        val eAA = p.square * n
+        val eAa = 2 * p * q * n
+        val eaa = q.square * n
+        val chisq = (cnt._1 - eAA).square/eAA + (cnt._2 - eAa).square/eAa + (cnt._3 - eaa).square/eaa
+        val dis = ChiSquared(1)
+        val res = 1.0 - dis.cdf(chisq)
+        v.addInfo(InfoKey.hwePvalue, res.toString)
+        res
       }
-      val cnt =  rest.toCounter(geno.toHWE, (1.0, 0.0, 0.0)).reduce
-      val n = cnt._1 + cnt._2 + cnt._3
-      val p = (cnt._1 + cnt._2/2)/n
-      val q = 1 - p
-      val eAA = p.square * n
-      val eAa = 2 * p * q * n
-      val eaa = q.square * n
-      val chisq = (cnt._1 - eAA).square/eAA + (cnt._2 - eAa).square/eAa + (cnt._3 - eaa).square/eaa
-      val dis = ChiSquared(1)
-      1.0 - dis.cdf(chisq)
     }
 
     def batchSpecific(batch: Array[String]): Map[String, Double] = {
-      if (v.parseInfo.contains("dbSNP")) {
-        batch.map(b => b -> 0.0).toMap
+      if (v.parseInfo.contains(InfoKey.batchSpecific)) {
+        v.parseInfo(InfoKey.batchSpecific).split(",").map{kv =>
+          val s = kv.split("->")
+          s(0) -> s(1).toDouble
+        }.toMap
       } else {
-        val keyFunc = (i: Int) => batch(i)
-        val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-        res.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+        if (v.parseInfo.contains("dbSNP")) {
+          batch.map(b => b -> 0.0).toMap
+        } else {
+          val keyFunc = (i: Int) => batch(i)
+          val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
+          val res = cnt.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
+          val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+          v.addInfo(InfoKey.batchSpecific, value)
+          res
+        }
       }
     }
 
     def isFunctional: Int = {
       val info = v.parseInfo
-
       if (info.contains(IK.anno) && FM(worstAnnotation(info(IK.anno))) < FM(F.InterGenic)) {
         val genes = parseAnnotation(v.parseInfo(IK.anno))
         if (genes.exists(p => FM(p._2) <= 4)) 1 else 0

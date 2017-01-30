@@ -54,22 +54,26 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
       * */
     //val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
 
-    val variation = v.toVariation()
-
-    val anno = v.parseInfo(IK.anno)
-    val genes =
-      if (anno == F.InterGenic.toString)
-        Array[(String, F.Value)]()
-      else
-        parseAnnotation(v.parseInfo(IK.anno))
-
-    val res = if (onlyFunctional) {
-      genes.filter(p => FM(p._2) <= 4)
+    if (! v.alt.matches("""[ACTG]+""")) {
+      Array[(String, Variant[A])]()
     } else {
-      genes
-    }
-    res.map{
-      case (g, _) => g -> v.copy
+      val variation = v.toVariation()
+
+      val anno = v.parseInfo(IK.anno)
+      val genes =
+        if (anno == F.InterGenic.toString)
+          Array[(String, F.Value)]()
+        else
+          parseAnnotation(v.parseInfo(IK.anno))
+
+      val res = if (onlyFunctional) {
+        genes.filter(p => FM(p._2) <= 4)
+      } else {
+        genes
+      }
+      res.map{
+        case (g, _) => g -> v.copy
+      }
     }
   }
 
@@ -99,6 +103,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
 }
 
 object VariantAnnotOp {
+
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
   val Nucleotide = Constant.Annotation.Base

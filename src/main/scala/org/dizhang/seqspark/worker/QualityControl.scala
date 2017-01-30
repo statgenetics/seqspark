@@ -82,18 +82,21 @@ object QualityControl {
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
 
-    /** 4. Variant level QC */
-    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
+    /** 4. link to variant database
+      * the information can be used in variant level QC
+      * */
+    val linked = linkVariantDB(simpleVCF)(conf, sc)
+
+    /** 5. Variant level QC */
+    val res = linked.variants(conf.qualityControl.variants)(ssc)
     if (conf.benchmark) {
       res.cache()
       logger.info(s"${res.count()} variants after variant level QC")
     }
 
-    /** 5. link to variant database */
-    val linked = linkVariantDB(res)(conf, sc)
 
-    linked.cache()
-    linked.checkpoint()
+    res.cache()
+    res.checkpoint()
 
 
     //simpleVCF.checkpoint()
@@ -101,25 +104,25 @@ object QualityControl {
     /** sample QC */
 
     if (sums.contains("sexCheck")) {
-      checkSex(linked)(ssc)
+      checkSex(res)(ssc)
     }
 
     if (sums.contains("titv")) {
-      titv(linked)(ssc)
+      titv(res)(ssc)
     }
 
     if (sums.contains("pca")) {
-      pca(linked)(ssc)
+      pca(res)(ssc)
     }
 
     val geneAnnot = if (sums.contains("annotation")) {
       logger.info("start gene annotation")
-      val tmp = linkGeneDB(linked)(conf, sc)
+      val tmp = linkGeneDB(res)(conf, sc)
       logger.info("finished gene annotation")
       countByFunction(tmp)
       tmp
     } else {
-      linked
+      res
     }
 
     if (conf.qualityControl.save) {

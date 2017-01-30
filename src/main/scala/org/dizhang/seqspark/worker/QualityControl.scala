@@ -114,9 +114,10 @@ object QualityControl {
       pca(res)(ssc)
     }
 
-    val geneAssoc = conf.association.methodList.exists(m =>
-      conf.association.method(m).misc.groupBy.head == "gene"
-    )
+    val geneAssoc = conf.association.methodList.exists { m =>
+      val gb = conf.association.method(m).misc.groupBy
+      gb.nonEmpty && gb.head == "gene"
+    }
     val geneAnnot = if (sums.contains("annotation") || geneAssoc) {
       logger.info("start gene annotation")
       val tmp = linkGeneDB(res)(conf, sc)

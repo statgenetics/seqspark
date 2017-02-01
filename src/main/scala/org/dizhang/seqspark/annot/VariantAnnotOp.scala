@@ -27,24 +27,30 @@ import scala.language.implicitConversions
 @SerialVersionUID(1L)
 class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
   def annotateByVariant(dict: Broadcast[RefGene]): Variant[A] = {
-    val variation = v.toVariation()
 
-    val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
-      dict.value.seq.contains(l.mRNAName)).map{l =>
-      (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
-    annot match {
-      case Nil =>
-        //logger.warn(s"no annotation for variant ${variation.toString}")
-        v.addInfo(IK.anno, F.InterGenic.toString)
-        v
-      case _ =>
-        //val consensus = annot.map(p => (p._1, p._3))
-        //  .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
-        val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
-          .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
-          .mkString(",,")
-        v.addInfo(IK.anno, merge)
-        v
+    if (! v.alt.matches("""[ATCG]+""")) {
+      v.addInfo(IK.anno, F.Unknown.toString)
+      v
+    } else {
+      val variation = v.toVariation()
+
+      val annot = IntervalTree.lookup(dict.value.loci, variation).filter(l =>
+        dict.value.seq.contains(l.mRNAName)).map{l =>
+        (l.geneName, l.mRNAName, l.annotate(variation, dict.value.seq(l.mRNAName)))}
+      annot match {
+        case Nil =>
+          //logger.warn(s"no annotation for variant ${variation.toString}")
+          v.addInfo(IK.anno, F.InterGenic.toString)
+          v
+        case _ =>
+          //val consensus = annot.map(p => (p._1, p._3))
+          //  .reduce((a, b) => if (FM(a._2) < FM(b._2)) a else b)
+          val merge = annot.map(p => (p._1, s"${p._2}:${p._3.toString}")).groupBy(_._1)
+            .map{case (k, value) => "%s::%s".format(k, value.map(x => x._2).mkString(","))}
+            .mkString(",,")
+          v.addInfo(IK.anno, merge)
+          v
+      }
     }
   }
 
@@ -52,13 +58,12 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
     /** the argument RefGene is the whole set of all genes involved
       * the output RefGene each represents a single gene
       * */
-    //val point = Region(s"${v.chr}:${v.pos}-${v.pos.toInt + 1}").asInstanceOf[Single]
 
     val variation = v.toVariation()
 
     val anno = v.parseInfo(IK.anno)
     val genes =
-      if (anno == F.InterGenic.toString)
+      if (FM(worstAnnotation(anno)) >= FM(F.InterGenic))
         Array[(String, F.Value)]()
       else
         parseAnnotation(v.parseInfo(IK.anno))
@@ -99,6 +104,7 @@ class VariantAnnotOp[A](val v: Variant[A]) extends Serializable {
 }
 
 object VariantAnnotOp {
+
   val F = Constant.Annotation.Feature
   val FM = F.values.zipWithIndex.toMap
   val Nucleotide = Constant.Annotation.Base
@@ -110,6 +116,10 @@ object VariantAnnotOp {
   def worstAnnotation(value: String): F.Value = {
     if (value == F.InterGenic.toString) {
       F.InterGenic
+    } else if (value == F.CNV.toString) {
+      F.CNV
+    } else if (value == F.Unknown.toString) {
+      F.Unknown
     } else {
       val genes = parseAnnotation(value)
       genes.map(_._2).reduce((a, b) => if (FM(a) < FM(b)) a else b)

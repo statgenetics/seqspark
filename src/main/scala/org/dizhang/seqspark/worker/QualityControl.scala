@@ -54,52 +54,71 @@ object QualityControl {
     logger.info("start quality control")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val annotated = linkVariantDB(decompose(input))(conf, sc)
+    //val annotated = linkVariantDB(decompose(input))(conf, sc)
 
     //annotated.cache()
     val sums = ssc.userConfig.qualityControl.summaries
     if (sums.contains("gdgq")) {
-      annotated.checkpoint()
+      input.checkpoint()
       if (conf.benchmark) {
         //annotated.foreach(_ => Unit)
-        logger.info(s"annotated data ready: ${annotated.count()} variants")
+        logger.info(s"raw data: ${input.count()} variants")
       }
-      statGdGq(annotated)(ssc)
+      statGdGq(input)(ssc)
     }
 
-
-    val cleaned = genotypeQC(annotated, conf.qualityControl.genotypes)
-
-    val simpleVCF: Data[Byte] = toSimpleVCF(cleaned)
-
-    simpleVCF.cache()
-    simpleVCF.checkpoint()
+    /** 1. Genotype level QC */
+    val cleaned = genotypeQC(input, conf.qualityControl.genotypes)
     if (conf.benchmark) {
-      logger.info(s"genotype QC completed: ${simpleVCF.count()} variants")
+      logger.info(s"genotype QC completed: ${cleaned.count()} variants")
     }
+    /** 2. decompose */
+    val decomposed = decompose(cleaned)
+    if (conf.benchmark) {
+      decomposed.cache()
+      logger.info(s"${decomposed.count()} variants after decomposition")
+    }
+
+    /** 3. convert to Byte genotype */
+    val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
+
+    /** 4. link to variant database
+      * the information can be used in variant level QC
+      * */
+    val linked = linkVariantDB(simpleVCF)(conf, sc)
+
+    /** 5. Variant level QC */
+    val res = linked.variants(conf.qualityControl.variants)(ssc)
+    if (conf.benchmark) {
+      res.cache()
+      logger.info(s"${res.count()} variants after variant level QC")
+    }
+
+
+    res.cache()
+    res.checkpoint()
 
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)
     /** sample QC */
 
     if (sums.contains("sexCheck")) {
-      checkSex(simpleVCF)(ssc)
+      checkSex(res)(ssc)
     }
 
     if (sums.contains("titv")) {
-      titv(simpleVCF)(ssc)
+      titv(res)(ssc)
     }
 
     if (sums.contains("pca")) {
-      pca(simpleVCF)(ssc)
+      pca(res)(ssc)
     }
 
-    /** Variant QC */
-    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
-    //annotated.unpersist()
-    //simpleVCF.unpersist()
-
-    val geneAnnot = if (sums.contains("annotation")) {
+    val geneAssoc = conf.association.methodList.exists { m =>
+      val gb = conf.association.method(m).misc.groupBy
+      gb.nonEmpty && gb.head == "gene"
+    }
+    val geneAnnot = if (sums.contains("annotation") || geneAssoc) {
       logger.info("start gene annotation")
       val tmp = linkGeneDB(res)(conf, sc)
       logger.info("finished gene annotation")
@@ -117,8 +136,6 @@ object QualityControl {
       geneAnnot.cache()
       geneAnnot.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
     }
-
-
 
     geneAnnot
   }

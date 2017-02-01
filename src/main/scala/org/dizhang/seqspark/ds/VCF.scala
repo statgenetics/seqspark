@@ -84,44 +84,34 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
           case "chr" => "chr" -> v.chr
           case "maf" =>
             val maf = v.maf(ctrlInd).toString
-            v.addInfo("SS_maf", maf)
             "maf" -> maf
           case "informative" =>
             if (v.informative) {
-              v.addInfo("SS_informative", "true")
               "informative" -> "1"
             } else {
-              v.addInfo("SS_informative", "false")
               "notInformative" -> "1"
             }
           //case "batchMaf" => "batchMaf" -> v.batchMaf(ctrlInd, batch).values.min.toString
           case "missingRate" =>
             val mr = (1 - v.callRate).toString
-            v.addInfo("SS_missingRate", mr)
             "missingRate" -> mr
           case "batchMissingRate" =>
             val bmr = (1 - v.batchCallRate(batch).values.min).toString
-            v.addInfo("SS_minBatchMissingRate", bmr)
             "batchMissingRate" -> bmr
           case "alleleNum" =>
             val an = v.alleleNum.toString
-            v.addInfo("SS_alleleNum", an)
             "alleleNum" -> an
           case "batchSpecific" =>
             val bs = v.batchSpecific(batch).values.max.toString
-            v.addInfo("SS_batchSpecific", bs)
             "batchSpecific" -> bs
           case "hwePvalue" =>
             val hwe = v.hwePvalue(ctrlInd).toString
-            v.addInfo("SS_hwePvalue", hwe)
             "hwePvalue" -> hwe
           case "isFunctional" =>
             val func = v.isFunctional.toString
-            v.addInfo("isFunctional", func)
             "isFunctional" -> func
           case x =>
             val other = v.parseInfo.getOrElse(x, "0")
-            v.addInfo(s"SS_${x}", other)
             x -> other
         }.toMap
         LogicalParser.eval(cond)(varMap)

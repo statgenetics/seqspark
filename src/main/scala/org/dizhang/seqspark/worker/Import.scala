@@ -52,7 +52,7 @@ object Import {
   implicit object CachedVCF extends Import[CacheVCF.type , Byte] {
     def load(ssc: SingleStudyContext): Data[Byte] = {
       val path = ssc.userConfig.input.genotype.path + ".cache"
-      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Byte]]
+      ssc.sparkContext.objectFile(path, ssc.userConfig.partitions).asInstanceOf[Data[Byte]]
     }
   }
 
@@ -65,7 +65,7 @@ object Import {
   implicit object CachedImputed extends Import[CachedImpute2.type , Imp] {
     def load(ssc: SingleStudyContext): Data[Imp] = {
       val path = ssc.userConfig.input.genotype.path + ".cache"
-      ssc.sparkContext.objectFile(path, ssc.userConfig.jobs).asInstanceOf[Data[Imp]]
+      ssc.sparkContext.objectFile(path, ssc.userConfig.partitions).asInstanceOf[Data[Imp]]
     }
   }
 
@@ -126,7 +126,7 @@ object Import {
     }
     val filter = imConf.filters
     val terms = LogicalParser.names(filter)
-    val raw = sc.textFile(imConf.path, conf.jobs)
+    val raw = sc.textFile(imConf.path, conf.partitions)
     val default = "0/0"
     /** prepare a regions tree to filter variants */
     val regions = sc.broadcast(imConf.variants match {
@@ -149,6 +149,8 @@ object Import {
     /** filter variants based on meta information
       * before making the actual genotype data for each sample
       * */
+
+    logger.info(s"using filter: ${LogicalParser.view(filter)}")
     val s1 = raw.filter{l =>
       pass(l)(filter, terms, regions.value)
     }.map(l => Variant.fromString(l, default, noSample = noSample))
@@ -178,7 +180,7 @@ object Import {
     val imputedFile = imConf.genotype.path
     val imputedInfoFile = imConf.genotype.path + "_info"
     val default = (1.0, 0.0, 0.0)
-    val imputedGeno = sc.textFile(imputedFile, conf.jobs).map{l =>
+    val imputedGeno = sc.textFile(imputedFile, conf.partitions).map{ l =>
       val v = Variant.fromImpute2(l, default)
       (v.toRegion, v)
     }

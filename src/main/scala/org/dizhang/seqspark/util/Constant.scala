@@ -56,13 +56,21 @@ object Constant {
 
   object Variant {
     object InfoKey {
-      val maf = "SS_MAF"
+      val mac = "SS_MAC"
       val mafAll = "SS_MAF_ALL"
       val mafCtrl = "SS_MAF_CTRL"
       val weight = "SS_WEIGHT"
       val gene = "SS_GENE"
       val func = "SS_FUNC"
       val anno = "SS_ANNO"
+      val informative = "SS_informative"
+      val maf = "SS_MAF"
+      val batchMaf = "SS_batchMAF"
+      val callRate = "SS_callRate"
+      val batchCallRate = "SS_batchCallRate"
+      val hwePvalue = "SS_hwePvalue"
+      val isFunctional = "SS_isFunctional"
+      val batchSpecific = "SS_batchSpecific"
     }
   }
 

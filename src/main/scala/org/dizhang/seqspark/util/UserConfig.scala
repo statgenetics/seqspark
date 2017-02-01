@@ -92,7 +92,7 @@ object UserConfig {
     val outDir = localDir + "/output"
     val dbDir = config.getString("dbDir")
     val pipeline = config.getStringList("pipeline").asScala.toList
-    val jobs = config.getInt("jobs")
+    val partitions = config.getInt("partitions")
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
 

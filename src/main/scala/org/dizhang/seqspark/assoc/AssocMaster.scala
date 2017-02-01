@@ -131,7 +131,7 @@ object AssocMaster {
     logger.info("start permutation test")
     val nm = sc.broadcast(HypoTest.NullModel(y, cov, fit = true, binaryTrait).asInstanceOf[HypoTest.NullModel.Fitted])
     logger.info("get the reference statistics first")
-    val jobs = conf.jobs
+    val jobs = conf.partitions
     val asymptoticRes = asymptoticTest(codings, y, cov, binaryTrait, config).collect().toMap
     val asymptoticStatistic = sc.broadcast(asymptoticRes.map(p => p._1 -> p._2.statistic))
     val intR = """(\d+)""".r
@@ -329,7 +329,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val permutation = methodConfig.resampling
     val clean = if (permutation) {
       codings.sortBy(p => p._2.size, ascending = false)
-        .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.jobs)).map(_._2)
+        .zipWithIndex().map(_.swap).partitionBy(new Balancer(cnf.partitions)).map(_._2)
     } else {
       codings
     }

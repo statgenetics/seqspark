@@ -347,7 +347,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     val nm = nullModel
     val sigma = sqrt(nm.b)
     val xsInfoInv = (nm.xs(::, *) :* sigma) * nm.invInfo * nm.a
-    (- xsInfoInv * (nm.xs.t * colMultiply(z, nm.b)) + z) / sqrt(nm.a)
+    (- xsInfoInv * (nm.xs.t * colMultiply(z, nm.b)) + colMultiply(z, sigma)) / sqrt(nm.a)
   }
 
   def paramOpt: Option[Parameters]

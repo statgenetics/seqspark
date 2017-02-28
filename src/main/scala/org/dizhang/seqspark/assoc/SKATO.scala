@@ -374,6 +374,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val P0Z = P0SqrtZ.t * P0SqrtZ
 
   lazy val vcs = LTs.map(lt => lt.t * P0Z * lt)
+
   /**
   lazy val vcs2 = kernels.map{k =>
     ScoreTest(nullModel.STNullModel, geno * cholesky(k).t).variance
@@ -383,6 +384,7 @@ trait SKATO extends AssocMethod with AssocMethod.AnalyticTest {
     eigSym.justEigenvalues(vc)
   )
   */
+
   def isDefined: Boolean
 
   def pValues: Array[Double]

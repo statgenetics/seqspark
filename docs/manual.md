@@ -79,7 +79,6 @@ seqspark {
   	genotype.path = "simulated.vcf.bz2"
   	phenotype.path = "simulated.tsv"
   }
-  qualityControl.genotypes = ["DP >= 8"]
   qualityControl {
     genotypes = ["DP >= 8 and GQ >= 20"]
   }
@@ -577,7 +576,7 @@ dolores@cluster demo$ seqspark MetaAnalysis meta.conf
 
 ##Appendices
 
-### A.1. Settting-up Spark on a workstation
+### A.1. Setting-up Spark on a workstation
 
 **0. preparation**
 

@@ -59,7 +59,7 @@ object QualityControl {
     //annotated.cache()
     val sums = ssc.userConfig.qualityControl.summaries
     if (sums.contains("gdgq")) {
-      input.checkpoint()
+      //input.checkpoint()
       if (conf.benchmark) {
         //annotated.foreach(_ => Unit)
         logger.info(s"raw data: ${input.count()} variants")

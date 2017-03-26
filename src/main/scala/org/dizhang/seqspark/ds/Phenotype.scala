@@ -165,10 +165,12 @@ trait Phenotype {
       val res = cov.zip(limits).map{
         case (c, limit) =>
           val raw = this.select(c).zip(indicator).filter(_._2).map(_._1)
-          winsorize(raw, limit)
+          val v = winsorize(raw, limit)
+          if (v.isEmpty) logger.warn(s"$c not available")
+          v
       }
-      if (res.forall(_.isDefined)) {
-        val scaled = DV.horzcat(res.map{x =>
+      if (res.exists(_.isDefined)) {
+        val scaled = DV.horzcat(res.filter(_.isDefined).map{x =>
           val u = DV(x.get)
           (u - mean(u))/stddev(u)
         }: _*)

@@ -138,9 +138,9 @@ object Samples {
     ).reduce((a, b) => (a._1 + b._1, a._2 + b._2))
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       if (v.isTi) {
-        v.toCounter(g => (1.0, 0.0), (0.0, 0.0))
+        v.toCounter(g => if (geno.isMis(g) || geno.isRef(g)) (0.0, 0.0) else (1.0, 0.0), (0.0, 0.0))
       } else {
-        v.toCounter(g => (0.0, 1.0), (0.0, 0.0))
+        v.toCounter(g => if (geno.isMis(g) || geno.isRef(g)) (0.0, 0.0) else (0.0, 1.0), (0.0, 0.0))
       }
     }.reduce((a, b) => a ++ b)
     val pheno = Phenotype("phenotype")(ssc.sparkSession)

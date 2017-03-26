@@ -163,7 +163,7 @@ object SingleStudy {
           val raw = Import.fromVCF(ssc)
 
           if (cnf.benchmark) {
-            raw.cache()
+            //raw.cache()
             raw.foreach(_ => Unit)
             logger.info("VCF imported")
           }

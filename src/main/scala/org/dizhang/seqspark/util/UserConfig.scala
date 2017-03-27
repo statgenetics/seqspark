@@ -95,6 +95,7 @@ object UserConfig {
     val partitions = config.getInt("partitions")
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
+    val cache = config.getBoolean("cache")
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
@@ -119,6 +120,7 @@ object UserConfig {
 
     val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
+    val decompose: Boolean = config.getBoolean("decompose")
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
 
     val samples: Either[Samples.Value, String] = {

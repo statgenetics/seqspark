@@ -164,13 +164,13 @@ object SingleStudy {
 
           if (cnf.benchmark) {
             //raw.cache()
-            raw.checkpoint()
+            //raw.checkpoint()
             //raw.foreach(_ => Unit)
             logger.info(s" ${raw.count()} variants from VCF imported")
           }
 
           val res = QualityControl.cleanVCF(raw)
-          res.cache()
+          if (cnf.cache) res.cache()
           //res.saveAsObjectFile(cnf.project)
           res
       }

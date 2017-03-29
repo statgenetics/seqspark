@@ -86,12 +86,15 @@ object QualityControl {
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
 
-    /** 4. link to variant database
+    /** 4. impute missing genotype */
+    val imputed: Data[Byte] = imputeMis(simpleVCF)(conf)
+
+    /** 5. link to variant database
       * the information can be used in variant level QC
       * */
-    val linked = linkVariantDB(simpleVCF)(conf, sc)
+    val linked = linkVariantDB(imputed)(conf, sc)
 
-    /** 5. Variant level QC */
+    /** 6. Variant level QC */
     val res = linked.variants(conf.qualityControl.variants)(ssc)
     if (conf.benchmark) {
       res.cache()

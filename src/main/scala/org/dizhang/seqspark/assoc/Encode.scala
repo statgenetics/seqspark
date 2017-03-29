@@ -277,14 +277,10 @@ object Encode {
     lazy val mafCount = vars.map(v => v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce)
 
     lazy val maf = {
-      val trueMaf = config.maf.getString("source") match {
+      config.maf.getString("source") match {
         case "pooled" => mafCount.map(_.ratio)
         case key =>
           vars.map(v => v.parseInfo(key).toDouble)
-      }
-      config.misc.impute match {
-        case ImputeMethod.bestGuess => trueMaf.map(x => if (x < 0.5) 0.0 else 1.0)
-        case _ => trueMaf
       }
     }
   }
@@ -292,13 +288,8 @@ object Encode {
   sealed trait ControlsMaf[A] extends Encode[A] {
     def controls: Array[Boolean]
     lazy val mafCount = vars.map(v => v.select(controls).toCounter(genotype.toAAF, (0.0, 2.0)).reduce)
-    lazy val maf = {
-      val trueMaf = mafCount.map(_.ratio)
-      config.misc.impute match {
-        case ImputeMethod.bestGuess => trueMaf.map(x => if (x < 0.5) 0.0 else 1.0)
-        case _ => trueMaf
-      }
-    }
+    lazy val maf = mafCount.map(_.ratio)
+
   }
 
   sealed trait SimpleWeight[A] extends BRV[A] {

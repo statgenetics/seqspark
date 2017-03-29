@@ -89,6 +89,7 @@ object UserConfig {
     val bestGuess = Value("bestGuess")
     val meanDosage = Value("meanDosage")
     val random = Value("random")
+    val no = Value("no")
   }
 
   case class RootConfig(config: Config) extends UserConfig {
@@ -128,6 +129,8 @@ object UserConfig {
 
     val decompose: Boolean = config.getBoolean("decompose")
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+
+    val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
     val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {

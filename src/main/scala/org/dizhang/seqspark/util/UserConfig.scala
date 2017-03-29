@@ -85,6 +85,12 @@ object UserConfig {
     val wald = Value("wald")
   }
 
+  object ImputeMethod extends Enumeration {
+    val bestGuess = Value("bestGuess")
+    val meanDosage = Value("meanDosage")
+    val random = Value("random")
+  }
+
   case class RootConfig(config: Config) extends UserConfig {
 
     val project = config.getString("project")
@@ -184,6 +190,7 @@ object UserConfig {
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
+    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
     val varLimit: (Int, Int) = {
       if (config.hasPath("varLimit")) {
         val res = config.getIntList("varLimit").asScala.toList

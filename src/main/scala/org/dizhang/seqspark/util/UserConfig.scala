@@ -109,6 +109,7 @@ object UserConfig {
     val input = InputConfig(config.getConfig("input"))
     val annotation = AnnotationConfig(config.getConfig("annotation"))
     val association = AssociationConfig(config.getConfig("association"))
+    val meta = MetaConfig(config.getConfig("meta"))
   }
 
   case class InputConfig(config: Config) extends UserConfig {
@@ -289,14 +290,19 @@ object UserConfig {
   }
 
   case class MetaConfig(config: Config) extends UserConfig {
-    def project = config.getString("project")
-    def localDir = config.getString("localDir")
-    def dbDir = config.getString("dbDir")
-    def studies = config.getStringList("studies").asScala.toArray
-    def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
-    def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
-    def method(name: String) = MetaConfig(config.getConfig(s"method.$name"))
+    def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
+    def studyList = config.getStringList("study.list").asScala.toArray
+    def study(name: String) = StudyConfig(config.getConfig(s"study.$name"))
+    def conditional = if (config.hasPath("conditional")) {
+      config.getStringList("conditional").asScala.toArray
+    } else {
+      Array[String]()
+    }
+  }
+
+  case class StudyConfig(config: Config) extends UserConfig {
+    def path: String = config.getString("path")
   }
 
 }

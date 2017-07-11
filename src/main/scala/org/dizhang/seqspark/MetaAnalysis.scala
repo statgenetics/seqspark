@@ -18,8 +18,11 @@ package org.dizhang.seqspark
 
 import java.io.File
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.dizhang.seqspark.ds.{Bed, Counter}
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.{Logger, LoggerFactory}
 /**
@@ -28,25 +31,30 @@ import org.slf4j.{Logger, LoggerFactory}
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def meta(args: Array[String]): Unit = {
+  def meta(rootConf: RootConfig): Unit = {
+    val user = System.getenv("USER")
+    val hdfsHome = s"hdfs:///user/$user"
 
-    if (badArgs(args)) {
-      logger.error(s"bad arguments format: '${args.mkString(" ")}'")
-      System.exit(1)
-    }
+    val project = rootConf.project
 
-    val userConfFile = new File(args(0))
-    val userConf = ConfigFactory
-      .parseFile(userConfFile)
-      .withFallback(ConfigFactory.load().getConfig("meta"))
-      .resolve()
+    /** Spark configuration */
+    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
+    scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    //scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
+    val sc: SparkContext = new SparkContext(scConf)
 
-    implicit val rootConf = RootConfig(userConf)
-    main
+    /** set checkpoint folder to hdfs home*/
+    sc.setCheckpointDir(hdfsHome + "/checkpoint")
+
+
   }
 
-  def main(implicit rootConf: RootConfig): Unit = {
+  def main(args: Array[String]): Unit = {
     logger.info("meta-analysis not available in this distribution, please update to the lastest version using 'git pull'")
+
+    val rootConf = SingleStudy.readConf(args(0))
+
+    meta(rootConf)
     //logger.info("start meta analysis")
     //logger.info("end meta analysis")
   }

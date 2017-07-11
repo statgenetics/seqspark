@@ -17,17 +17,15 @@
 package org.dizhang.seqspark.ds
 
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.assoc.RareMetalWorker
-import org.dizhang.seqspark.ds.SummaryStatistic._
+import org.dizhang.seqspark.assoc.SumStat
+import scala.language.implicitConversions
 
 /**
   * for rare metal
   */
-trait SummaryStatistic {
+class SummaryStatistic(val statistic: RDD[SumStat.RMWResult]) {
 
-  def `trait`: String
-  def statistic: RDD[RareMetalWorker.DefaultRMWResult]
-  def ++(that: SummaryStatistic): SummaryStatistic = {
+  def add(that: SummaryStatistic): SummaryStatistic = {
     val p1 = this.statistic.map(r => (r.segmentId, r))
     val p2 = that.statistic.map(r => (r.segmentId, r))
     val sum = p1.fullOuterJoin(p2).map{
@@ -36,22 +34,16 @@ trait SummaryStatistic {
       case (k, (None, Some(b))) => b
     }
 
-    DefaultStatistics(`trait`, sum.asInstanceOf[RDD[RareMetalWorker.DefaultRMWResult]])
+    new SummaryStatistic(sum)
 
   }
 
 }
 object SummaryStatistic {
 
-  def merge(s1: RDD[(Int, RareMetalWorker.RMWResult)],
-            s2: RDD[(Int, RareMetalWorker.RMWResult)]): RDD[(Int, RareMetalWorker.RMWResult)] = {
-    s1.join(s2).map{
-      case (k, (r1, r2)) => (k, r1 ++ r2)
-    }
+  implicit def toSummaryStatistic(res: RDD[SumStat.RMWResult]): SummaryStatistic = {
+    new SummaryStatistic(res)
   }
-
-  case class DefaultStatistics(`trait`: String,
-                               statistic: RDD[RareMetalWorker.DefaultRMWResult]) extends SummaryStatistic
 
   
 }

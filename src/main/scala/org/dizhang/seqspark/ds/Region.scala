@@ -71,6 +71,7 @@ trait Region extends Serializable {
     if (! (this < that)) true else false
   }
 }
+
 case class Single(chr: Byte, pos: Int) extends Region {
   val start = pos
   val end = pos + 1
@@ -92,6 +93,10 @@ case class Variation(chr: Byte, start: Int, end: Int,
   }
   def mutType = Variant.mutType(ref, alt)
   override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
+  def toRegion: String = s"$chr:$start-$end[$ref|$alt]"
+
+  //def copy() = Variation(chr, start, end, ref, alt, info)
+
   def ==(that: Variation): Boolean = {
     this.asInstanceOf[Region] == that.asInstanceOf[Region] && this.ref == that.ref && this.alt == that.alt
   }
@@ -147,6 +152,12 @@ object Single {
 
 
 object Region {
+
+  case object Empty extends Region {
+    val chr = 0.toByte
+    val start = 0
+    val end = 0
+  }
 
   implicit def ord[A <: Region] = new Ordering[A] {
     def compare(x: A, y: A): Int = {

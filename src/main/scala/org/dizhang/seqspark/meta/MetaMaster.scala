@@ -143,7 +143,12 @@ object MetaMaster {
     data.map{
       case (g, r) =>
         methodType match {
-          case _ => g -> MetaMethod.Burden(r, weightType).result
+          case MethodType.skat =>
+            val m = methodConf.misc.method
+            val rho = methodConf.misc.rho
+            g -> MetaMethod.SKAT(r, weightType, m, rho).result
+          case _ =>
+            g -> MetaMethod.Burden(r, weightType).result
         }
     }
   }

@@ -110,6 +110,8 @@ object ScoreTest {
     }
   }
 
+  case class Mock(score: DenseVector[Double],
+                  variance: DenseMatrix[Double]) extends ScoreTest
 }
 
 @SerialVersionUID(7778780001L)

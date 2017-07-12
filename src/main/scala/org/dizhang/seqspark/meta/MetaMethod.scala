@@ -16,13 +16,14 @@
 
 package org.dizhang.seqspark.meta
 
-import breeze.linalg.{DenseVector => DV, DenseMatrix => DM}
+import breeze.linalg.{*, DenseVector => DV}
 import breeze.numerics._
 import breeze.stats.distributions._
 import org.dizhang.seqspark.util.UserConfig.WeightMethod
-import org.dizhang.seqspark.assoc.{AssocMethod => AME}
+import org.dizhang.seqspark.assoc.{AssocMethod => AME, SKAT => ASKAT, SKATO => ASKATO}
 import org.dizhang.seqspark.assoc.SumStat.RMWResult
 import org.dizhang.seqspark.ds.Variation
+import org.dizhang.seqspark.stat.ScoreTest
 import org.dizhang.seqspark.util.Constant.Variant
 
 /**
@@ -70,5 +71,17 @@ object MetaMethod {
   }
 
   /** SKAT */
-
+  case class SKAT(data: RMWResult,
+                  weightType: WeightMethod.Value,
+                  numericalMethod: String,
+                  rho: Double) {
+    def result: AME.Result = {
+      val weight = getWeight(data.vars, weightType)
+      val u = weight :* data.score
+      val tmp =  data.variance(::, *) :* weight
+      val v = tmp(*, ::) :* weight
+      val st = ScoreTest.Mock(u, v)
+      ASKAT(st, data.vars, numericalMethod, rho).result
+    }
+  }
 }

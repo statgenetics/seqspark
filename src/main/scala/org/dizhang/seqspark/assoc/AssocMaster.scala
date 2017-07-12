@@ -219,7 +219,7 @@ object AssocMaster {
       case MethodType.skat =>
         val method = config.misc.method
         val rho = config.misc.rho
-        codings.map(p => (p._1, SKAT(nm.value, p._2, method, rho).result))
+        codings.map(p => (p._1, SKAT(nm.value, p._2.asInstanceOf[Encode.Rare], method, rho).result))
       case MethodType.skato =>
         val method = config.misc.method
         codings.map(p => (p._1, SKATO(nm.value, p._2, method).result))

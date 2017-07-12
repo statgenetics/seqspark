@@ -20,6 +20,7 @@ import breeze.linalg.{*, CSCMatrix, cholesky, diag, eigSym, sum, DenseMatrix => 
 import breeze.stats.mean
 import org.apache.spark.SparkContext
 import org.dizhang.seqspark.assoc.SKAT._
+import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.General._
@@ -46,7 +47,7 @@ object SKAT {
   */
 
   def apply(nullModel: NM,
-            x: Encode.Coding,
+            x: Encode.Rare,
             method: String,
             rho: Double): SKAT = {
     val nmf = nullModel match {
@@ -55,15 +56,24 @@ object SKAT {
       case nm: NM.Fitted => nm
     }
 
+    val st = ScoreTest(nmf, x.coding)
+
+    apply(st, x.vars, method, rho)
+  }
+
+  def apply(scoreTest: ScoreTest,
+            vars: Array[Variation],
+            method: String,
+            rho: Double): SKAT = {
     method match {
-      case "liu.mod" => LiuModified(nmf, x.asInstanceOf[Encode.Rare], rho)
-      case "liu" => Liu(nmf, x.asInstanceOf[Encode.Rare], rho)
-      case _ => Davies(nmf, x.asInstanceOf[Encode.Rare], rho)
+      case "liu.mod" => LiuModified(scoreTest, vars, rho)
+      case "liu" => Liu(scoreTest, vars, rho)
+      case _ => Davies(scoreTest, vars, rho)
     }
   }
 
   def apply(nullModel: NM.Fitted,
-            x: Encode.Coding,
+            x: Encode.Rare,
             resampled: DM[Double],
             rho: Double): SKAT = {
     SmallSampleAdjust(nullModel, x.asInstanceOf[Encode.Rare], resampled, rho)
@@ -122,60 +132,58 @@ object SKAT {
       case _ =>
         None
     }
-
-
   }
 
   @SerialVersionUID(7727750101L)
-  final case class Davies(nullModel: NM.Fitted,
-                          x: Encode.Rare,
+  final case class Davies(scoreTest: ScoreTest,
+                          vars: Array[Variation],
                           rho: Double = 0.0) extends SKAT {
 
     def result: AssocMethod.SKATResult = {
       getLambda(vc) match {
         case None =>
-          AssocMethod.SKATResult(x.vars, qScore, None, """method=Davies;failed to compute eigen values""")
+          AssocMethod.SKATResult(vars, qScore, None, """method=Davies;failed to compute eigen values""")
         case Some(l) =>
           val cdf = LCCSDavies.Simple(l).cdf(qScore)
           if (cdf.pvalue >= 1.0 || cdf.pvalue <= 0.0) {
             val liucdf = LCCSLiu.Modified(l).cdf(qScore)
             val info = s"method=Liu.mod;DaviesPvalue=${1.0 - cdf.pvalue}"
-            AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - liucdf.pvalue), info)
+            AssocMethod.SKATResult(vars, qScore, Some(1.0 - liucdf.pvalue), info)
           } else {
             val info = s"method=Davies;ifault=${cdf.ifault};trace=${cdf.trace.map(_.toInt).mkString(",")}"
-            AssocMethod.SKATResult(x.vars, qScore, Some(1.0 - cdf.pvalue), info)
+            AssocMethod.SKATResult(vars, qScore, Some(1.0 - cdf.pvalue), info)
           }
       }
     }
 
   }
   @SerialVersionUID(7727750201L)
-  final case class Liu(nullModel: NM.Fitted,
-                       x: Encode.Rare,
+  final case class Liu(scoreTest: ScoreTest,
+                       vars: Array[Variation],
                        rho: Double = 0.0) extends SKAT {
 
     def result: AssocMethod.SKATResult = {
       val cs = getMoments(vc)
       val cdf = LCCSLiu.SimpleMoments(cs).cdf(qScore)
       if (cdf.ifault == 0)
-        AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "method=Liu;success")
+        AssocMethod.SKATResult(vars, qScore, Some(1 - cdf.pvalue), "method=Liu;success")
       else
-        AssocMethod.SKATResult(x.vars, qScore, None, "method=Liu;fail to get p value")
+        AssocMethod.SKATResult(vars, qScore, None, "method=Liu;fail to get p value")
     }
 
   }
   @SerialVersionUID(7727750301L)
-  final case class LiuModified(nullModel: NM.Fitted,
-                               x: Encode.Rare,
+  final case class LiuModified(scoreTest: ScoreTest,
+                               vars: Array[Variation],
                                rho: Double = 0.0) extends SKAT {
 
     def result: AssocMethod.SKATResult = {
       val cs = getMoments(vc)
       val cdf = LCCSLiu.ModifiedMoments(cs).cdf(qScore)
       if (cdf.ifault == 0)
-        AssocMethod.SKATResult(x.vars, qScore, Some(1 - cdf.pvalue), "method=Liu.mod;success")
+        AssocMethod.SKATResult(vars, qScore, Some(1 - cdf.pvalue), "method=Liu.mod;success")
       else
-        AssocMethod.SKATResult(x.vars, qScore, None, "method=Liu.mod;fail to get p value")
+        AssocMethod.SKATResult(vars, qScore, None, "method=Liu.mod;fail to get p value")
     }
   }
   @SerialVersionUID(7727750401L)
@@ -183,8 +191,11 @@ object SKAT {
                                      x: Encode.Rare,
                                      resampled: DM[Double],
                                      rho: Double = 0.0) extends SKAT {
+
+    val scoreTest = ScoreTest(nullModel, x.coding)
+    val vars = x.vars
     /** resampled is a 10000 x n matrix, storing re-sampled residuals */
-    val simScores = resampled * geno
+    val simScores = resampled * x.coding * L
     val simQs: DV[Double] = simScores(*, ::).map(s => s.t * kernel * s)
 
     def result: AssocMethod.SKATResult = {
@@ -208,10 +219,11 @@ object SKAT {
   * */
 @SerialVersionUID(7727750001L)
 trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
-  def nullModel: NM.Fitted
-  def x: Encode.Rare
+  //def nullModel: NM.Fitted
+  //def x: Encode.Rare
   def rho: Double
 
+  def vars: Array[Variation]
   /**
     * we trust the size is not very large here
     * otherwise, we could not store the matrix in memory
@@ -219,20 +231,24 @@ trait SKAT extends AssocMethod with AssocMethod.AnalyticTest {
     * Moved the weight to the encode module
     * */
   lazy val kernel: DM[Double] = {
-    val size = x.coding.cols
+    val size = scoreTest.score.length
     (1.0 - rho) * DM.eye[Double](size) + rho * DM.ones[Double](size, size)
   }
 
-  def geno = x.coding * cholesky(kernel)
-  lazy val scoreTest: ScoreTest = ScoreTest(nullModel, geno)
+  lazy val L = cholesky(kernel)
 
-  def phi2 = nullModel.a
+  //def geno = x.coding * cholesky(kernel)
+  def scoreTest: ScoreTest //= ScoreTest(nullModel, geno)
+
+  //def phi2 = nullModel.a
 
   def qScore: Double = {
-    scoreTest.score.t * scoreTest.score //* phi2
+    val s = (scoreTest.score.toDenseMatrix * L).toDenseVector
+    s dot s
+    //scoreTest.score.t * scoreTest.score //* phi2
   }
   //lazy val scoreSigma: DM[Double] = symMatrixSqrt(scoreTest.variance)
-  lazy val vc = scoreTest.variance //* phi2 //scoreSigma * kernel * scoreSigma
+  lazy val vc = L.t * scoreTest.variance * L //* phi2 //scoreSigma * kernel * scoreSigma
 
   def result: AssocMethod.SKATResult
 }

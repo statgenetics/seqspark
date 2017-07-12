@@ -37,7 +37,7 @@ trait MetaMethod {
 object MetaMethod {
   val IK = Variant.InfoKey
 
-  /** currently on skat/wss/noWeight are available
+  /** currently skat/wss/noWeight are available
     * */
   def getWeight(vars: Array[Variation], weightType: WeightMethod.Value): DV[Double] = {
     lazy val maf = DV(vars.map{v =>

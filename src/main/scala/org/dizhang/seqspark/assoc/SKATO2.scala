@@ -17,7 +17,7 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.numerics._
-import breeze.linalg.{CSCMatrix => CM, DenseMatrix => DM, DenseVector => DV, _}
+import breeze.linalg.{DenseMatrix => DM, DenseVector => DV, _}
 import breeze.numerics.{lgamma, pow}
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.assoc.SKATO2._
@@ -43,24 +43,38 @@ object SKATO2 {
 
   def apply(nullModel: NM,
             x: Encode.Rare,
-            method: String): SKATO2 = {
+            method: String,
+            rs: Array[Double]): SKATO2 = {
     val nmf = nullModel match {
       case NM.Simple(y, b) => NM.Fit(y, b)
       case NM.Mutiple(y, c, b) => NM.Fit(y, c, b)
       case nm: NM.Fitted => nm
     }
     val st = ScoreTest(nmf, x.coding)
-    apply(st, x.vars, method)
+    apply(st, x.vars, method, rs)
   }
 
   def apply(st: ScoreTest,
             vars: Array[Variation],
-            method: String): SKATO2 = {
+            method: String,
+            rs: Array[Double]): SKATO2 = {
+
+    val rhos: Array[Double] = if (rs.length == 0) {
+      method match {
+        case "optimal.adj" => RhosAdj
+        case "optimal" => RhosOld
+        case _ => RhosAdj
+        //case _ => misc.rCorr
+      }
+    } else {
+      rs
+    }
+
     method match {
       case "liu"|"liu.mod"|"optimal.moment"|"optimal.moment.adj" =>
-        LiuModified(st, vars, method)
+        LiuModified(st, vars, method, rhos)
       case _ =>
-        Davies(st, vars, method)
+        Davies(st, vars, method, rhos)
 
     }
   }
@@ -237,7 +251,8 @@ object SKATO2 {
   @SerialVersionUID(7727760101L)
   case class Davies(scoreTest: ScoreTest,
                     vars: Array[Variation],
-                    method: String) extends SKATO2 with AsymptoticKur {
+                    method: String,
+                    rhos: Array[Double]) extends SKATO2 with AsymptoticKur {
 
     def integrand(x: DV[Double]): DV[Double] = {
       require(x.length == GKSize)
@@ -306,7 +321,8 @@ object SKATO2 {
   @SerialVersionUID(7727760301L)
   case class LiuModified(scoreTest: ScoreTest,
                          vars: Array[Variation],
-                         method: String)
+                         method: String,
+                         rhos: Array[Double])
     extends LiuPValue with AsymptoticKur
 
 
@@ -322,14 +338,7 @@ trait SKATO2 extends AssocMethod with AssocMethod.AnalyticTest {
   def numVars: Int = vars.length
   //lazy val misc = x.config.misc
   def method: String
-  lazy val rhos: Array[Double] = {
-    method match {
-      case "optimal.adj" => RhosAdj
-      case "optimal" => RhosOld
-      case _ => RhosAdj
-      //case _ => misc.rCorr
-    }
-  }
+  def rhos: Array[Double]
 
   /**
   lazy val P0SqrtZ: DM[Double] = {

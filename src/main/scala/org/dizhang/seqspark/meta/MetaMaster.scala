@@ -81,7 +81,10 @@ class MetaMaster(metaContext: MetaAnalysisContext) {
         case MethodType.snv =>
           logger.warn("Single variant analysis is performed by defaut. " +
             "No need to explicitly specify it in method list")
-        case MethodType.brv|MethodType.skat => runMethod(grouped, m)(sc, metaConf)
+        case MethodType.brv|MethodType.skat =>
+          logger.info(s"Perform meta-analysis using method $m")
+          val res = runMethod(grouped, m)(sc, metaConf).collect()
+          AMA.writeResults(res, s"output/meta_$m")
         case _ => logger.warn(s"This method ($m) is not supported in meta analysis")
       }
     }
@@ -145,6 +148,11 @@ object MetaMaster {
     data.map{
       case (g, r) =>
         methodType match {
+          case MethodType.skato =>
+            val m = methodConf.misc.method
+            val rhos = methodConf.misc.rhos
+            g -> MetaMethod.SKATO(r, weightType, m, rhos).result
+
           case MethodType.skat =>
             val m = methodConf.misc.method
             val rho = methodConf.misc.rho

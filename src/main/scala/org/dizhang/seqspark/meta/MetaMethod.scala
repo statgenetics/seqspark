@@ -20,7 +20,7 @@ import breeze.linalg.{*, DenseVector => DV}
 import breeze.numerics._
 import breeze.stats.distributions._
 import org.dizhang.seqspark.util.UserConfig.WeightMethod
-import org.dizhang.seqspark.assoc.{AssocMethod => AME, SKAT => ASKAT, SKATO => ASKATO}
+import org.dizhang.seqspark.assoc.{AssocMethod => AME, SKAT => ASKAT, SKATO2 => ASKATO}
 import org.dizhang.seqspark.assoc.SumStat.RMWResult
 import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.stat.ScoreTest
@@ -86,12 +86,19 @@ object MetaMethod {
   }
 
   /** SKAT-O */
-  /**
+
   case class SKATO(data: RMWResult,
                    weightType: WeightMethod.Value,
                    numericalMethod: String,
-                   rhos: DV[Double]) extends MetaMethod {
-
+                   rhos: Array[Double]) extends MetaMethod {
+    def result: AME.Result = {
+      val weight = getWeight(data.vars, weightType)
+      val u = weight :* data.score
+      val tmp =  data.variance(::, *) :* weight
+      val v = tmp(*, ::) :* weight
+      val st = ScoreTest.Mock(u, v)
+      ASKATO(st, data.vars, numericalMethod, rhos).result
+    }
   }
-  */
+
 }

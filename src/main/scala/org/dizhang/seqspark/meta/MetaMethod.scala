@@ -58,7 +58,7 @@ object MetaMethod {
 
   /** Burden test */
   case class Burden(data: RMWResult,
-                    weightType: WeightMethod.Value) {
+                    weightType: WeightMethod.Value) extends MetaMethod {
     def result: AME.Result = {
       val weight = getWeight(data.vars, weightType)
       val u = weight dot data.score
@@ -74,7 +74,7 @@ object MetaMethod {
   case class SKAT(data: RMWResult,
                   weightType: WeightMethod.Value,
                   numericalMethod: String,
-                  rho: Double) {
+                  rho: Double) extends MetaMethod {
     def result: AME.Result = {
       val weight = getWeight(data.vars, weightType)
       val u = weight :* data.score
@@ -84,4 +84,14 @@ object MetaMethod {
       ASKAT(st, data.vars, numericalMethod, rho).result
     }
   }
+
+  /** SKAT-O */
+  /**
+  case class SKATO(data: RMWResult,
+                   weightType: WeightMethod.Value,
+                   numericalMethod: String,
+                   rhos: DV[Double]) extends MetaMethod {
+
+  }
+  */
 }

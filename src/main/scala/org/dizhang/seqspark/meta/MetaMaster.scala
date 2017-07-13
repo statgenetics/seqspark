@@ -78,9 +78,11 @@ class MetaMaster(metaContext: MetaAnalysisContext) {
     methods.foreach{ m =>
       val mtype = metaConf.method(m).`type`
       mtype match {
-        case MethodType.snv => Unit
-        case MethodType.brv => runMethod(grouped, m)(sc, metaConf)
-        case _ => logger.warn(s"This method type (${mtype.toString}) is not implemented")
+        case MethodType.snv =>
+          logger.warn("Single variant analysis is performed by defaut. " +
+            "No need to explicitly specify it in method list")
+        case MethodType.brv|MethodType.skat => runMethod(grouped, m)(sc, metaConf)
+        case _ => logger.warn(s"This method ($m) is not supported in meta analysis")
       }
     }
   }

@@ -33,7 +33,7 @@ import org.dizhang.seqspark.util.General._
   * so this test is very fast for large sample rare variant association
   *
   * Only implement linear and logistic models here
-  *
+  * They are unified into one model.
   */
 
 object ScoreTest {
@@ -110,6 +110,8 @@ object ScoreTest {
     }
   }
 
+  case class Mock(score: DenseVector[Double],
+                  variance: DenseMatrix[Double]) extends ScoreTest
 }
 
 @SerialVersionUID(7778780001L)

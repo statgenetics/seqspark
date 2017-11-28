@@ -17,7 +17,7 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{inv, DenseMatrix => DM, DenseVector => DV}
-import org.dizhang.seqspark.assoc.RareMetalWorker._
+import org.dizhang.seqspark.assoc.SumStat._
 import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
 import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.stat.ScoreTest
@@ -26,49 +26,41 @@ import org.dizhang.seqspark.util.Constant
 
 import scala.language.existentials
 /**
-  * raremetal worker
-  * generate the summary statistics
-  *
-  * Because we don't want to compute the covariance involving
-  * common variants, which are usually ignoreed in rare variant
-  * association. We separate common and rare variants
+  * like raremetal worker
+  * generate the summary statistics for a fixed length region
+  * allows for further conditional analysis
   *
   * For computational efficiency, never use diag() for large densevector
   * breeze will try to make a densematrix, it is not necessary
   *
   */
 @SerialVersionUID(7727790001L)
-sealed trait RareMetalWorker extends AssocMethod {
+sealed trait SumStat extends AssocMethod {
   def nullModel: NM.Fitted
   def sampleSize: Int = nullModel.y.length
-  def x: Encode.Coding
-  def common: Option[Encode.Common] = x match {
-    case c: Encode.Common => Some(c)
-    case m: Encode.Mixed => Some(m.common)
-    case _ => None
-  }
-  def rare: Option[Encode.Rare] = x match {
-    case r: Encode.Rare => Some(r)
-    case m: Encode.Mixed => Some(m.rare)
-    case _ => None
-  }
+  def x: Encode.Meta
   def model: ScoreTest
   def score: DV[Double]
   def variance: DM[Double]
-  def result: RareMetalWorker.RMWResult = {
-      RareMetalWorker.DefaultRMWResult(binary = nullModel.binary, Array(sampleSize),
-        commonAndRare(common.map(_.vars), rare.map(_.vars)), score, variance)
+  def result: SumStat.RMWResult = {
+      SumStat.DefaultRMWResult(binary = nullModel.binary, sampleSize,
+        getVars(x), score, variance)
   }
 }
 
-object RareMetalWorker {
+object SumStat {
 
   val IK = Constant.Variant.InfoKey
   val SegmentSize = 1e6.toInt
+  val MaxSegs = 250 /** chr1 is 248,956,422 bp. */
+
+  def apply(nm: NM, coding: Encode.Coding): SumStat = {
+    Analytic(nm.asInstanceOf[NM.Fitted], coding.asInstanceOf[Encode.Meta])
+  }
 
   @SerialVersionUID(7727790101L)
   final case class Analytic(nullModel: NM.Fitted,
-                            x: Encode.Coding) extends RareMetalWorker {
+                            x: Encode.Meta) extends SumStat {
     val model = x match {
       case Encode.Common(c, v) => ScoreTest(nullModel, c)
       case Encode.Rare(r, v) => ScoreTest(nullModel, r)
@@ -79,37 +71,63 @@ object RareMetalWorker {
   }
 
   @SerialVersionUID(7727790201L)
-  trait RMWResult extends AssocMethod.Result {
+  trait RMWResult {
+    def segment: Region
+    def segmentId: Int
+    def binary: Boolean
+    def sampleSize: Int
+    def vars: Array[Variation]
+    def score: DV[Double]
+    def variance: DM[Double]
+    def ++(that: RMWResult): RMWResult
+
+    def conditional(known: Array[Variation]): RMWResult
+  }
+
+  case object EmptyRMWResult extends RMWResult {
+    def segment: Region = Region.Empty
+    def segmentId: Int = 0
+    def binary: Boolean = false
+    def sampleSize: Int = 0
+    def vars: Array[Variation] = Array.empty[Variation]
+    def score: DV[Double] = DV[Double]()
+    def variance: DM[Double] = DM.zeros[Double](0,0)
+    def ++(that: RMWResult): RMWResult = that
+    def conditional(known: Array[Variation]): RMWResult = this
+  }
+  case class DefaultRMWResult(binary: Boolean,
+                              sampleSize: Int,
+                              vars: Array[Variation],
+                              score: DV[Double],
+                              variance: DM[Double]) extends RMWResult {
     def segment: Region = {
       val some = vars.head
       val start = some.start/SegmentSize * SegmentSize
       Region(some.chr, start, start + SegmentSize)
     }
     def segmentId: Int = {
-      segment.chr.toInt * SegmentSize + segment.start/SegmentSize
+      segment.chr.toInt * MaxSegs + segment.start/SegmentSize
     }
-    def binary: Boolean
-    def sampleSizes: Array[Int]
-    def vars: Array[Variation]
-    def score: DV[Double]
-    def variance: DM[Double]
     def ++(that: RMWResult): RMWResult = {
-      val vm1 = this.vars.zipWithIndex.toMap
-      val vm2 = that.vars.zipWithIndex.toMap
-      val allVars = mergeVars(this.vars, that.vars)
-      val sizes = this.sampleSizes ++ that.sampleSizes
-      val index1 = allVars.map(k => if (vm1.contains(k)) vm1(k) else -1)
-      val index2 = allVars.map(k => if (vm2.contains(k)) vm2(k) else -2)
-      val s1 = rearrange(index1, this.score)
-      val s2 = rearrange(index2, that.score)
-      val v1 = rearrange(index1, this.variance)
-      val v2 = rearrange(index2, that.variance)
-      this.binary match {
-        case false => DefaultRMWResult(binary = false, sizes, allVars, s1 + s2, v1 + v2)
-        case true => DefaultRMWResult(binary = true, sizes, allVars, s1 + s2, v1 + v2)
+      that match {
+        case EmptyRMWResult => this
+        case _ =>
+          val vm1 = this.vars.zipWithIndex.toMap
+          val vm2 = that.vars.zipWithIndex.toMap
+          val allVars = mergeVars(this.vars, that.vars)
+          val sizes = this.sampleSize + that.sampleSize
+          val index1 = allVars.map(k => if (vm1.contains(k)) vm1(k) else -1)
+          val index2 = allVars.map(k => if (vm2.contains(k)) vm2(k) else -2)
+          val s1 = rearrange(index1, this.score)
+          val s2 = rearrange(index2, that.score)
+          val v1 = rearrange(index1, this.variance)
+          val v2 = rearrange(index2, that.variance)
+          this.binary match {
+            case false => DefaultRMWResult(binary = false, sizes, allVars, s1 + s2, v1 + v2)
+            case true => DefaultRMWResult(binary = true, sizes, allVars, s1 + s2, v1 + v2)
+          }
       }
     }
-
     def conditional(known: Array[Variation]): RMWResult = {
       lazy val local = known.toSet.intersect(vars.toSet)
 
@@ -135,25 +153,28 @@ object RareMetalWorker {
             val aa = 1.0 - u1.t * v11Inv * u1 / numSample
             val newScore = (u2 - v21 * v11Inv * u1)/aa
             val newVariance = (v22 - v21 * v11Inv * v12)/aa
-            DefaultRMWResult(binary = false, this.sampleSizes, newVars, newScore, newVariance)
+            DefaultRMWResult(binary = false, this.sampleSize, newVars, newScore, newVariance)
           case true =>
             val newScore = u2 - v21 * v11Inv * u1
             val newVariance = v22 - v21 * v11Inv * v12
-            DefaultRMWResult(binary = true, this.sampleSizes, newVars, newScore, newVariance)
+            DefaultRMWResult(binary = true, this.sampleSize, newVars, newScore, newVariance)
         }
       }
     }
-  }
+    override def toString: String = {
+      val vm = for {
+        i <- 1 until variance.rows
+        j <- 0 until i
+      } yield variance(i, j)
 
-  case class DefaultRMWResult(binary: Boolean,
-                              sampleSizes: Array[Int],
-                              vars: Array[Variation],
-                              score: DV[Double],
-                              variance: DM[Double]) extends RMWResult {
-    def header = ""
-    def pValue: Option[Double] = Some(1.0)
-    def statistic: Double = 0.0
-    def self: DefaultRMWResult = this
+      s">${segmentId.toString}\n" +
+      s"region:${segment.toString}\n" +
+      s"binary:${if (binary) "yes" else "no"}\n" +
+      s"sampleSize:$sampleSize\n" +
+      s"vars:${vars.map(_.toString).mkString(";")}\n" +
+      s"score:${score.toArray.mkString(";")}\n" +
+      s"variance:${vm.mkString(";")}\n"
+    }
   }
 
 
@@ -165,12 +186,11 @@ object RareMetalWorker {
     }
   }
 
-  def commonAndRare(v1: Option[Array[Variation]], v2: Option[Array[Variation]]): Array[Variation] = {
-    (v1, v2) match {
-      case (None, None) => Array[Variation]()
-      case (Some(x), None) => x
-      case (None, Some(y)) => y
-      case (Some(x), Some(y)) => x ++ y
+  def getVars(coding: Encode.Meta): Array[Variation] = {
+    coding match {
+      case Encode.Mixed(r, c) => c.vars ++ r.vars
+      case Encode.Common(_, v) => v
+      case Encode.Rare(_, v) => v
     }
   }
 

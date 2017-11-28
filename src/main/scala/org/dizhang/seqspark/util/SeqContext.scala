@@ -33,7 +33,7 @@ case class SingleStudyContext(userConfig: RootConfig,
                               sparkContext: SparkContext,
                               sparkSession: SparkSession) extends SeqContext
 
-case class MetaAnalysisContext(userConfig: MetaConfig,
+case class MetaAnalysisContext(userConfig: RootConfig,
                                sparkContext: SparkContext) extends SeqContext
 
 
@@ -42,6 +42,6 @@ object SeqContext {
     SingleStudyContext(cnf, sc, ss)
   }
 
-  def apply(cnf: MetaConfig, sc: SparkContext): SeqContext =
+  def apply(cnf: RootConfig, sc: SparkContext): SeqContext =
     MetaAnalysisContext(cnf, sc)
 }

@@ -335,7 +335,7 @@ case class SparseVariant[A: Genotype](var meta: Array[String],
 
   def map[B: Genotype](f: A => B): Variant[B] = {
     val newDefault = f(default)
-    val newElems: Map[Int, B] = elems.map{case (k, v) => k -> f(v)}
+    val newElems: Map[Int, B] = elems.map{case (k, v) => k -> f(v)}.filter(p => p._2 != newDefault)
     Variant.fromMap(meta.clone(), newElems, newDefault, size)
   }
 

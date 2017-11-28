@@ -20,8 +20,10 @@ import java.io.{File, PrintWriter}
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
-import org.dizhang.seqspark.util.Constant.Genotype.Raw
+import org.dizhang.seqspark.util.Constant.Genotype.{Raw}
 import org.dizhang.seqspark.util.{General, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.UserConfig._
+import General._
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -100,6 +102,18 @@ object Genotypes {
 
   def toSimpleVCF(self: Data[String]): Data[Byte] = {
     self.map(v => v.map(g => Genotype.Raw.toSimpleGenotype(g)))
+  }
+
+  def imputeMis(self: Data[Byte])(implicit conf: RootConfig): Data[Byte] = {
+    conf.input.genotype.missing match {
+      case ImputeMethod.bestGuess =>
+        self.map{v =>
+          val aaf = v.toCounter(Genotype.Simple.toAAF, (0.0, 2.0)).reduce.ratio
+          val target: Byte = if (aaf < 0.5) v.default else (v.default ^ 3).toByte
+          v.map(x => if (Genotype.Simple.isMis(x)) target else x)
+        }
+      case _ => self
+    }
   }
 
   val gdTicks: Array[Int] = (0 to 10).toArray ++ Array(15, 20, 25, 30, 35, 40, 60, 80, 100)

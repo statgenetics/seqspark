@@ -14,16 +14,26 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark.meta
+package org.dizhang.seqspark.ds
 
-import org.dizhang.seqspark.assoc.RareMetalWorker
+import Pedigree._
 
 /**
-  * meta analysis
+  * Created by zhangdi on 10/16/17.
   */
-trait Burden {
+class Pedigree(val data: Array[Ped]) {
+  //val graph: Map[String, Map[String, List[String]]]
+}
 
-  def worker: RareMetalWorker.RMWResult
+object Pedigree {
 
+  def apply(input: Seq[String]): Pedigree = {
+    val data = input.map{l =>
+      val s = l.split("\t")
+      Ped(s(0), s(1), s(2), s(3), s(4).toInt, s(5).toInt)
+    }.toArray
+    new Pedigree(data)
+  }
 
+  case class Ped(fid: String, iid: String, pid: String, mid: String, sex: Int, aff: Int)
 }

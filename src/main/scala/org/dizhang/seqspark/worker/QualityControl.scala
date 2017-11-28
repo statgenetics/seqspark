@@ -59,35 +59,42 @@ object QualityControl {
     //annotated.cache()
     val sums = ssc.userConfig.qualityControl.summaries
     if (sums.contains("gdgq")) {
-      input.checkpoint()
-      if (conf.benchmark) {
+      //input.checkpoint()
+      //if (conf.benchmark) {
         //annotated.foreach(_ => Unit)
-        logger.info(s"raw data: ${input.count()} variants")
-      }
+        //logger.info(s"raw data: ${input.count()} variants")
+      //}
       statGdGq(input)(ssc)
     }
 
     /** 1. Genotype level QC */
     val cleaned = genotypeQC(input, conf.qualityControl.genotypes)
-    if (conf.benchmark) {
-      logger.info(s"genotype QC completed: ${cleaned.count()} variants")
-    }
+    //if (conf.benchmark) {
+      //cleaned.cache()
+      //logger.info(s"genotype QC completed: ${cleaned.count()} variants")
+    //}
     /** 2. decompose */
-    val decomposed = decompose(cleaned)
-    if (conf.benchmark) {
-      decomposed.cache()
-      logger.info(s"${decomposed.count()} variants after decomposition")
-    }
+    val decomposed = if (conf.input.genotype.decompose)
+      decompose(cleaned)
+    else
+      cleaned
+    //if (conf.benchmark) {
+      //decomposed.cache()
+      //logger.info(s"${decomposed.count()} variants after decomposition")
+    //}
 
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
 
-    /** 4. link to variant database
+    /** 4. impute missing genotype */
+    val imputed: Data[Byte] = imputeMis(simpleVCF)(conf)
+
+    /** 5. link to variant database
       * the information can be used in variant level QC
       * */
-    val linked = linkVariantDB(simpleVCF)(conf, sc)
+    val linked = linkVariantDB(imputed)(conf, sc)
 
-    /** 5. Variant level QC */
+    /** 6. Variant level QC */
     val res = linked.variants(conf.qualityControl.variants)(ssc)
     if (conf.benchmark) {
       res.cache()
@@ -96,7 +103,7 @@ object QualityControl {
 
 
     res.cache()
-    res.checkpoint()
+    //res.checkpoint()
 
     //simpleVCF.checkpoint()
     //simpleVCF.persist(StorageLevel.MEMORY_AND_DISK)

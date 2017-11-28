@@ -16,11 +16,10 @@
 
 package org.dizhang.seqspark
 
-import java.io.File
-
-import com.typesafe.config.ConfigFactory
-import org.dizhang.seqspark.util.General._
+import org.apache.spark.{SparkConf, SparkContext}
+import org.dizhang.seqspark.util.MetaAnalysisContext
 import org.dizhang.seqspark.util.UserConfig.RootConfig
+import org.dizhang.seqspark.meta._
 import org.slf4j.{Logger, LoggerFactory}
 /**
   * meta analysis
@@ -28,27 +27,29 @@ import org.slf4j.{Logger, LoggerFactory}
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def meta(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
 
-    if (badArgs(args)) {
-      logger.error(s"bad arguments format: '${args.mkString(" ")}'")
-      System.exit(1)
-    }
+    logger.info("start meta analysis")
 
-    val userConfFile = new File(args(0))
-    val userConf = ConfigFactory
-      .parseFile(userConfFile)
-      .withFallback(ConfigFactory.load().getConfig("meta"))
-      .resolve()
+    val rootConf = SingleStudy.readConf(args(0))
 
-    implicit val rootConf = RootConfig(userConf)
-    main
-  }
+    val user = System.getenv("USER")
+    val hdfsHome = s"hdfs:///user/$user"
 
-  def main(implicit rootConf: RootConfig): Unit = {
-    logger.info("meta-analysis not available in this distribution, please update to the lastest version using 'git pull'")
-    //logger.info("start meta analysis")
-    //logger.info("end meta analysis")
+    val project = rootConf.project
+
+    /** Spark configuration */
+    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
+    scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    //scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
+    val sc: SparkContext = new SparkContext(scConf)
+
+    val metaContext = MetaAnalysisContext(rootConf, sc)
+    val mm = new MetaMaster(metaContext)
+
+    mm.run()
+
+    logger.info("end meta analysis")
   }
 
 }

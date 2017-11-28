@@ -219,7 +219,7 @@ object AssocMaster {
       case MethodType.skat =>
         val method = config.misc.method
         val rho = config.misc.rho
-        codings.map(p => (p._1, SKAT(nm.value, p._2, method, rho).result))
+        codings.map(p => (p._1, SKAT(nm.value, p._2.asInstanceOf[Encode.Rare], method, rho).result))
       case MethodType.skato =>
         val method = config.misc.method
         codings.map(p => (p._1, SKATO(nm.value, p._2, method).result))
@@ -231,17 +231,18 @@ object AssocMaster {
     }
     res
   }
-/**
+
   def rareMetalWorker(encode: RDD[(String, Encode.Coding)],
-                      y: Broadcast[DenseVector[Double]],
-                      cov: Broadcast[Option[DenseMatrix[Double]]],
+                      y: DenseVector[Double],
+                      cov: Option[DenseMatrix[Double]],
                       binaryTrait: Boolean,
-                      config: MethodConfig)(implicit sc: SparkContext): Unit = {
-    val reg = adjustForCov(binaryTrait, y.value, cov.value.get)
-    val nm = sc.broadcast(ScoreTest.NullModel(reg))
-    encode.map(p => (p._1, RareMetalWorker.Analytic(nm.value, p._2).result))
+                      config: MethodConfig)
+                     (implicit sc: SparkContext, conf: RootConfig): RDD[SumStat.RMWResult] = {
+    val fit = true
+    val nm = sc.broadcast(HypoTest.NullModel(y, cov, fit, binaryTrait))
+    encode.map(p => SumStat(nm.value, p._2).result)
   }
-*/
+
   def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: String): Unit = {
     //val header = implicitly[AssocMethod.Header[A]]
 
@@ -364,9 +365,15 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
 
 
     val test = methodConfig.test
-    val binary = config.`trait`(currentTrait._1).binary
-    logger.info(s"run trait ${currentTrait._1} with method $method")
-    if (permutation) {
+    val traitName = currentTrait._1
+    val binary = config.`trait`(traitName).binary
+    logger.info(s"run trait ${traitName} with method $method")
+    if (methodConfig.`type` == MethodType.meta) {
+      val res = rareMetalWorker(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf)
+      res.cache()
+      res.saveAsObjectFile(cnf.input.genotype.path + s".${cnf.project}.summary.$traitName")
+      res.saveAsTextFile(cnf.input.genotype.path + s".${cnf.project}.summary.$traitName.txt")
+    } else if (permutation) {
       val res = permutationTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).toArray
       writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_${method}_perm")
     } else {

@@ -160,6 +160,8 @@ object Encode {
     def size: Int
     def numVars: Int
   }
+  sealed trait Meta extends Coding
+
   case object Empty extends Coding {
     def isDefined = false
     def informative = false
@@ -167,7 +169,7 @@ object Encode {
     def size = 0
     def numVars = 0
   }
-  case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding {
+  case class Rare(coding: CSCMatrix[Double], vars: Array[Variation]) extends Coding with Meta {
     def isDefined = vars.length > 0
     def informative = true
     def copy = {
@@ -182,14 +184,14 @@ object Encode {
       }.mkString(",")
     }
   }
-  case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding {
+  case class Common(coding: DenseMatrix[Double], vars: Array[Variation]) extends Coding with Meta {
     def isDefined = vars.length > 0
     def informative = true
     def copy = Common(coding.copy, vars.map(v => v.copy()))
     def size = vars.length
     def numVars = vars.length
   }
-  case class Mixed(rare: Rare, common: Common) extends Coding {
+  case class Mixed(rare: Rare, common: Common) extends Coding with Meta {
     def isDefined = rare.isDefined && common.isDefined
     def informative = true
     def copy = Mixed(rare.copy, common.copy)
@@ -289,6 +291,7 @@ object Encode {
     def controls: Array[Boolean]
     lazy val mafCount = vars.map(v => v.select(controls).toCounter(genotype.toAAF, (0.0, 2.0)).reduce)
     lazy val maf = mafCount.map(_.ratio)
+
   }
 
   sealed trait SimpleWeight[A] extends BRV[A] {

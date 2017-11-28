@@ -85,6 +85,13 @@ object UserConfig {
     val wald = Value("wald")
   }
 
+  object ImputeMethod extends Enumeration {
+    val bestGuess = Value("bestGuess")
+    val meanDosage = Value("meanDosage")
+    val random = Value("random")
+    val no = Value("no")
+  }
+
   case class RootConfig(config: Config) extends UserConfig {
 
     val project = config.getString("project")
@@ -95,12 +102,14 @@ object UserConfig {
     val partitions = config.getInt("partitions")
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
+    val cache = config.getBoolean("cache")
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
     val input = InputConfig(config.getConfig("input"))
     val annotation = AnnotationConfig(config.getConfig("annotation"))
     val association = AssociationConfig(config.getConfig("association"))
+    val meta = MetaConfig(config.getConfig("meta"))
   }
 
   case class InputConfig(config: Config) extends UserConfig {
@@ -119,7 +128,10 @@ object UserConfig {
 
     val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
+    val decompose: Boolean = config.getBoolean("decompose")
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+
+    val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
     val samples: Either[Samples.Value, String] = {
       config.getString("samples") match {
@@ -182,6 +194,7 @@ object UserConfig {
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
+    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
     val varLimit: (Int, Int) = {
       if (config.hasPath("varLimit")) {
         val res = config.getIntList("varLimit").asScala.toList
@@ -277,14 +290,19 @@ object UserConfig {
   }
 
   case class MetaConfig(config: Config) extends UserConfig {
-    def project = config.getString("project")
-    def localDir = config.getString("localDir")
-    def dbDir = config.getString("dbDir")
-    def studies = config.getStringList("studies").asScala.toArray
-    def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
-    def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
-    def method(name: String) = MetaConfig(config.getConfig(s"method.$name"))
+    def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
+    def studyList = config.getStringList("study.list").asScala.toArray
+    def study(name: String) = StudyConfig(config.getConfig(s"study.$name"))
+    def conditional = if (config.hasPath("conditional")) {
+      config.getStringList("conditional").asScala.toArray
+    } else {
+      Array[String]()
+    }
+  }
+
+  case class StudyConfig(config: Config) extends UserConfig {
+    def path: String = config.getString("path")
   }
 
 }

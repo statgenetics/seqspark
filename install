@@ -28,7 +28,7 @@ unless ($db_dir =~ m#^/#) {
 
 sub build {
 	print STDERR "Building seqspark ...\n";
-	!system("sbt assembly 2>&1 > build.log") or die "Failed to build jar: $!\n";
+	!system("sbt -sbt-version 0.13.16 assembly 2>&1 > build.log") or die "Failed to build jar: $!\n";
 	print STDERR "Finished building seqspark.\n";
 }
 
@@ -54,8 +54,10 @@ sub install {
 	}
 	my $scripts = "bin";
 	my $conf = "conf";
-	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n/";
-	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix/\n";
+	!system("mkdir -p $prefix") or die "Failed to create folder: $prefix\n";
+	!system("mkdir -p $prefix/conf") or die "Failed to create folder: $prefix/conf\n";
+	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n";
+	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix\n";
 	##prepare conf
 	open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
 	open my $o_conf, ">$prefix/conf/reference.conf" or die "Failed to open $prefix/conf/reference.conf for write: $!\n";

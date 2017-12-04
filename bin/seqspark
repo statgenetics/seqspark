@@ -1,21 +1,29 @@
 #!/bin/bash
 
-Mode=$1
-Conf=$2
-shift
+Usage() {
+	echo "Usage: seqspark conf [opts]                  "
+	echo "  conf -- File containing the parameters     "
+	echo "  opts -- Spark options                      "
+}
+
+if [[ -z $1 ]]
+then
+	echo "Error: you must specify the conf file"
+	Usage
+	exit
+fi
+
+if [[ "$1" -eq "SingleStudy" || "$1" -eq "MetaAnalysis" ]]
+then
+	echo "Error: seqspark no longer takes run mode option, please check the latest document."
+	Usage
+	exit
+fi
+
+Conf=$1
 shift
 Opts=$@
 
-if [[ -z $Mode || -z $Conf ]]
-then
-	echo "************************************************"
-	echo "* run mode and configuration file must be set  *"
-	echo "* Usage: seqspark mode conf                    *"
-	echo "*  mode -- Must be SingleStudy or MetaAnalysis *"
-	echo "*  conf -- File containing the parameters      *"
-	echo "************************************************"
-	exit
-fi
 
 if [ -z $SEQSPARK_HOME ]
 then
@@ -24,12 +32,11 @@ fi
 CONFDIR=${SEQSPARK_HOME}/conf
 
 
-echo "run mode:        $Mode"
 echo "conf file:       $Conf"
 echo "spark options:   $Opts"
 
 spark-submit --driver-class-path $CONFDIR\
-    --class org.dizhang.seqspark.$Mode $Opts \
+    --class org.dizhang.seqspark.SeqSpark $Opts \
     $SEQSPARK_HOME/SeqSpark.jar $Conf
 
 exit 0

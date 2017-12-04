@@ -27,11 +27,9 @@ import org.slf4j.{Logger, LoggerFactory}
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def main(args: Array[String]): Unit = {
+  def apply(rootConf: RootConfig): Unit = {
 
     logger.info("start meta analysis")
-
-    val rootConf = SingleStudy.readConf(args(0))
 
     val user = System.getenv("USER")
     val hdfsHome = s"hdfs:///user/$user"

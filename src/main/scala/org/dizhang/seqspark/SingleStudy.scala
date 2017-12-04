@@ -40,18 +40,11 @@ object SingleStudy {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
-  def main(args: Array[String]) {
-    /** check args */
-    if (badArgs(args)) {
-      logger.error(s"bad argument: ${args.mkString(" ")}")
-      System.exit(1)
-    }
+  def apply(rootConf: RootConfig) {
 
     /** quick run */
 
     try {
-
-      val rootConf = readConf(args(0))
 
       if (checkConf(rootConf)) {
         run(rootConf)
@@ -67,30 +60,7 @@ object SingleStudy {
     }
   }
 
-  def readConf(file: String): RootConfig = {
-    val userConfFile = new File(file)
-    require(userConfFile.exists())
 
-    ConfigFactory.invalidateCaches()
-    System.setProperty("config.file", file)
-    val userConf = ConfigFactory.load().getConfig("seqspark")
-
-    /**
-    val userConf = ConfigFactory
-      .parseFile(userConfFile)
-      .withFallback(ConfigFactory.load().getConfig("seqspark"))
-      .resolve()
-    */
-    val show = userConf.root().render()
-
-    val rootConfig = RootConfig(userConf)
-
-    if (rootConfig.debug) {
-      logger.debug("Conf detail:\n" + show)
-    }
-
-    rootConfig
-  }
 
   def checkConf(conf: RootConfig): Boolean = {
     if (! annot.CheckDatabase.qcTermsInDB(conf)) {

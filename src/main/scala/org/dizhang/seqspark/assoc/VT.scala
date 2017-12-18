@@ -72,29 +72,11 @@ object VT {
                                      x: Encode.VT)
     extends VT with AssocMethod.AnalyticTest
   {
-    val scoreTest = {
-      //val cnt = x.coding.activeSize
-      //println(s"geno: ${geno.coding.rows} x ${geno.coding.cols}, " +
-      //  s"active: $cnt sample: ${geno.coding.toDense(0,::).t.toArray.mkString(",")}")
-      val m = DenseVector.horzcat(x.coding:_*)
-      ScoreTest(nullModel, m)
-    }
+
     val statistic = getStatistic(nullModel, x)
-    private val ss = diag(scoreTest.variance).map(_.sqrt)
-    private val ts = scoreTest.score :/ ss
-    val pValue = {
-      val maxT = max(ts)
-      val cutoff = maxT :* DenseVector.ones[Double](ts.length)
-      val pTry = Try(MultivariateNormal.Centered(scoreTest.variance).cdf(cutoff))
-      pTry match {
-        case Success(p) =>
-          //VT.logger.debug(s"info:${p.inform} err:${p.error}")
-          Some(1.0 - p.pvalue)
-        case _ => None
-      }
-    }
+    val pValue = None
     def result: AssocMethod.VTAnalytic = {
-      val info = s"Ts=${ts.toArray.mkString(",")}"
+      val info = s"MAFs=${x.coding.length}"
       AssocMethod.VTAnalytic(x.vars, x.size, statistic, pValue, info)
     }
   }

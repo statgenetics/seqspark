@@ -13,7 +13,7 @@ then
 	exit
 fi
 
-if [[ "$1" -eq "SingleStudy" || "$1" -eq "MetaAnalysis" ]]
+if [ "$1" == "SingleStudy" ] || [ "$1" == "MetaAnalysis" ]
 then
 	echo "Error: seqspark no longer takes run mode option, please check the latest document."
 	Usage

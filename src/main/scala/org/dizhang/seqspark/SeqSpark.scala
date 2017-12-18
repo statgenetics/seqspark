@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark.worker
+package org.dizhang.seqspark
 
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
-import org.dizhang.seqspark.{MetaAnalysis, SingleStudy}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.slf4j.LoggerFactory

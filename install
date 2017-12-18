@@ -9,21 +9,31 @@ my $prefix = $ENV{HOME} . "/seqspark";
 my $help = 0;
 my $db_dir = '';
 
-if (scalar @ARGV == 0) {&help;}
 
 GetOptions(
 	'prefix=s' => \$prefix,
 	'db-dir=s' => \$db_dir,
 	'h|help!' => \$help
 );
-#check db_dir
-my $user = $ENV{USER};
-if ($db_dir eq "") {
-	die "$db_dir not provided, use /user/$user/seqspark as default\n";
-	$db_dir = "seqspark";
-}
-unless ($db_dir =~ m#^/#) {
-	$db_dir = "/user/". $ENV{USER} . "/$db_dir";
+
+if (scalar @ARGV == 0 or $help) {&help;}
+
+sub check_db_dir {
+	
+	my $dir = shift;	
+
+	my $user = $ENV{USER};
+	
+	if ($dir == "") {
+		print STDERR "no database path specified, will not download database files. You can download them later using seqspark-db\n";
+		return 1;
+	}
+
+	unless ($dir =~ m#^/#) {
+		$dir = "/user/". $ENV{USER} . "/$dir";
+		print STDERR "Will use the absolute HDFS path: $dir\n";
+		return 0;
+	}
 }
 
 sub build {
@@ -74,7 +84,9 @@ sub install {
 }
 
 sub download_dbs {
-	
+
+	return if (&check_db_dir($db_dir));
+
 	!system("hdfs", "dfs", "-mkdir", "-p", "$db_dir") 
 		or die "Cannot create dir $db_dir on HDFS, you need to mannually download databases later\n";
 	my @db = qw/refFlat_table refGene_seq dbSNP-138.vcf.bz2/;

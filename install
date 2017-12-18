@@ -25,8 +25,8 @@ sub check_db_dir {
 
 	my $user = $ENV{USER};
 	
-	if ($dir == "") {
-		print STDERR "no database path specified, will not download database files. You can download them later using seqspark-db\n";
+	if ($dir eq "") {
+		print STDERR "No database path specified, will not download database files.\nYou can download them later using seqspark-db\n";
 		return 1;
 	}
 

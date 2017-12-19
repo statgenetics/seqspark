@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.worker
 
-import java.io.{File, PrintWriter}
+import java.io.{PrintWriter}
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
@@ -25,7 +25,7 @@ import org.dizhang.seqspark.util.{General, LogicalParser, SingleStudyContext}
 import org.dizhang.seqspark.util.UserConfig._
 import General._
 import org.slf4j.{Logger, LoggerFactory}
-
+import java.nio.file.Path
 /**
   * Genotype QC functions, currently are only for Raw VCF data
   */
@@ -65,9 +65,8 @@ object Genotypes {
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")
-    val outdir = new File(conf.localDir + "/output")
-    outdir.mkdir()
-    writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")
+
+    writeBcnt(res, batchKeys, conf.output.resolve("callRate_by_dpgq.txt"))
   }
 
   def genotypeQC(self: Data[String], cond: LogicalParser.LogExpr): RDD[Variant[String]] = {
@@ -131,8 +130,8 @@ object Genotypes {
     }
   }
 
-  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: String) {
-    val pw = new PrintWriter(new File(outFile))
+  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
+    val pw = new PrintWriter(outFile.toFile)
     pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {
       val iter = cnt.keySet.iterator

@@ -22,6 +22,7 @@ import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
 import scala.collection.JavaConverters._
 import scala.io.Source
+import java.nio.file.{Path, Paths}
 
 /**
   * Wrapper around the typesafe.config
@@ -103,6 +104,7 @@ object UserConfig {
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
     val cache = config.getBoolean("cache")
+    val output: Path = Paths.get(config.getString("output")).toAbsolutePath
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 

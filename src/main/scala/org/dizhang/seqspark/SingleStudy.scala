@@ -29,8 +29,8 @@ import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
 import org.dizhang.seqspark.worker.{Import, QualityControl}
 import org.slf4j.LoggerFactory
-
 import scala.collection.JavaConverters._
+import java.nio.file.{Files}
 
 /**
  * Main function
@@ -74,8 +74,19 @@ object SingleStudy {
       false
     } else {
       logger.info("Conf file fine")
-      new File(conf.outDir).mkdir()
-      true
+      if (Files.exists(conf.output)) {
+        if (Files.isDirectory(conf.output)) {
+          logger.warn(s"using an existing output directory '${conf.output.toString}'")
+          true
+        } else {
+          logger.error(s"'${conf.output.toString}' exists and is not a directory.")
+          false
+        }
+      } else {
+        logger.info(s"create output directory '${conf.output.toString}'")
+        Files.createDirectories(conf.output)
+        true
+      }
     }
   }
 

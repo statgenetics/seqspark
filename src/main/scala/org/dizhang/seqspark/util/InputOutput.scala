@@ -27,6 +27,7 @@ import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import com.typesafe.config.Config
+import java.nio.file.Path
 
 import scala.io.Source
 /**
@@ -107,11 +108,11 @@ object InputOutput {
     pw.close()
   }
 
-  def writeDenseMatrix(file: String,
+  def writeDenseMatrix(file: Path,
                        dm: DenseMatrix[Double],
                        header: Option[String] = None,
                        rowNames: Option[Array[String]] = None): Unit = {
-    val pw = new PrintWriter(new File(file))
+    val pw = new PrintWriter(file.toFile)
 
     header.foreach(h => pw.write(h + "\n"))
 

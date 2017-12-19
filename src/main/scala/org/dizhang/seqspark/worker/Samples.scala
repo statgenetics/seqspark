@@ -31,8 +31,8 @@ import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
 import org.slf4j.LoggerFactory
-
 import scala.collection.BitSet
+import java.nio.file.Path
 
 /**
   * Created by zhangdi on 9/20/16.
@@ -56,9 +56,9 @@ object Samples {
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val sn = phenotype.sampleNames
     val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
-    val path = ssc.userConfig.localDir + "/output/pca.csv"
+    val path = ssc.userConfig.output.resolve("pca.csv")
     writeDenseMatrix(path, res, Some(header), Some(sn))
-    Phenotype.update("file://" + path, "phenotype")(ssc.sparkSession)
+    Phenotype.update("file:" + ssc.userConfig.output.toAbsolutePath, "phenotype")(ssc.sparkSession)
   }
 
   def prune[A: Genotype](self: Data[A])
@@ -199,12 +199,10 @@ object Samples {
         v.toCounter(geno.callRate, (0.0, 1.0))).reduce((a, b) => a ++ b)
       Some(res)
     }
-    val outdir = new File(ssc.userConfig.localDir + "/output")
-    outdir.mkdir()
-    writeCheckSex((xHet, yCall), outdir.toString + "/checkSex.txt")(ssc)
+    writeCheckSex((xHet, yCall), ssc.userConfig.output.resolve("checkSex.txt"))(ssc)
   }
 
-  def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: String)
+  def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: Path)
                    (ssc: SingleStudyContext): Unit = {
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
@@ -217,7 +215,7 @@ object Samples {
       case Some(s) => s
     }
     //logger.info(s"sex ${sex.length}")
-    val pw = new PrintWriter(new File(outFile))
+    val pw = new PrintWriter(outFile.toFile)
     pw.write("iid,sex,xHet,xHom,yCall,yMis\n")
     //logger.info(s"before counter")
     val x: Counter[(Double, Double)] = data._1.getOrElse(Counter.fill(iid.length)((0.0, 0.0)))

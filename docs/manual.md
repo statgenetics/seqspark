@@ -633,7 +633,7 @@ dolores@workstation: cd etc/hadoop/
 
 - `hadoop-env.sh`: 
 
-   change the line `export JAVA_HOME=${JAVA_HOME}` to `export JAVA_HOME=/opt/hadoop-2.6.5`
+   change the line `export JAVA_HOME=${JAVA_HOME}` to `export JAVA_HOME=/opt/jdk1.8.0_121`
 
 - `core-site.xml`:
 
@@ -706,7 +706,7 @@ Configure Spark:
 ```shell
 dolores@workstation: ~$ cd /opt/spark-2.1.0/conf
 dolores@workstation: conf$ cp spark-env.sh.template spark-env.sh
-dolores@workstation: conf$ cp spark-default.conf.template spark-default.conf
+dolores@workstation: conf$ cp spark-defaults.conf.template spark-defaults.conf
 dolores@workstation: conf$ cp log4j.properties.template log4j.properties
 ```
 
@@ -719,7 +719,7 @@ dolores@workstation: conf$ cp log4j.properties.template log4j.properties
    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${HADOOP_HOME}/lib/native
    export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
    source ${HADOOP_CONF_DIR}/hadoop-env.sh
-   export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME/bin/hadoop} classpath)
+   export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath)
    export SPARK_WORKDER_MEMORY=52g
    export SPARK_WORKER_CORES=16
   ```
@@ -808,7 +808,7 @@ dolores@node0: cd etc/hadoop/
 
 - `hadoop-env.sh`: 
 
-  change the line `export JAVA_HOME=${JAVA_HOME}` to `export JAVA_HOME=/opt/hadoop-2.6.5`
+  change the line `export JAVA_HOME=${JAVA_HOME}` to `export JAVA_HOME=/opt/jdk1.8.0_121`
 
 - `core-site.xml`:
 
@@ -911,7 +911,7 @@ Configure Spark:
 ```shell
 dolores@node0: ~$ cd /opt/spark-2.1.0/conf
 dolores@node0: conf$ cp spark-env.sh.template spark-env.sh
-dolores@node0: conf$ cp spark-default.conf.template spark-default.conf
+dolores@node0: conf$ cp spark-defaults.conf.template spark-defaults.conf
 dolores@node0: conf$ cp log4j.properties.template log4j.properties
 ```
 
@@ -924,7 +924,7 @@ dolores@node0: conf$ cp log4j.properties.template log4j.properties
    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${HADOOP_HOME}/lib/native
    export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
    source ${HADOOP_CONF_DIR}/hadoop-env.sh
-   export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME/bin/hadoop} classpath)
+   export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath)
    export SPARK_WORKER_CORES=16
    export SPARK_WORKDER_MEMORY=52g
   ```
@@ -949,7 +949,7 @@ dolores@node0: conf$ cp log4j.properties.template log4j.properties
 
 - `log4j.properties`:
 
-   	add one line    `log4j.logger.org.apache.spark=WARN`
+    add one line    `log4j.logger.org.apache.spark=WARN`
 
 - `slaves`:
 

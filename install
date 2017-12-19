@@ -2,48 +2,69 @@
 
 use strict;
 use warnings;
+use Cwd qw(abs_path cwd);
+use File::Basename;
 use Getopt::Long;
 
 
-my $prefix = $ENV{HOME} . "/seqspark";
-my $help = 0;
-my $db_dir = '';
+sub check_args {
+	#Set up defaults
+	my $prefix = $ENV{HOME} . "/seqspark";
+	my $help = 0;
+	my $db_dir = '';
+	my $download = 1;
+	my $set_conf = 1;	
 
-if (scalar @ARGV == 0) {&help;}
+	#If there is no argument at all, print help.
+	if (scalar @ARGV == 0) {&help;}
 
-GetOptions(
-	'prefix=s' => \$prefix,
-	'db-dir=s' => \$db_dir,
-	'h|help!' => \$help
-);
+	#Get options
+	GetOptions(
+		'prefix=s' => \$prefix,
+		'db-dir=s' => \$db_dir,
+		'download!' => \$download,
+		'h|help!' => \$help
+	);
 
-if ($help) {&help;}
-
-sub check_db_dir {
+	#If help, print help.
+	if ($help) {&help;}
 	
-	my $dir = shift;	
-
-	my $user = $ENV{USER};
+	$prefix = abs_path($prefix);
+	my $src_dir = abs_path(dirname($0));
 	
-	if ($dir eq "") {
-		print STDERR "No database path specified, will not download database files.\nYou can download them later using seqspark-db\n";
-		return 1;
+	if ($prefix eq $src_dir) {
+		die "Please don't install seqspark into the source code directory. Exit without installation.";
 	}
 
-	unless ($dir =~ m#^/#) {
-		$dir = "/user/". $ENV{USER} . "/$dir";
-		print STDERR "Will use the absolute HDFS path: $dir\n";
-		return 0;
+	if ($src_dir ne abs_path(cwd())) {
+		warn "$src_dir," . cwd();
+		die "Please run this install script in the source code directory. Exit without installation.";
+	}	
+
+	if (-f "$prefix/conf/reference.conf") {
+		print STDERR "Old version detected, won't change db-dir setting.\n";
+		$set_conf = 0;
+		$download = 0;
+	} elsif ($db_dir eq "") {
+		$db_dir = "/user/$ENV{USR}/seqspark";
+		print STDERR "No db-dir specified, will use $db_dir.\n"
+	} elsif (! $download) {
+		print STDERR "Will install into $prefix, database files won't be downloaded.\n";
+	} else {
+		print STDERR "Will install into $prefix, database files will be downloaded to $db_dir\n";
 	}
+	return ($prefix, $set_conf, $db_dir, $download);
 }
 
 sub build {
 	print STDERR "Building seqspark ...\n";
-	!system("sbt -sbt-version 0.13.16 assembly 2>&1 > build.log") or die "Failed to build jar: $!\n";
+	!system("sbt -sbt-version 0.13.16 assembly 2>&1 | tee build.log") or die "Failed to build jar: $!\n";
 	print STDERR "Finished building seqspark.\n";
 }
 
 sub install {
+	my ($prefix, $set_conf, $db_dir) = @_;
+	
 	open my $fh, "build.sbt" or die "Failed to open build.sbt: $!\n";
 	my $jar;	
 	my $scalaVersion = "2.11";
@@ -66,10 +87,15 @@ sub install {
 	my $scripts = "bin";
 	my $conf = "conf";
 	!system("mkdir -p $prefix") or die "Failed to create folder: $prefix\n";
-	!system("mkdir -p $prefix/conf") or die "Failed to create folder: $prefix/conf\n";
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n";
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix\n";
+	
+	
 	##prepare conf
+	if (! $set_conf) {
+		return;
+	}
+	!system("mkdir -p $prefix/conf") or die "Failed to create folder: $prefix/conf\n";
 	open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
 	open my $o_conf, ">$prefix/conf/reference.conf" or die "Failed to open $prefix/conf/reference.conf for write: $!\n";
 	while (<$i_conf>) {
@@ -81,12 +107,15 @@ sub install {
 	}
 	close $i_conf;
 	close $o_conf;
-	&download_dbs;
 }
 
 sub download_dbs {
+	my ($db_dir, $download) = @_;	
 
-	return if (&check_db_dir($db_dir));
+	if (! $download) {
+		print STDERR "No need to download database files.\n";
+		return;
+	}
 
 	!system("hdfs", "dfs", "-mkdir", "-p", "$db_dir") 
 		or die "Cannot create dir $db_dir on HDFS, you need to mannually download databases later\n";
@@ -111,19 +140,33 @@ sub download_dbs {
 sub help {
 		print "Usage: ./install [options]
 Options:
-	--help,-h            Show this help message
-	--prefix=[dir]       Set install directory. [~/seqspark]
-	--db-dir=[dir]       HDFS path to store the database files. [/user//seqspark]\n";
+	--help,-h            		Show this help message
+	--prefix=[dir]      		Set install directory. [\"\"]
+	--db-dir=[dir]       		HDFS path to store the database files. [/user/$ENV{USER}/seqspark]
+	--download|no-download		download the database files or not. [download]
+Examples:
+	Fresh install:
+		./install --prefix ~/software/seqspark --db-dir ref/seqspark
+	
+	Install an updated version into the same prefix and db-dir:
+		./install --prefix /to/your/old/prefix
+	
+	Install without downloading databases:
+		./install --prefix ~/seqspark --db-dir ref/seqspark --no-download\n";
 	exit;
 }
 
 sub main {
-	print STDERR "Going to install seqspark with the following options:
-	--prefix         $prefix
-	--db-dir         $db_dir\n";	
+	#Check agrguments
+	my ($prefix, $set_conf, $db_dir, $download) = &check_args();
 	
+	#Build seqspark using sbt
 	&build;
-	&install;
+	
+	#Install seqspark and possibly databse files.
+	&install($prefix, $db_dir, $set_conf);
+
+	&download_dbs($db_dir, $download);
 }
 
 &main;

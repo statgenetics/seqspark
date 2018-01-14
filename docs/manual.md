@@ -1,6 +1,6 @@
 # SEQSpark Manual
 
-Zhang Di & Suzanne M. Leal
+Copyright 2016-2018 Zhang Di & Suzanne M. Leal
 
 [TOC]
 

@@ -56,9 +56,9 @@ object Samples {
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val sn = phenotype.sampleNames
     val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
-    val path = ssc.userConfig.output.resolve("pca.csv")
+    val path = ssc.userConfig.output.results.resolve("pca.csv")
     writeDenseMatrix(path, res, Some(header), Some(sn))
-    Phenotype.update("file:" + ssc.userConfig.output.toAbsolutePath, "phenotype")(ssc.sparkSession)
+    Phenotype.update("file:" + ssc.userConfig.output.results.toAbsolutePath, "phenotype")(ssc.sparkSession)
   }
 
   def prune[A: Genotype](self: Data[A])
@@ -199,7 +199,7 @@ object Samples {
         v.toCounter(geno.callRate, (0.0, 1.0))).reduce((a, b) => a ++ b)
       Some(res)
     }
-    writeCheckSex((xHet, yCall), ssc.userConfig.output.resolve("checkSex.txt"))(ssc)
+    writeCheckSex((xHet, yCall), ssc.userConfig.output.results.resolve("checkSex.txt"))(ssc)
   }
 
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: Path)

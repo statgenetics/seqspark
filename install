@@ -6,7 +6,6 @@ use Cwd qw(abs_path cwd);
 use File::Basename;
 use Getopt::Long;
 
-
 sub check_args {
 	#Set up defaults
 	my $prefix = $ENV{HOME} . "/seqspark";
@@ -28,7 +27,7 @@ sub check_args {
 
 	#If help, print help.
 	if ($help) {&help;}
-	
+
 	$prefix = abs_path($prefix);
 	my $src_dir = abs_path(dirname($0));
 	
@@ -90,17 +89,19 @@ sub install {
 	!system("cp", $target, $prefix) or die "Failed to copy jar file to $prefix\n";
 	!system("cp", "-r", $scripts, $prefix) or die "Failed to copy scripts to $prefix\n";
 	
-	
+
+
 	##prepare conf
 	if (! $set_conf) {
 		return;
 	}
 	!system("mkdir -p $prefix/conf") or die "Failed to create folder: $prefix/conf\n";
-	open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
+    !system("cp conf/log4j.properties $prefix/conf/") or die "Falied to copy log4j.properties to $prefix/conf/: $!\n";
+    open my $i_conf, "conf/reference.conf" or die "Failed to open conf/reference.conf: $!\n";
 	open my $o_conf, ">$prefix/conf/reference.conf" or die "Failed to open $prefix/conf/reference.conf for write: $!\n";
 	while (<$i_conf>) {
 		if (m/dbDir_unset/) {
-			print $o_conf "dbDir = $db_dir\n";
+            printf $o_conf "dbDir = %s\n", $db_dir;
 		} else {
 			print $o_conf $_;
 		}
@@ -159,12 +160,12 @@ Examples:
 sub main {
 	#Check agrguments
 	my ($prefix, $set_conf, $db_dir, $download) = &check_args();
-	
+
 	#Build seqspark using sbt
 	&build;
 	
 	#Install seqspark and possibly databse files.
-	&install($prefix, $db_dir, $set_conf);
+	&install($prefix,  $set_conf, $db_dir);
 
 	&download_dbs($db_dir, $download);
 }

@@ -31,6 +31,9 @@ object SeqSpark {
   val logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]): Unit = {
+
+
+
     /** check args */
     if (badArgs(args)) {
       logger.error(s"bad argument: ${args.mkString(" ")}")

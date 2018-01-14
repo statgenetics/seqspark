@@ -124,5 +124,18 @@ object VCF {
 
   implicit def toGeneralizedVCF[A: Genotype](data: RDD[Variant[A]]): VCF[A] = new VCF(data)
 
+  case class Format[A](name: String, num: Int, sep: String)
 
+  /**
+  case class
+
+  class header(version: String,
+               filter: Set[String],
+               format: Map[String, Format[_]],
+
+
+              ) {
+
+  }
+  */
 }

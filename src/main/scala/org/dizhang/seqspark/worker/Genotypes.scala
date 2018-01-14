@@ -66,7 +66,7 @@ object Genotypes {
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")
 
-    writeBcnt(res, batchKeys, conf.output.resolve("callRate_by_dpgq.txt"))
+    writeBcnt(res, batchKeys, conf.output.results.resolve("callRate_by_dpgq.txt"))
   }
 
   def genotypeQC(self: Data[String], cond: LogicalParser.LogExpr): RDD[Variant[String]] = {

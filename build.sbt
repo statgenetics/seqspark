@@ -19,8 +19,8 @@ libraryDependencies ++= Seq(
 	"org.scalanlp" %% "breeze" % "0.12",
 	"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-	"net.java.dev.jna" % "jna" % "4.2.2",
-	"org.scalaz" %% "scalaz-core" % "7.2.4"
+	"net.java.dev.jna" % "jna" % "4.2.2"
+	//"org.scalaz" %% "scalaz-core" % "7.2.4"
 )
 
 //resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
@@ -37,6 +37,11 @@ assemblyMergeStrategy in assembly := {
 		oldStrategy(x)
 }
 
+fork in Test := true
+parallelExecution in Test := false
+testOptions in Test := Seq(Tests.Filter(s => ! s.endsWith("SingleStudySpec")))
+
+javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled")
 assemblyJarName in assembly := "SeqSpark.jar"
 test in assembly := {}
 mainClass in (Compile, run) := Some("org.dizhang.seqspark.SingleStudy")

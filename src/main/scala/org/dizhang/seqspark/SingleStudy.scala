@@ -74,17 +74,17 @@ object SingleStudy {
       false
     } else {
       logger.info("Conf file fine")
-      if (Files.exists(conf.output)) {
-        if (Files.isDirectory(conf.output)) {
-          logger.warn(s"using an existing output directory '${conf.output.toString}'")
+      if (Files.exists(conf.output.results)) {
+        if (Files.isDirectory(conf.output.results)) {
+          logger.warn(s"using an existing output directory '${conf.output.results.toString}'")
           true
         } else {
-          logger.error(s"'${conf.output.toString}' exists and is not a directory.")
+          logger.error(s"'${conf.output.results.toString}' exists and is not a directory.")
           false
         }
       } else {
-        logger.info(s"create output directory '${conf.output.toString}'")
-        Files.createDirectories(conf.output)
+        logger.info(s"create output directory '${conf.output.results.toString}'")
+        Files.createDirectories(conf.output.results)
         true
       }
     }
@@ -103,7 +103,8 @@ object SingleStudy {
     /** Spark configuration */
     val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
     scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
+    scConf.registerKryoClasses(Array(classOf[ConfigObject],
+      classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
     val sc: SparkContext = new SparkContext(scConf)
 
     /** set checkpoint folder to hdfs home*/
@@ -139,7 +140,7 @@ object SingleStudy {
         logger.info(s"read from cache, rec: ${res.count()}")
         res
       } catch {
-        case e: Exception =>
+        case _: Exception =>
           logger.info("no cache, compute from start")
           val raw = Import.fromVCF(ssc)
 

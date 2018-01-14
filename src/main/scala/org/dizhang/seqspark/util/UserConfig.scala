@@ -93,6 +93,13 @@ object UserConfig {
     val no = Value("no")
   }
 
+  object DBFormat extends Enumeration {
+    val vcf: Value = Value("vcf")
+    val plain: Value = Value("plain")
+    val csv: Value = Value("csv")
+    val tsv: Value = Value("tsv")
+  }
+
   case class RootConfig(config: Config) extends UserConfig {
 
     val project = config.getString("project")
@@ -104,7 +111,7 @@ object UserConfig {
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
     val cache = config.getBoolean("cache")
-    val output: Path = Paths.get(config.getString("output")).toAbsolutePath
+    val output: OutputConfig = OutputConfig(config.getConfig("output"), project)
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
@@ -119,6 +126,16 @@ object UserConfig {
     val phenotype = PhenotypeConfig(config.getConfig("phenotype"))
   }
 
+  case class OutputConfig(config: Config, proj: String) extends UserConfig {
+    val genotype = GenotypeConfig(config.getConfig("genotype"))
+    val results: Path = {
+      if (config.hasPath("results"))
+        Paths.get(config.getString("results")).toAbsolutePath
+      else
+        Paths.get(proj).toAbsolutePath
+    }
+  }
+
   case class GenotypeConfig(config: Config) extends UserConfig {
 
     val format = ImportGenotypeType.withName(config.getString("format"))
@@ -130,8 +147,12 @@ object UserConfig {
 
     val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
-    val decompose: Boolean = config.getBoolean("decompose")
+    val export: Boolean = if (config.hasPath("export")) config.getBoolean("export") else false
+
+    val decompose: Boolean = if (config.hasPath("decompose")) config.getBoolean("decompose") else false
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+
+    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
 
     val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
@@ -180,10 +201,26 @@ object UserConfig {
     def dbDir = config.getString("dbDir")
     def variants = config.getConfig("variants")
     def genes = config.getConfig("genes")
-    def RefSeq = config.getConfig("RefSeq")
+    def RefSeq = config.getConfig("db.RefSeq")
     def dbNSFP = config.getConfig("dbNSFP")
     def CADD = config.getConfig("CADD")
     def ExAC = config.getConfig("ExAC")
+    def dbList: List[String] = config.getConfig("db").root().keySet().asScala.toList
+    def db(name: String): DatabaseConfig = DatabaseConfig(config.getConfig(s"db.$name"))
+    def addInfo: Map[String, String] = {
+      val keys = config.getConfig("addInfo").root().keySet().asScala.toList
+      keys.map(k => k -> config.getString(s"addInfo.$k")).toMap
+    }
+  }
+
+  case class DatabaseConfig(config: Config) extends UserConfig {
+    def format: DBFormat.Value = DBFormat.withName(config.getString("format"))
+    def delimiter: String =
+      if (config.hasPath("delimiter"))
+        config.getString("delimiter")
+      else
+        ""
+    def path: String = config.getString("path")
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {

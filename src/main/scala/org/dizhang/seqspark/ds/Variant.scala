@@ -33,6 +33,13 @@ object Variant {
   val THRESHOLD = 0.25
   val MINIMIUM = 1000
 
+  /**
+    * Define info and meta class
+    *
+    * */
+  case class Info(original: String, addon: Map[String, String])
+
+
   def fill[A: Genotype](meta: Array[String], size: Int)(default: A): Variant[A] = {
     if (size == 0) {
       DummyVariant(meta, default)

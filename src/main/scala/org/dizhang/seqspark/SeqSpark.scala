@@ -17,10 +17,14 @@
 package org.dizhang.seqspark
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.typesafe.config.ConfigFactory
+import org.apache.spark.sql.SparkSession
 import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.util.UserConfig.RootConfig
+import org.dizhang.seqspark.util.{Constant, QueryParser, SeqContext}
+import org.dizhang.seqspark.util.UserConfig.{AnnotationConfig, DBFormat, RootConfig}
+import org.dizhang.seqspark.worker.Annotation.logger
 import org.slf4j.LoggerFactory
 
 /**
@@ -42,10 +46,26 @@ object SeqSpark {
 
     val rootConf = readConf(args(0))
 
+
+    val warehouse = if (rootConf.local)
+      s"file://${Paths.get("").toAbsolutePath.toString}"
+    else
+      s"hdfs:///user/${System.getProperty("user.name")}"
+
+    val ss: SparkSession = SparkSession
+      .builder()
+      .appName("SEQSpark")
+      .config("spark.sql.warehouse", warehouse)
+      .getOrCreate()
+
+    val sc = ss.sparkContext
+
+    val seqContext = SeqContext(rootConf, sc, ss)
+
     if (rootConf.pipeline.contains("meta")) {
-      MetaAnalysis(rootConf)
+      MetaAnalysis(seqContext)
     } else {
-      SingleStudy(rootConf)
+      SingleStudy(seqContext)
     }
 
   }
@@ -73,4 +93,7 @@ object SeqSpark {
 
     rootConfig
   }
+
+
+
 }

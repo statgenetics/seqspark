@@ -46,7 +46,8 @@ class SingleStudySpec extends IntegrationSpec with SharedTestData {
   }
 
   it should "run the whole thing" in {
-
+    val ssc = util.SeqContext(conf, sc, spark)
+    SingleStudy(ssc)
   }
 
 }

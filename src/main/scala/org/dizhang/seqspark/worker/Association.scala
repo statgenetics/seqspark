@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Zhang Di
+ * Copyright 2018 Zhang Di
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark
+package org.dizhang.seqspark.worker
+import org.dizhang.seqspark.assoc.AssocMaster
+import org.dizhang.seqspark.ds.Genotype
+import org.dizhang.seqspark.util.SeqContext
 
-import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.Genotype.Imp
-import org.dizhang.seqspark.ds.{Genotype, Variant}
-
-/**
-  * Created by zhangdi on 9/19/16.
-  */
-package object worker {
-
-  type Data[A] = RDD[Variant[A]]
-
+object Association {
+  def apply[B: Genotype](input: Data[B])(implicit ssc: SeqContext): Unit = {
+    if (ssc.userConfig.pipeline.contains("association"))
+      new AssocMaster(input).run()
+  }
 }

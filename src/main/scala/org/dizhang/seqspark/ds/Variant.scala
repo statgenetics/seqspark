@@ -135,6 +135,16 @@ object Variant {
       } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
   }
 
+  def serializeInfo(im: Map[String, String]): String = {
+    if (im.isEmpty)
+      "."
+    else
+      im.map{
+        case (k, v) =>
+          if (v == "true") k else s"$k=$v"
+      }.mkString(";")
+  }
+
   def mutType(ref: String, alt: String): MutType.Value = {
     val cnvReg = """[\[\]\<\>]""".r
     cnvReg.findFirstIn(alt) match {
@@ -244,6 +254,10 @@ abstract class Variant[A: Genotype] extends Serializable {
     }
 
     this.meta(7) = s"$info;$key=$value"
+  }
+
+  def updateInfo(im: Map[String, String]): Unit = {
+    this.meta(7) = Variant.serializeInfo(parseInfo ++ im)
   }
 
   def parseFormat: Array[String] = {

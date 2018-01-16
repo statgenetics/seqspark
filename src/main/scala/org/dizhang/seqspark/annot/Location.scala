@@ -153,9 +153,9 @@ sealed trait Location extends Region {
 
   def annotate(v: Variation, seq: mRNA): feature.Feature = {
     v.mutType match {
-      case MutType.snv => annotate(Single(v.chr, v.start), Some(seq), Some(Base.withName(v.alt)))
+      case MutType.snv => annotate(Single(v.chr, v.pos), Some(seq), Some(Base.withName(v.alt)))
       case MutType.indel => {
-        val int = Region(v.chr, v.start + 1, v.end)
+        val int = Region(v.chr, v.pos + 1, v.end)
         if (int overlap this) {
           if (exons.exists(e => e overlap int)) {
             if (int overlap cds) {

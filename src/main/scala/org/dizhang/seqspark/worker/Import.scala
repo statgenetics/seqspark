@@ -16,60 +16,66 @@
 
 package org.dizhang.seqspark.worker
 
+import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
+import org.dizhang.seqspark.util.UserConfig.{GenotypeFormat => GenoFormat}
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext, UserConfig => UC}
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext, UserConfig => UC}
 import org.slf4j.LoggerFactory
+
 
 /**
   * Created by zhangdi on 8/13/16.
   */
-sealed trait Import[A <: Import.Source, B] {
-  def load(ssc: SingleStudyContext): Data[B]
+sealed trait Import[A] {
+  def load(ssc: SeqContext, a: A): Data[A]
 }
+
 
 object Import {
 
-  sealed trait Source
-  case object PlainVCF extends Source
-  case object CacheVCF extends Source
-  case object Impute2 extends Source
-  case object CachedImpute2 extends Source
 
+  /** load data by formats */
+  def apply[A](ssc: SeqContext, a: A)
+              (implicit importer: Import[A]): Data[A] = {
+    importer.load(ssc, a)
+  }
 
-  val logger = LoggerFactory.getLogger(getClass)
+  private val logger = LoggerFactory.getLogger(getClass)
 
   type Imp = (Double, Double, Double)
 
-  implicit object RawVCF extends Import[PlainVCF.type , String] {
-    def load(ssc: SingleStudyContext): Data[String] = {
+  implicit val StringVCF = new Import[String] {
+    def load(ssc: SeqContext, a: String): Data[String] = {
       fromVCF(ssc)
     }
   }
 
-  implicit object CachedVCF extends Import[CacheVCF.type , Byte] {
-    def load(ssc: SingleStudyContext): Data[Byte] = {
-      val path = ssc.userConfig.input.genotype.path + ".cache"
-      ssc.sparkContext.objectFile(path, ssc.userConfig.partitions).asInstanceOf[Data[Byte]]
+  implicit val ByteVCF = new Import[Byte] {
+    def load(ssc: SeqContext, a: Byte): Data[Byte] = {
+      fromCache(ssc).asInstanceOf[Data[Byte]]
     }
   }
 
-  implicit object Imputed extends Import[Impute2.type , Imp] {
-    def load(ssc: SingleStudyContext): Data[Imp] = {
-      fromImpute2(ssc)
+
+  implicit val ImputedVCF = new Import[Imp] {
+    def load(ssc: SeqContext, a: Imp): Data[Imp] = {
+      if (ssc.userConfig.input.genotype.format == GenoFormat.imputed) {
+        fromImpute2(ssc)
+      } else {
+        fromCache(ssc).asInstanceOf[Data[Imp]]
+      }
     }
   }
 
-  implicit object CachedImputed extends Import[CachedImpute2.type , Imp] {
-    def load(ssc: SingleStudyContext): Data[Imp] = {
-      val path = ssc.userConfig.input.genotype.path + ".cache"
-      ssc.sparkContext.objectFile(path, ssc.userConfig.partitions).asInstanceOf[Data[Imp]]
-    }
+  def fromCache(ssc: SeqContext): RDD[Nothing] = {
+    val path = ssc.userConfig.input.genotype.path + ".cache"
+    ssc.sparkContext.objectFile(path, ssc.userConfig.partitions)
   }
 
-  def fromVCF(ssc: SingleStudyContext): Data[String] = {
+  def fromVCF(ssc: SeqContext): Data[String] = {
 
     def pass(l: String)
             (logExpr: LogExpr,
@@ -171,7 +177,7 @@ object Import {
     s3
   }
 
-  def fromImpute2(ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
+  def fromImpute2(ssc: SeqContext): Data[(Double, Double, Double)] = {
     logger.info("start import ...")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext

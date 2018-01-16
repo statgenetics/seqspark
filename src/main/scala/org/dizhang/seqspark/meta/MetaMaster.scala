@@ -29,7 +29,7 @@ import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.ds.SummaryStatistic._
 import org.dizhang.seqspark.meta.MetaMaster._
 import org.dizhang.seqspark.util.Constant.{Annotation, Variant}
-import org.dizhang.seqspark.util.MetaAnalysisContext
+import org.dizhang.seqspark.util.SeqContext
 import org.dizhang.seqspark.util.UserConfig.{MetaConfig, MethodType, RootConfig}
 import org.slf4j.LoggerFactory
 
@@ -37,7 +37,7 @@ import scala.annotation.tailrec
 /**
   * Created by zhangdi on 6/13/16.
   */
-class MetaMaster(metaContext: MetaAnalysisContext) {
+class MetaMaster(metaContext: SeqContext) {
   val logger = LoggerFactory.getLogger(this.getClass)
   def rootConfig = metaContext.userConfig
   def sc = metaContext.sparkContext

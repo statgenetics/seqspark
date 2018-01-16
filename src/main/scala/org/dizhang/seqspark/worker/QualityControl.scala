@@ -16,9 +16,8 @@
 
 package org.dizhang.seqspark.worker
 
-import org.dizhang.seqspark.annot.{linkVariantDB, linkGeneDB}
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.util.SingleStudyContext
+import org.dizhang.seqspark.util.SeqContext
 import org.dizhang.seqspark.worker.Genotypes._
 import org.dizhang.seqspark.worker.Samples._
 import org.dizhang.seqspark.worker.Variants._
@@ -29,7 +28,7 @@ import org.slf4j.{LoggerFactory, Logger}
   */
 
 sealed trait QualityControl[A, B] {
-  def clean(input: Data[A])(implicit ssc: SingleStudyContext): Data[B]
+  def clean(input: Data[A], pass: Boolean)(implicit ssc: SeqContext): Data[B]
 }
 
 object QualityControl {
@@ -38,19 +37,40 @@ object QualityControl {
 
   type Imp = (Double, Double, Double)
 
+  def apply[A, B](data: Data[A], a: A, b: B)
+                                 (implicit ssc: SeqContext, qc: QualityControl[A, B]): Data[B] = {
+    val pass = ! ssc.userConfig.pipeline.contains("qualityControl")
+
+    qc.clean(data, pass)
+  }
+
+  implicit object CleanVCF extends QualityControl[Byte, Byte] {
+    def clean(input: Data[Byte], pass: Boolean)(implicit ssc: SeqContext): Data[Byte] = {
+      input
+    }
+  }
+
   implicit object VCF extends QualityControl[String, Byte] {
-    def clean(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
-      cleanVCF(input)
+    def clean(input: Data[String], pass: Boolean)(implicit ssc: SeqContext): Data[Byte] = {
+      if (pass) {
+        Genotypes.toSimpleVCF(input)
+      } else {
+        cleanVCF(input)
+      }
     }
   }
 
   implicit object Imputed extends QualityControl[Imp, Imp] {
-    def clean(input: Data[Imp])(implicit ssc: SingleStudyContext): Data[Imp] = {
-      cleanImputed(input)
+    def clean(input: Data[Imp], pass: Boolean)(implicit ssc: SeqContext): Data[Imp] = {
+      if (pass) {
+        input
+      } else {
+        cleanImputed(input)
+      }
     }
   }
 
-  def cleanVCF(input: Data[String])(implicit ssc: SingleStudyContext): Data[Byte] = {
+  def cleanVCF(input: Data[String])(implicit ssc: SeqContext): Data[Byte] = {
     logger.info("start quality control")
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
@@ -89,13 +109,10 @@ object QualityControl {
     /** 4. impute missing genotype */
     val imputed: Data[Byte] = imputeMis(simpleVCF)(conf)
 
-    /** 5. link to variant database
-      * the information can be used in variant level QC
-      * */
-    val linked = linkVariantDB(imputed)(conf, sc)
 
     /** 6. Variant level QC */
-    val res = linked.variants(conf.qualityControl.variants)(ssc)
+    val res = imputed.variants(conf.qualityControl.variants)(ssc)
+
     if (conf.benchmark) {
       res.cache()
       logger.info(s"${res.count()} variants after variant level QC")
@@ -121,61 +138,28 @@ object QualityControl {
       pca(res)(ssc)
     }
 
-    val geneAssoc = conf.association.methodList.exists { m =>
-      val gb = conf.association.method(m).misc.groupBy
-      gb.nonEmpty && gb.head == "gene"
-    }
-    val geneAnnot = if (sums.contains("annotation") || geneAssoc) {
-      logger.info("start gene annotation")
-      val tmp = linkGeneDB(res)(conf, sc)
-      logger.info("finished gene annotation")
-      countByFunction(tmp)
-      tmp
-    } else {
-      res
-    }
-
-    if (conf.qualityControl.save) {
-      geneAnnot.cache()
-      geneAnnot.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
-    }
-    if (conf.qualityControl.export) {
-      geneAnnot.cache()
-      geneAnnot.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
-    }
-
-    geneAnnot
+    res
   }
 
   def cleanImputed(input: Data[(Double, Double, Double)])
-                  (implicit ssc: SingleStudyContext): Data[(Double, Double, Double)] = {
+                  (implicit ssc: SeqContext): Data[(Double, Double, Double)] = {
     val conf = ssc.userConfig
     val sc = ssc.sparkContext
-    val annotated = linkVariantDB(input)(conf, sc)
-    annotated.cache()
 
     //annotated.checkpoint()
 
     val sums = ssc.userConfig.qualityControl.summaries
     /** sample QC */
     if (sums.contains("sexCheck")) {
-      checkSex(annotated)(ssc)
+      checkSex(input)(ssc)
     }
 
     if (sums.contains("pca")) {
-      pca(annotated)(ssc)
+      pca(input)(ssc)
     }
 
     /** Variant QC */
-    val res = annotated.variants(conf.qualityControl.variants)(ssc)
-    if (conf.qualityControl.save) {
-      res.cache()
-      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
-    }
-    if (conf.qualityControl.export) {
-      res.cache()
-      res.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
-    }
-    res
+    input.variants(conf.qualityControl.variants)(ssc)
+
   }
 }

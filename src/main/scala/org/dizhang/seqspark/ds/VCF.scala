@@ -20,7 +20,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType}
-import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
 import scala.language.implicitConversions
@@ -59,7 +59,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     }.groupByKey()
   }
 
-  def variants(cond: LogicalParser.LogExpr)(ssc: SingleStudyContext): RDD[Variant[A]] = {
+  def variants(cond: LogicalParser.LogExpr)(ssc: SeqContext): RDD[Variant[A]] = {
     if (cond == LogicalParser.T) {
       logger.info("condition empty, no need to filter variants")
       self

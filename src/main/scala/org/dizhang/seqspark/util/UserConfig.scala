@@ -20,9 +20,14 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
+
 import scala.collection.JavaConverters._
 import scala.io.Source
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
+
+import org.apache.hadoop
+import org.apache.hadoop.fs
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * Wrapper around the typesafe.config
@@ -32,17 +37,38 @@ import java.nio.file.{Path, Paths}
   */
 object UserConfig {
 
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  lazy val hadoopConf = new hadoop.conf.Configuration()
+  lazy val hdfs = hadoop.fs.FileSystem.get(hadoopConf)
+
+  def getProperPath(unchecked: String): String = {
+    if (unchecked.isEmpty) {
+      logger.warn(s"using empty path")
+      unchecked
+    } else if (hdfs.exists(new fs.Path(unchecked))) {
+      unchecked
+    } else if (Files.exists(Paths.get(unchecked))) {
+      "file://" + Paths.get(unchecked).toAbsolutePath.toString
+    } else {
+      logger.error(s"path doesn't exist on HDFS or Local FS: $unchecked")
+      ""
+    }
+  }
+
   object GenomeBuild extends Enumeration {
     val hg18 = Value("hg18")
     val hg19 = Value("hg19")
     val hg38 = Value("hg38")
   }
 
-  object ImportGenotypeType extends Enumeration {
+  object GenotypeFormat extends Enumeration {
     val vcf = Value("vcf")
     val imputed = Value("impute2")
-    val cachevcf = Value("cachedVcf")
-    val cacheimputed = Value("cachedImpute2")
+    //val bgen = Value("bgen")
+    //val cacheFullvcf = Value("cachedFullVcf")
+    val cacheVcf = Value("cachedVcf")
+    val cacheImputed = Value("cachedImpute2")
   }
 
   object Samples extends Enumeration {
@@ -104,6 +130,9 @@ object UserConfig {
 
     val project = config.getString("project")
     val localDir = config.getString("localDir")
+
+    def local: Boolean = config.hasPath("local") && config.getBoolean("local")
+
     val outDir = localDir + "/output"
     val dbDir = config.getString("dbDir")
     val pipeline = config.getStringList("pipeline").asScala.toList
@@ -138,16 +167,23 @@ object UserConfig {
 
   case class GenotypeConfig(config: Config) extends UserConfig {
 
-    val format = ImportGenotypeType.withName(config.getString("format"))
+    def format = GenotypeFormat.withName(config.getString("format"))
 
-    val path = config.getString("path")
+    def pathRaw: String = config.getString("path")
 
+    def path = getProperPath(pathRaw)
+
+    def pathValid = path != ""
 
     //val filters = config.getStringList("filters").asScala.toArray
 
     val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
     val export: Boolean = if (config.hasPath("export")) config.getBoolean("export") else false
+
+    def save: Boolean = if (config.hasPath("save")) config.getBoolean("save") else false
+
+    def cache: Boolean = if (config.hasPath("cache")) config.getBoolean("cache") else false
 
     val decompose: Boolean = if (config.hasPath("decompose")) config.getBoolean("decompose") else false
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
@@ -176,7 +212,9 @@ object UserConfig {
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
-    val path = config.getString("path")
+    def pathRaw: String = config.getString("path")
+    def path = getProperPath(pathRaw)
+    def pathValid = path != ""
     val batch = config.getString("batch")
   }
 
@@ -215,12 +253,17 @@ object UserConfig {
 
   case class DatabaseConfig(config: Config) extends UserConfig {
     def format: DBFormat.Value = DBFormat.withName(config.getString("format"))
-    def delimiter: String =
-      if (config.hasPath("delimiter"))
-        config.getString("delimiter")
-      else
-        ""
-    def path: String = config.getString("path")
+    def delimiter: String = format match {
+      case DBFormat.vcf => ""
+      case _ => config.getString("delimiter")
+    }
+    def header: Array[String] = format match {
+      case DBFormat.vcf => Array[String]()
+      case _ => config.getStringList("header").asScala.toArray
+    }
+    def pathRaw: String = config.getString("path")
+    def path: String = getProperPath(pathRaw)
+    def pathValid: Boolean = path != ""
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {
@@ -341,7 +384,9 @@ object UserConfig {
   }
 
   case class StudyConfig(config: Config) extends UserConfig {
-    def path: String = config.getString("path")
+    def pathRaw: String = config.getString("path")
+    def path: String = getProperPath(pathRaw)
+    def pathValid: Boolean = path != ""
   }
 
 }

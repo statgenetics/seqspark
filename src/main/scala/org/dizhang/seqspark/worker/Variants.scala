@@ -85,6 +85,28 @@ object Variants {
           }
         }
         newV.meta(4) = alleles(i)
+        /** trim the same bases after decomposing */
+        while (newV.ref.last == newV.alt.last && newV.ref.length > 1 && newV.alt.length > 1) {
+          newV.meta(3) = newV.ref.substring(0, newV.ref.length - 1)
+          newV.meta(4) = newV.alt.substring(0, newV.alt.length - 1)
+        }
+        while (newV.ref.head == newV.alt.head && newV.ref.length > 1 && newV.alt.length > 1) {
+          newV.meta(3) = newV.ref.substring(1)
+          newV.meta(4) = newV.alt.substring(1)
+          newV.meta(1) = s"${newV.pos.toInt + 1}"
+        }
+
+        /** parse info */
+        val info = newV.parseInfo.map{
+          case (k, va) =>
+            val s = va.split(",")
+            if (s.length == v.alleleNum - 1) {
+              k -> s(i - 1)
+            } else {
+              k -> va
+            }
+        }
+        newV.meta(7) = Variant.serializeInfo(info)
         newV
       }.filter{
         case SparseVariant(_,e,_,_) => e.nonEmpty

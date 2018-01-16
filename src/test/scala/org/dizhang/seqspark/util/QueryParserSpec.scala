@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Zhang Di
+ * Copyright 2018 Zhang Di
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,30 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark
+package org.dizhang.seqspark.util
 
-import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.Genotype.Imp
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.BaseSpecs
 
-/**
-  * Created by zhangdi on 9/19/16.
-  */
-package object worker {
+class QueryParserSpec extends BaseSpecs.UnitSpec {
 
-  type Data[A] = RDD[Variant[A]]
+  def msg(expr: String): List[String] = {
+    val qe = QueryParser.parse(expr)
+    QueryParser.dbKeys(qe).map(p => s"db: ${p._1} keys: ${p._2.mkString(",")}").toList
+  }
+
+  "A QueryParser" should "parse simple db existance" in {
+    val db = "dbSNP"
+
+    msg(db).foreach(m => logger.info(m))
+
+  }
+
+  it should "parse db and key" in {
+
+    val dbKey = "gnomAD.AN"
+
+    msg(dbKey).foreach(m => logger.info(m))
+
+  }
 
 }

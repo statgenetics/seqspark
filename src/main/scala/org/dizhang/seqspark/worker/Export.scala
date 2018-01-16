@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Zhang Di
+ * Copyright 2018 Zhang Di
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,30 +14,22 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark
+package org.dizhang.seqspark.worker
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.util.SeqContext
-import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.meta._
-import org.slf4j.{Logger, LoggerFactory}
-/**
-  * meta analysis
-  */
-object MetaAnalysis {
-  val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def apply(seqContext: SeqContext): Unit = {
+object Export {
 
-    logger.info("start meta analysis")
-
-    /** Spark configuration */
-
-    val mm = new MetaMaster(seqContext)
-
-    mm.run()
-
-    logger.info("end meta analysis")
+  def apply[A: Genotype](data: Data[A])(implicit ssc: SeqContext): Unit = {
+    val geno = implicitly[Genotype[A]]
+    val conf = ssc.userConfig.output.genotype
+    if (conf.export) {
+      val path = if (conf.path.isEmpty) ssc.userConfig.input.genotype.path + ".export" else conf.path
+      data.map(v => v.toString).saveAsTextFile(path)
+    }
+    if (conf.save || conf.cache) {
+      data.saveAsObjectFile(conf.path)
+    }
   }
-
 }

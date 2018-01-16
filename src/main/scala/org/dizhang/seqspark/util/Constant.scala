@@ -72,6 +72,7 @@ object Constant {
       val isFunctional = "SS_isFunctional"
       val batchSpecific = "SS_batchSpecific"
     }
+    val dbExists = "dbExists"
   }
 
   object Annotation {

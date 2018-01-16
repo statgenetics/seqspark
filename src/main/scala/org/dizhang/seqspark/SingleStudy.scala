@@ -26,11 +26,12 @@ import org.dizhang.seqspark.ds.{Bed, Counter, Genotype, Phenotype}
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
-import org.dizhang.seqspark.util.{SingleStudyContext, UserConfig}
-import org.dizhang.seqspark.worker.{Import, QualityControl}
+import org.dizhang.seqspark.util.{SeqContext, UserConfig}
+import org.dizhang.seqspark.worker._
 import org.slf4j.LoggerFactory
+
 import scala.collection.JavaConverters._
-import java.nio.file.{Files}
+import java.nio.file.Files
 
 /**
  * Main function
@@ -40,14 +41,14 @@ object SingleStudy {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
-  def apply(rootConf: RootConfig) {
+  def apply(seqContext: SeqContext) {
 
     /** quick run */
 
     try {
 
-      if (checkConf(rootConf)) {
-        run(rootConf)
+      if (checkConf(seqContext.userConfig)) {
+        run(seqContext)
       } else {
         logger.error("Configuration error, exit")
       }
@@ -60,20 +61,18 @@ object SingleStudy {
     }
   }
 
-
-
   def checkConf(conf: RootConfig): Boolean = {
-    if (! annot.CheckDatabase.qcTermsInDB(conf)) {
-      logger.error("conf error in qualityControl")
-      false
-    } else if (! annot.CheckDatabase.annTermsInDB(conf)) {
+    if (! Annotation.checkDB(conf.annotation)) {
       logger.error("conf error in annotation")
       false
-    } else if (conf.pipeline.last == "association" && ! annot.CheckDatabase.assTermsInDB(conf)) {
-      logger.error("conf error in association method variants")
+    } else if (! conf.input.phenotype.pathValid) {
+      logger.error(s"phenotype input path not valid: ${conf.input.phenotype.pathRaw}")
+      false
+    } else if (! conf.input.genotype.pathValid) {
+      logger.error(s"genotype input path not valid: ${conf.input.genotype.pathRaw}")
       false
     } else {
-      logger.info("Conf file fine")
+      //logger.info("Conf file fine")
       if (Files.exists(conf.output.results)) {
         if (Files.isDirectory(conf.output.results)) {
           logger.warn(s"using an existing output directory '${conf.output.results.toString}'")
@@ -87,39 +86,28 @@ object SingleStudy {
         Files.createDirectories(conf.output.results)
         true
       }
+
+
     }
   }
 
 
-  def run(cnf: RootConfig) {
+  def run(seqContext: SeqContext) {
 
 
 
-    val user = System.getenv("USER")
-    val hdfsHome = s"hdfs:///user/$user"
+    val cnf = seqContext.userConfig
 
     val project = cnf.project
 
-    /** Spark configuration */
-    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
-    scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    scConf.registerKryoClasses(Array(classOf[ConfigObject],
-      classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
-    val sc: SparkContext = new SparkContext(scConf)
+    val ss = seqContext.sparkSession
 
-    /** set checkpoint folder to hdfs home*/
-    sc.setCheckpointDir(hdfsHome + "/checkpoint")
-
-    val ss: SparkSession = SparkSession
-      .builder()
-      .appName("SeqSpark Phenotype")
-      .config("spark.sql.warehouse", hdfsHome)
-      .getOrCreate()
+    val sc = seqContext.sparkContext
 
     Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
 
-    implicit val ssc = SingleStudyContext(cnf, sc, ss)
-
+    implicit val ssc = seqContext
+    Pipeline(ssc)
     /**
     if (cnf.pipeline.isEmpty) {
       logger.error("no pipeline specified, exit")
@@ -131,8 +119,15 @@ object SingleStudy {
     }
     */
 
+    /**
+    /** import genotype */
+    val genoData: worker.GenoData = Import(ssc)
 
-    if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.vcf) {
+    val pipeline = cnf.pipeline
+
+    val annotated = Annotation(genoData)
+
+    if (cnf.input.genotype.format == UserConfig.GenotypeFormat.vcf) {
       val clean = try {
         val cachePath = cnf.input.genotype.path + s".$project"
         val res = sc.objectFile(cachePath).asInstanceOf[worker.Data[Byte]].map(identity)
@@ -157,7 +152,7 @@ object SingleStudy {
           res
       }
       runAssoc(clean)
-    } else if (cnf.input.genotype.format == UserConfig.ImportGenotypeType.imputed) {
+    } else if (cnf.input.genotype.format == UserConfig.GenotypeFormat.imputed) {
       val clean = try {
         val cachePath = cnf.input.genotype.path + s".$project"
         val res =sc.objectFile(cachePath).asInstanceOf[worker.Data[(Double, Double, Double)]].map(identity)
@@ -194,7 +189,9 @@ object SingleStudy {
     //Export(last)
     //PropertyConfigurator.configure("log4j.properties")
   }
-
+*/
+  }
+  /**
   /**
   def runImport[A, B](src: A, ssc: SingleStudyContext)(implicit imp: Import[A, B]): worker.Data[B] = {
     imp.load(ssc)
@@ -204,8 +201,11 @@ object SingleStudy {
     qc.clean(input)
   }
 */
+
+
+
   def runAssoc[A: Genotype](input: worker.Data[A])
-                           (implicit ssc: SingleStudyContext): Unit = {
+                           (implicit ssc: SeqContext): Unit = {
     if (ssc.userConfig.pipeline.length == 2 || ssc.userConfig.pipeline.head == "association") {
       val assocConf = ssc.userConfig.association
       val methods = assocConf.methodList
@@ -231,7 +231,7 @@ object SingleStudy {
       assoc.run()
     }
   }
-
+*/
 
 
 }

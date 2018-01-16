@@ -21,7 +21,7 @@ import java.io.{PrintWriter}
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
 import org.dizhang.seqspark.util.Constant.Genotype.{Raw}
-import org.dizhang.seqspark.util.{General, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.{General, LogicalParser, SeqContext}
 import org.dizhang.seqspark.util.UserConfig._
 import General._
 import org.slf4j.{Logger, LoggerFactory}
@@ -31,7 +31,7 @@ import java.nio.file.Path
   */
 object Genotypes {
   val logger: Logger = LoggerFactory.getLogger(getClass)
-  def statGdGq(self: Data[String])(ssc: SingleStudyContext): Unit = {
+  def statGdGq(self: Data[String])(ssc: SeqContext): Unit = {
     logger.info("count genotype by DP and GQ ...")
 
     val sc = ssc.sparkContext

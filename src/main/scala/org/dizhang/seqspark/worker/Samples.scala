@@ -29,7 +29,7 @@ import org.dizhang.seqspark.stat.PCA
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38, Pheno}
 import org.dizhang.seqspark.util.InputOutput._
 import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.slf4j.LoggerFactory
 import scala.collection.BitSet
 import java.nio.file.Path
@@ -40,7 +40,7 @@ import java.nio.file.Path
 object Samples {
   val logger = LoggerFactory.getLogger(getClass)
 
-  def pca[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
+  def pca[A: Genotype](self: Data[A])(ssc: SeqContext): Unit = {
     logger.info(s"perform PCA")
     val geno = implicitly[Genotype[A]]
 
@@ -62,7 +62,7 @@ object Samples {
   }
 
   def prune[A: Genotype](self: Data[A])
-                        (ssc: SingleStudyContext): RDD[Array[Double]] = {
+                        (ssc: SeqContext): RDD[Array[Double]] = {
     val geno = implicitly[Genotype[A]]
     val pcaConf = ssc.userConfig.qualityControl.pca
     val coding = self.map{v =>
@@ -124,7 +124,7 @@ object Samples {
     math.pow(r(0,1), 2.0) >= r2
   }
 
-  def titv[A: Genotype](self: Data[A])(ssc: SingleStudyContext): Unit = {
+  def titv[A: Genotype](self: Data[A])(ssc: SeqContext): Unit = {
     logger.info("compute ti/tv ratio")
     val geno = implicitly[Genotype[A]]
     val cntAll = self.map(v =>
@@ -158,7 +158,7 @@ object Samples {
     logger.info("finished computing ti/tv")
   }
 
-  def checkSex[A: Genotype](self:Data[A])(ssc: SingleStudyContext): Unit = {
+  def checkSex[A: Genotype](self:Data[A])(ssc: SeqContext): Unit = {
     logger.info("check sex")
     val geno = implicitly[Genotype[A]]
     def toHet(g: A): (Double, Double) = {
@@ -203,7 +203,7 @@ object Samples {
   }
 
   def writeCheckSex(data: (Option[Counter[(Double, Double)]], Option[Counter[(Double, Double)]]), outFile: Path)
-                   (ssc: SingleStudyContext): Unit = {
+                   (ssc: SeqContext): Unit = {
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     //val fid = pheno.select("fid").map(_.getOrElse("NA"))

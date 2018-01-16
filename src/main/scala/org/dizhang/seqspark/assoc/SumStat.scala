@@ -102,7 +102,7 @@ object SumStat {
                               variance: DM[Double]) extends RMWResult {
     def segment: Region = {
       val some = vars.head
-      val start = some.start/SegmentSize * SegmentSize
+      val start = some.pos /SegmentSize * SegmentSize
       Region(some.chr, start, start + SegmentSize)
     }
     def segmentId: Int = {

@@ -30,7 +30,7 @@ import org.dizhang.seqspark.ds.{Genotype, Phenotype}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.util.{Constant, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.{Constant, LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 
@@ -260,7 +260,7 @@ object AssocMaster {
 }
 
 @SerialVersionUID(105L)
-class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
+class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = Phenotype("phenotype")(ssc.sparkSession)

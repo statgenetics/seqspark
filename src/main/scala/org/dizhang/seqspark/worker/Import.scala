@@ -17,18 +17,22 @@
 package org.dizhang.seqspark.worker
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.util.AccumulatorV2
 import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.{Phenotype, Region, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, Region, Variant}
 import org.dizhang.seqspark.util.UserConfig.{GenotypeFormat => GenoFormat}
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
 import org.dizhang.seqspark.util.{LogicalParser, SeqContext, UserConfig => UC}
+import org.dizhang.seqspark.worker.Genotypes.GenoCounter
 import org.slf4j.LoggerFactory
 
 
 /**
   * Created by zhangdi on 8/13/16.
   */
+// TODO: separate sample and variant selection
+
 sealed trait Import[A] {
   def load(ssc: SeqContext, a: A): Data[A]
 }
@@ -76,6 +80,7 @@ object Import {
   }
 
   def fromVCF(ssc: SeqContext): Data[String] = {
+
 
     def pass(l: String)
             (logExpr: LogExpr,
@@ -174,7 +179,7 @@ object Import {
           s1.samples(samples)(sc)
       }
     }
-    s3
+    Variants.decompose(s3)
   }
 
   def fromImpute2(ssc: SeqContext): Data[(Double, Double, Double)] = {

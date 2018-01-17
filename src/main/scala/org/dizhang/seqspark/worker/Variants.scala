@@ -18,11 +18,14 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
 
+import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.SeqContext
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
@@ -35,12 +38,20 @@ object Variants {
 
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
+
+  val varCnt = new LongAccumulator()
+
   def decompose(self: Data[String]): Data[String] = {
     logger.info("decompose multi-allelic variants")
     self.flatMap(v => decomposeVariant(v))
   }
 
-  def countByFunction[A](self: Data[A]): Unit = {
+  def titv[A](self: Data[A]): (Int, Int) = {
+    self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
+      .reduce((a, b) => CounterElementSemiGroup.PairInt.op(a, b))
+  }
+
+  def countByFunction[A](self: Data[A])(implicit ssc: SeqContext): Unit = {
     val cnt = self.map(v =>
       if (v.parseInfo.contains(IK.anno)) {
         worstAnnotation(v.parseInfo(IK.anno)) -> 1
@@ -49,7 +60,9 @@ object Variants {
       }).countByKey()
       .toArray.sortBy(p => FM(p._1))
 
-    val pw = new PrintWriter(new File("output/annotation_summary.txt"))
+    val outDir = ssc.userConfig.output.results
+
+    val pw = new PrintWriter(outDir.resolve("annotation_summary.txt").toFile)
     for ((k, v) <- cnt) {
       pw.write(s"${k.toString}: $v\n")
     }
@@ -57,7 +70,7 @@ object Variants {
     val genes = self.flatMap(v =>
       v.parseInfo(InfoKey.anno).split(",,").map(g => g.split("::")(0))
     ).countByValue()
-    val pw2 = new PrintWriter(new File("output/variants_genes.txt"))
+    val pw2 = new PrintWriter(outDir.resolve("variants_genes.txt").toFile)
     for ((k, v) <- genes) {
       pw2.write(s"$k: $v\n")
     }

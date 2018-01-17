@@ -304,6 +304,8 @@ case class DummyVariant[A: Genotype](var meta: Array[String], default: A)
   def denseSize = 0
   def map[B: Genotype](f: A => B): DummyVariant[B] = DummyVariant(meta.clone(), f(default))
   def apply(i: Int): A = default
+
+  override def toString: String = s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info"
 }
 
 

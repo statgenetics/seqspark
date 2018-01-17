@@ -38,6 +38,7 @@ object Phenotype {
    )
 
    def update(path: String, table: String)(spark: SparkSession): Phenotype = {
+     logger.debug(s"phenotype path: $path")
      val dataFrame = spark.read.options(options).csv(path)
      logger.info(s"add ${dataFrame.columns.mkString(",")} to phenotype dataframe")
      val old = spark.table(table)

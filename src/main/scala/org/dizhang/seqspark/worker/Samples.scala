@@ -58,7 +58,7 @@ object Samples {
     val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
     val path = ssc.userConfig.output.results.resolve("pca.csv")
     writeDenseMatrix(path, res, Some(header), Some(sn))
-    Phenotype.update("file:" + ssc.userConfig.output.results.toAbsolutePath, "phenotype")(ssc.sparkSession)
+    Phenotype.update("file://" + path.toString, "phenotype")(ssc.sparkSession)
   }
 
   def prune[A: Genotype](self: Data[A])
@@ -146,8 +146,8 @@ object Samples {
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     //val fid = pheno.select("fid").map(_.get)
     val iid = pheno.select("iid").map(_.get)
-    val outFile = "output/titv.txt"
-    val pw = new PrintWriter(new File(outFile))
+    val outFile = ssc.userConfig.output.results.resolve("titv").toAbsolutePath.toFile
+    val pw = new PrintWriter(outFile)
     pw.write(s"#all,${cntAll._1},${cntAll._2}\n")
     pw.write("iid,ti,tv\n")
     for (i <- iid.indices) {

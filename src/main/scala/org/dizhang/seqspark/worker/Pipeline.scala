@@ -48,64 +48,63 @@ object Pipeline {
     val conf = ssc.userConfig
     conf.input.genotype.format match {
       case GenotypeFormat.vcf =>
-        val data = Import(ssc, a)
-        val annotated = Annotation(data, a)
-        val clean = QualityControl(annotated, a, b)
-        Export(clean)
-        Association(clean)
-        //run[String, Byte](data, a, b)
+        run[String, Byte](a, b)
       case GenotypeFormat.imputed =>
-        val data = Import(ssc, c)
-        val annotated = Annotation(data, c)
-        val clean = QualityControl(annotated, c, c)
-        Export(clean)
-        Association(clean)
-      case GenotypeFormat.`cacheVcf` =>
-        val data = Import(ssc, b)
-        val annotated = Annotation(data, b)
-        val clean = QualityControl(annotated, b, b)
-        Export(clean)
-        Association(clean)
+        run[Imp, Imp](c, c)
+      case GenotypeFormat.cacheVcf =>
+        run[Byte, Byte](b, b)
       case GenotypeFormat.cacheImputed =>
-        val data = Import(ssc, c)
-        val annotated = Annotation(data, c)
-        val clean = QualityControl(annotated, c, c)
-        Export(clean)
-        Association(clean)
+        run[Imp, Imp](c, c)
     }
   }
-  def run[A, B](data: Data[A], a: A, b: B)
+
+
+
+  def run[A, B](a: A, b: B)
                (implicit ssc: SeqContext,
                 genoa: Genotype[A],
                 genob: Genotype[B],
                 importer: Import[A],
                 qc: QualityControl[A, B]): Unit = {
+
     val conf = ssc.userConfig
+
     var pipeline = ssc.userConfig.pipeline
 
     val imported = Import(ssc, a)
 
-    val annotated = Annotation(imported, a)
-
-    val clean = if (pipeline.nonEmpty && pipeline.head == "qualityControl") {
-      pipeline = pipeline.tail
-      QualityControl(annotated, a, b)
+    if (pipeline.isEmpty) {
+      Export(imported)
     } else {
-      QualityControl(annotated, a, b)
-    }
+      val annotated =
+        if (pipeline.nonEmpty && pipeline.head == "annotation") {
+          pipeline = pipeline.tail
+          Annotation(imported, a)
+        } else {
+          imported
+        }
 
+      if (pipeline.isEmpty) {
+        Export(annotated)
+      } else {
+        val clean =
+          if (pipeline.nonEmpty && pipeline.head == "qualityControl") {
+            pipeline = pipeline.tail
+            QualityControl(annotated, a, b)
+          } else {
+            QualityControl(annotated, a, b, pass = true)
+          }
 
-    if (conf.qualityControl.save) {
-      clean.cache()
-      clean.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
-    }
-    if (conf.qualityControl.export) {
-      clean.cache()
-      clean.saveAsTextFile(conf.input.genotype.path + s".${conf.project}.vcf")
-    }
-
-    if (pipeline.nonEmpty && pipeline.head == "association") {
-      Association(clean)
+        if (pipeline.isEmpty) {
+          Export(clean)
+        } else {
+          if (pipeline.nonEmpty && pipeline.head == "association") {
+            pipeline = pipeline.tail
+            Association(clean)
+          }
+          Export(clean)
+        }
+      }
     }
 
   }

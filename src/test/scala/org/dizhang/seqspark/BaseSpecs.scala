@@ -17,11 +17,14 @@
 package org.dizhang.seqspark
 
 import java.net.URL
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
 import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.{Files, Path, Paths}
+import java.util.Comparator
+
 import scala.sys.process._
 import scala.io.Source
 import scala.collection.JavaConverters._
@@ -143,7 +146,11 @@ object BaseSpecs {
       Files.deleteIfExists(rootFolder.resolve(s"$name.new.md5"))
       Files.deleteIfExists(md5file)
       if (Files.exists(dataFolder)) {
-        Files.list(dataFolder).iterator().asScala.foreach(p => Files.deleteIfExists(p))
+        Files.walk(dataFolder)
+          .iterator().asScala.toList.sorted(Ordering[Path].reverse)
+          .foreach(p =>
+            Files.deleteIfExists(p)
+          )
         Files.deleteIfExists(dataFolder)
       }
     }
@@ -151,7 +158,7 @@ object BaseSpecs {
     def download(): Unit = {
       clear()
       (new URL(s"$url/$name.md5") #> rootFolder.resolve(s"$name.md5").toFile).!!
-      Files.createDirectories(dataFolder)
+      if (! Files.exists(dataFolder)) Files.createDirectories(dataFolder)
       files.foreach(f =>
         (new URL(s"$url/$name/$f") #> dataFolder.resolve(s"$f").toFile).!!
       )

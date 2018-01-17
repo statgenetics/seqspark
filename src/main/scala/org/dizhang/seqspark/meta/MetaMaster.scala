@@ -63,7 +63,7 @@ class MetaMaster(metaContext: SeqContext) {
 
     /** single variant analysis */
     val snv = runSNV(annotated).collect()
-    AMA.writeResults(snv, "output/meta_snv")
+    AMA.writeResults(snv,rootConfig.output.results.resolve("meta_snv").toFile)
 
     /** gene based analyses
       * 1. filter variants based on MAF and functional annotation
@@ -84,7 +84,7 @@ class MetaMaster(metaContext: SeqContext) {
         case MethodType.brv|MethodType.skat =>
           logger.info(s"Perform meta-analysis using method $m")
           val res = runMethod(grouped, m)(sc, metaConf).collect()
-          AMA.writeResults(res, s"output/meta_$m")
+          AMA.writeResults(res, rootConfig.output.results.resolve(s"meta_$m").toFile)
         case _ => logger.warn(s"This method ($m) is not supported in meta analysis")
       }
     }

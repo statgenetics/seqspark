@@ -17,11 +17,9 @@
 package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.ds.VCF._
+import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 import org.dizhang.seqspark.util.SeqContext
-import org.dizhang.seqspark.worker.Genotypes._
-import org.dizhang.seqspark.worker.Samples._
-import org.dizhang.seqspark.worker.Variants._
-import org.slf4j.{LoggerFactory, Logger}
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * Created by zhangdi on 9/25/16.
@@ -37,9 +35,8 @@ object QualityControl {
 
   type Imp = (Double, Double, Double)
 
-  def apply[A, B](data: Data[A], a: A, b: B)
-                                 (implicit ssc: SeqContext, qc: QualityControl[A, B]): Data[B] = {
-    val pass = ! ssc.userConfig.pipeline.contains("qualityControl")
+  def apply[A, B](data: Data[A], a: A, b: B, pass: Boolean = false)
+                 (implicit ssc: SeqContext, qc: QualityControl[A, B]): Data[B] = {
 
     qc.clean(data, pass)
   }
@@ -84,40 +81,58 @@ object QualityControl {
         //annotated.foreach(_ => Unit)
         //logger.info(s"raw data: ${input.count()} variants")
       //}
-      statGdGq(input)(ssc)
+      Genotypes.statGdGq(input)(ssc)
     }
 
+    if (sums.contains("titv")) {
+      val ratio = Variants.titv(input)
+      logger.info(s"titv ratio before QC: ${ratio._1.toDouble/ratio._2} = ${ratio._1}/${ratio._2}")
+    }
+
+
     /** 1. Genotype level QC */
-    val cleaned = genotypeQC(input, conf.qualityControl.genotypes)
+    val (cleaned, rawGenoCnts) = Genotypes.genotypeQC(input, conf.qualityControl.genotypes)(sc)
     //if (conf.benchmark) {
       //cleaned.cache()
       //logger.info(s"genotype QC completed: ${cleaned.count()} variants")
     //}
-    /** 2. decompose */
-    val decomposed = if (conf.input.genotype.decompose)
-      decompose(cleaned)
-    else
-      cleaned
     //if (conf.benchmark) {
       //decomposed.cache()
       //logger.info(s"${decomposed.count()} variants after decomposition")
     //}
 
+    if (conf.benchmark) {
+      logger.info(s"${cleaned.count()} variants before QC")
+      logger.info(s"${cleaned.map(v => v.parseInfo("SS_RawGeno").toInt).reduce((a, b) => a + b)} genotypes before QC")
+    }
+
+
     /** 3. convert to Byte genotype */
-    val simpleVCF: Data[Byte] = toSimpleVCF(decomposed)
+    val simpleVCF: Data[Byte] = Genotypes.toSimpleVCF(cleaned)
 
-    /** 4. impute missing genotype */
-    val imputed: Data[Byte] = imputeMis(simpleVCF)(conf)
-
-
-    /** 6. Variant level QC */
-    val res = imputed.variants(conf.qualityControl.variants)(ssc)
+    /** 4. Variant level QC */
+    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
 
     if (conf.benchmark) {
       res.cache()
       logger.info(s"${res.count()} variants after variant level QC")
+      logger.info(s"${res.map(v => v.parseInfo("SS_CleanGeno").toInt).reduce((a, b) => a + b)} genotypes after QC")
+      val maf = res.map{v =>
+        val info = v.parseInfo
+        if (info.contains(InfoKey.maf)) {
+          Some(info(InfoKey.maf).toDouble)
+        } else {
+          None
+        }
+      }
+      val rare = maf.map(m => m.map(d => d < 0.01 || d > 0.99))
+      logger.info(s"${rare.filter(r => r.isDefined && r.get).count()} rare variants by annotation")
+      logger.info(s"${rare.filter(r => r.isEmpty).count()} unknown variants by annotation")
+      logger.info(s"${rare.filter(r => r.isDefined && ! r.get).count()} common variants by annotation")
     }
 
+    /** 5. impute missing genotype */
+    val imputed: Data[Byte] = Genotypes.imputeMis(res)(conf)
 
     res.cache()
     //res.checkpoint()
@@ -127,18 +142,24 @@ object QualityControl {
     /** sample QC */
 
     if (sums.contains("sexCheck")) {
-      checkSex(res)(ssc)
+      Samples.checkSex(res)(ssc)
     }
 
     if (sums.contains("titv")) {
-      titv(res)(ssc)
+      val ratio = Variants.titv(res)
+      logger.info(s"titv ratio after QC: ${ratio._1.toDouble/ratio._2} = ${ratio._1}/${ratio._2}")
     }
 
     if (sums.contains("pca")) {
-      pca(res)(ssc)
+      Samples.pca(res)(ssc)
     }
 
-    res
+    if (conf.qualityControl.save) {
+      res.cache()
+      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
+    }
+
+    imputed
   }
 
   def cleanImputed(input: Data[(Double, Double, Double)])
@@ -151,15 +172,21 @@ object QualityControl {
     val sums = ssc.userConfig.qualityControl.summaries
     /** sample QC */
     if (sums.contains("sexCheck")) {
-      checkSex(input)(ssc)
+      Samples.checkSex(input)(ssc)
     }
 
     if (sums.contains("pca")) {
-      pca(input)(ssc)
+      Samples.pca(input)(ssc)
     }
 
     /** Variant QC */
-    input.variants(conf.qualityControl.variants)(ssc)
+    val res = input.variants(conf.qualityControl.variants)(ssc)
 
+    if (conf.qualityControl.save) {
+      res.cache()
+      res.saveAsObjectFile(conf.input.genotype.path + s".${conf.project}")
+    }
+
+    res
   }
 }

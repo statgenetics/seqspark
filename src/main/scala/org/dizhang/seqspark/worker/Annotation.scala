@@ -64,9 +64,6 @@ object Annotation {
     } else {
       geneAnnot
     }
-
-
-
   }
 
   def checkDB(conf: AnnotationConfig): Boolean = {

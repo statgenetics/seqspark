@@ -100,7 +100,7 @@ object RefGene {
       mergeFa(a, b)
     }.map(s => (s._1, makeRNA(s._1, s._2))).toMap
     */
-    logger.debug(s"${seq.take(100).keys.mkString(":")}")
+    //logger.debug(s"${seq.take(100).keys.mkString(":")}")
     logger.info(s"${seq.size} transcript sequences")
 
     /**
@@ -129,6 +129,7 @@ object RefGene {
   }
 }
 
+@SerialVersionUID(0L)
 class RefGene(val build: String,
               val loci: IntervalTree[Location],
-              val seq: Map[String, mRNA])
+              val seq: Map[String, mRNA]) extends Serializable

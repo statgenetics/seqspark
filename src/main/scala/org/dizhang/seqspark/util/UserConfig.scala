@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.util
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
@@ -44,7 +44,9 @@ object UserConfig {
 
   def getProperPath(unchecked: String): String = {
     if (unchecked.isEmpty) {
-      logger.warn(s"using empty path")
+      //logger.warn(s"using empty path")
+      unchecked
+    } else if (unchecked.startsWith("file:")) {
       unchecked
     } else if (hdfs.exists(new fs.Path(unchecked))) {
       unchecked
@@ -181,6 +183,8 @@ object UserConfig {
 
     val export: Boolean = if (config.hasPath("export")) config.getBoolean("export") else false
 
+    val supersede: Boolean = if (config.hasPath("supersede")) config.getBoolean("supersede") else false
+
     def save: Boolean = if (config.hasPath("save")) config.getBoolean("save") else false
 
     def cache: Boolean = if (config.hasPath("cache")) config.getBoolean("cache") else false
@@ -225,6 +229,12 @@ object UserConfig {
     val save = config.getBoolean("save")
     val export = config.getBoolean("export")
     val pca = PCAConfig(config.getConfig("pca"))
+    def groups: List[String] = {
+      if (config.hasPath("groups"))
+        config.getStringList("groups").asScala.toList
+      else
+        List[String]()
+    }
   }
 
   case class PCAConfig(config: Config) extends UserConfig {
@@ -262,7 +272,7 @@ object UserConfig {
       case _ => config.getStringList("header").asScala.toArray
     }
     def pathRaw: String = config.getString("path")
-    def path: String = getProperPath(pathRaw)
+    def path: String = if (config.hasPath("path")) getProperPath(pathRaw) else ""
     def pathValid: Boolean = path != ""
   }
 

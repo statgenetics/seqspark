@@ -147,7 +147,7 @@ object QualityControl {
     {
       val varCnt = res.count()
       logger.info(s"$varCnt variants after variant level QC")
-      val genoCnt = res.map(v => v.parseInfo("SS_CleanGeno").toInt).reduce((a, b) => a + b)
+      val genoCnt = if (res.isEmpty()) 0 else res.map(v => v.parseInfo("SS_CleanGeno").toInt).reduce((a, b) => a + b)
       logger.info(s"$genoCnt genotypes after QC")
       val maf = res.map { v =>
         val info = v.parseInfo

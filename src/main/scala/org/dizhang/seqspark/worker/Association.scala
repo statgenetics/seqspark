@@ -18,10 +18,18 @@ package org.dizhang.seqspark.worker
 import org.dizhang.seqspark.assoc.AssocMaster
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.util.SeqContext
+import org.slf4j.LoggerFactory
 
 object Association {
+
+  private val logger = LoggerFactory.getLogger(getClass)
+
   def apply[B: Genotype](input: Data[B])(implicit ssc: SeqContext): Unit = {
     if (ssc.userConfig.pipeline.contains("association"))
-      new AssocMaster(input).run()
+      if (input.isEmpty()) {
+        logger.warn(s"no variants left. cannot perform association analysis")
+      } else {
+        new AssocMaster(input).run()
+      }
   }
 }

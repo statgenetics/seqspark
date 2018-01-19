@@ -52,13 +52,18 @@ object Samples {
     }
     val pruned = prune(common)(ssc)
     val res =  new PCA(pruned).pc(10)
-    logger.info(s"PC dimension: ${res.rows} x ${res.cols}")
-    val phenotype = Phenotype("phenotype")(ssc.sparkSession)
-    val sn = phenotype.sampleNames
-    val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
-    val path = ssc.userConfig.output.results.resolve("pca.csv")
-    writeDenseMatrix(path, res, Some(header), Some(sn))
-    Phenotype.update("file://" + path.toString, "phenotype")(ssc.sparkSession)
+    if (res.rows == 0) {
+      logger.warn(s"no result for PCA")
+      Unit
+    } else {
+      logger.debug(s"PC dimension: ${res.rows} x ${res.cols}")
+      val phenotype = Phenotype("phenotype")(ssc.sparkSession)
+      val sn = phenotype.sampleNames
+      val header = "iid" + Pheno.delim + (1 to 10).map(i => s"_pc$i").mkString(Pheno.delim)
+      val path = ssc.userConfig.output.results.resolve("pca.csv")
+      writeDenseMatrix(path, res, Some(header), Some(sn))
+      Phenotype.update("file://" + path.toString, "phenotype")(ssc.sparkSession)
+    }
   }
 
   def prune[A: Genotype](self: Data[A])

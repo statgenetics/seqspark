@@ -47,8 +47,12 @@ object Variants {
   }
 
   def titv[A](self: Data[A]): (Int, Int) = {
+    val cnt =
     self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
-      .reduce((a, b) => CounterElementSemiGroup.PairInt.op(a, b))
+    if (cnt.isEmpty())
+      (0, 0)
+    else
+      cnt.reduce((a, b) => CounterElementSemiGroup.PairInt.op(a, b))
   }
 
   def countByFunction[A](self: Data[A])(implicit ssc: SeqContext): Unit = {

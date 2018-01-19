@@ -125,7 +125,7 @@ object QualityControl {
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = Genotypes.toSimpleVCF(cleaned)
 
-    simpleVCF.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    simpleVCF.persist(StorageLevel.MEMORY_ONLY_SER)
 
     {
       val varCnt = simpleVCF.count()
@@ -142,7 +142,7 @@ object QualityControl {
     val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
 
     //if (conf.benchmark) {
-      res.persist(StorageLevel.MEMORY_ONLY_SER)
+      //res.persist(StorageLevel.MEMORY_ONLY_SER)
 
     {
       val varCnt = res.count()

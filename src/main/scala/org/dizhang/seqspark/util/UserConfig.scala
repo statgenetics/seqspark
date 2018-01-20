@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.util
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
@@ -41,6 +41,7 @@ object UserConfig {
 
   lazy val hadoopConf = new hadoop.conf.Configuration()
   lazy val hdfs = hadoop.fs.FileSystem.get(hadoopConf)
+
 
   def getProperPath(unchecked: String): String = {
     if (unchecked.isEmpty) {
@@ -283,14 +284,27 @@ object UserConfig {
   case class AssociationConfig(config: Config) extends UserConfig {
     def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
-    def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
+    def method(name: String) = {
+      val conf = config.getConfig(s"method.$name")
+      val mtype = conf.getString("type")
+      if (name != mtype)
+        MethodConfig(conf.withFallback(config.getConfig(s"method.$mtype")).resolve())
+      else
+        MethodConfig(conf)
+
+    }
     def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
     def sites: String = config.getString("method.sites")
 
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
-    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
+    val impute: ImputeMethod.Value =
+      if (config.hasPath("impute"))
+        ImputeMethod.withName(config.getString("impute"))
+      else
+        ImputeMethod.withName("bestGuess")
+
     val varLimit: (Int, Int) = {
       if (config.hasPath("varLimit")) {
         val res = config.getIntList("varLimit").asScala.toList
@@ -354,7 +368,11 @@ object UserConfig {
 
   case class MethodConfig(config: Config) extends UserConfig {
     val `type` = MethodType.withName(config.getString("type"))
-    val weight = WeightMethod.withName(config.getString("weight"))
+    val weight =
+      if (config.hasPath("weight"))
+        WeightMethod.withName(config.getString("weight"))
+      else
+        WeightMethod.withName("none")
     val maf = config.getConfig("maf")
     val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
     val test = if (config.hasPath("test"))

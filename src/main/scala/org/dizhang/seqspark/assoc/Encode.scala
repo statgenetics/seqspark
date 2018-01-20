@@ -304,6 +304,7 @@ object Encode {
 
   }
 
+  // TODO: need to add support for arbitary INFO key
   sealed trait SimpleWeight[A] extends BRV[A] {
     def weight: DenseVector[Double] = {
       val mafDV: DenseVector[Double] = DenseVector(maf)

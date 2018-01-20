@@ -62,10 +62,13 @@ object SingleStudy {
   }
 
   def checkConf(conf: RootConfig): Boolean = {
-    if (! Annotation.checkDB(conf.annotation)) {
+    if (conf.pipeline.isEmpty) {
+      logger.error("pipeline empty")
+      false
+    } else if (! Annotation.checkDB(conf.annotation)) {
       logger.error("conf error in annotation")
       false
-    } else if (! conf.input.phenotype.pathValid) {
+    } else if (! conf.input.phenotype.pathValid && (conf.pipeline.length > 1 || conf.pipeline.head != "annotation")) {
       logger.error(s"phenotype input path not valid: ${conf.input.phenotype.pathRaw}")
       false
     } else if (! conf.input.genotype.pathValid) {

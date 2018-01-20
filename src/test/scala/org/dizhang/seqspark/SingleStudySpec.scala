@@ -16,12 +16,22 @@
 
 package org.dizhang.seqspark
 import BaseSpecs._
+import org.dizhang.seqspark.util.UserConfig.RootConfig
 
 class SingleStudySpec extends IntegrationSpec with SharedTestData {
 
-  val confFile = getClass.getResource("/demo.conf").getPath
-  val conf = SeqSpark.readConf(confFile)
+  private val confFile = getClass.getResource("/demo.conf").getPath
+  private val conf = SeqSpark.readConf(confFile)
 
+  def readConf(path: String): RootConfig = {
+    val file = getClass.getResource(s"/$path").getPath
+    SeqSpark.readConf(file)
+  }
+
+  def runPipeline(conf: RootConfig): Unit = {
+    val ssc = util.SeqContext(conf, sc, spark)
+    SingleStudy(ssc)
+  }
 
   "A SingleStudy" should "read conf file properly" in {
     logger.info(s"Conf path: $confFile")
@@ -35,19 +45,31 @@ class SingleStudySpec extends IntegrationSpec with SharedTestData {
     )
   }
 
-  it should "load genotype into sc" in {
+  ignore should "load genotype into sc" in {
     val geno = sc.textFile(conf.input.genotype.path)
     logger.info(s"${geno.filter(! _.startsWith("#")).count()} variants")
   }
 
-  it should "load phenotype into spark" in {
+  ignore should "load phenotype into spark" in {
     val pheno = spark.read.options(ds.Phenotype.options).csv(conf.input.phenotype.path)
     logger.info(s"${pheno.count()} samples")
   }
 
-  it should "run the whole thing" in {
+  ignore should "run the whole thing" in {
     val ssc = util.SeqContext(conf, sc, spark)
     SingleStudy(ssc)
+  }
+
+  ignore should "run annotation" in {
+    runPipeline(readConf("anno.conf"))
+  }
+
+  ignore should "run qc" in {
+    runPipeline(readConf("qc.conf"))
+  }
+
+  it should "run association" in {
+    runPipeline(readConf("assoc.conf"))
   }
 
 }

@@ -258,16 +258,19 @@ object AssocMaster {
 
   def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: File): Unit = {
     //val header = implicitly[AssocMethod.Header[A]]
-
-    val pw = new PrintWriter(outFile)
-    pw.write(s"${res.head._2.header}\n")
-    res.sortBy(p =>
-      p._2.pValue match {
-        case None => 2.0
-        case Some(x) => x}).foreach{p =>
-      pw.write("%s\t%s\n".format(p._1, p._2.toString))
+    if (res.isEmpty) {
+      logger.warn(s"no res for file ${outFile.toString}")
+    } else {
+      val pw = new PrintWriter(outFile)
+      pw.write(s"${res.head._2.header}\n")
+      res.sortBy(p =>
+        p._2.pValue match {
+          case None => 2.0
+          case Some(x) => x}).foreach{p =>
+        pw.write("%s\t%s\n".format(p._1, p._2.toString))
+      }
+      pw.close()
     }
-    pw.close()
   }
 
 }
@@ -338,9 +341,9 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
     val cond = LogicalParser.parse(methodConfig.misc.variants)
     val chosenVars = currentGenotype.variants(cond)(ssc)
 
-    //if (cnf.benchmark) {
-      //logger.info(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")
-    //}
+    if (cnf.benchmark) {
+      logger.debug(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")
+    }
 
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 

@@ -44,7 +44,7 @@ object Annotation {
     val assocConf = conf.association
 
     /** need to perform functional annotation? */
-    val geneAssoc = assocConf.methodList.exists(m =>
+    val geneAssoc = conf.pipeline.contains("association") && assocConf.methodList.exists(m =>
       assocConf.method(m).`type` match {
         case MethodType.meta | MethodType.snv => false
         case _ => true

@@ -77,8 +77,11 @@ object Pipeline {
       Export(imported)
     } else {
       val annotated =
-        if (pipeline.nonEmpty && pipeline.head == "annotation") {
-          pipeline = pipeline.tail
+        if (pipeline.nonEmpty && (pipeline.head == "annotation" || pipeline.contains("association"))) {
+          pipeline = if (pipeline.head == "annotation")
+            pipeline.tail
+          else
+            pipeline
           Annotation(imported, a)
         } else {
           imported

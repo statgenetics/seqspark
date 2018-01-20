@@ -57,19 +57,30 @@ object Phenotype {
 
    def apply(path: String, table: String)(spark: SparkSession): Phenotype = {
 
-    logger.info(s"creating phenotype dataframe from $path")
+     if (path.isEmpty) {
+       Dummy
+     } else {
+       logger.info(s"creating phenotype dataframe from $path")
 
-    val dataFrame = spark.read.options(options).csv(path)
+       val dataFrame = spark.read.options(options).csv(path)
 
-    dataFrame.createOrReplaceTempView(table)
+       dataFrame.createOrReplaceTempView(table)
 
-    Distributed(dataFrame)
+       Distributed(dataFrame)
+     }
   }
 
    def apply(table: String)(spark: SparkSession): Phenotype = {
-     Distributed(spark.table(table))
+     if (spark.catalog.tableExists("phenotype"))
+       Distributed(spark.table(table))
+     else
+       Dummy
    }
 
+   case object Dummy extends Phenotype {
+     def select(field: String): Array[Option[String]] = Array[Option[String]]()
+     def contains(field: String): Boolean = false
+   }
 
   case class Distributed(df: DataFrame) extends Phenotype {
 

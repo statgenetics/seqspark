@@ -17,7 +17,7 @@
 package org.dizhang.seqspark
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.dizhang.seqspark.util.MetaAnalysisContext
+import org.dizhang.seqspark.util.SeqContext
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import org.dizhang.seqspark.meta._
 import org.slf4j.{Logger, LoggerFactory}
@@ -27,25 +27,13 @@ import org.slf4j.{Logger, LoggerFactory}
 object MetaAnalysis {
   val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def main(args: Array[String]): Unit = {
+  def apply(seqContext: SeqContext): Unit = {
 
     logger.info("start meta analysis")
 
-    val rootConf = SingleStudy.readConf(args(0))
-
-    val user = System.getenv("USER")
-    val hdfsHome = s"hdfs:///user/$user"
-
-    val project = rootConf.project
-
     /** Spark configuration */
-    val scConf = new SparkConf().setAppName("SeqSpark-%s" format project)
-    scConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    //scConf.registerKryoClasses(Array(classOf[ConfigObject], classOf[Config], classOf[Bed], classOf[Var], classOf[Counter[(Double, Double)]]))
-    val sc: SparkContext = new SparkContext(scConf)
 
-    val metaContext = MetaAnalysisContext(rootConf, sc)
-    val mm = new MetaMaster(metaContext)
+    val mm = new MetaMaster(seqContext)
 
     mm.run()
 

@@ -16,12 +16,18 @@
 
 package org.dizhang.seqspark.util
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
+
 import scala.collection.JavaConverters._
 import scala.io.Source
+import java.nio.file.{Files, Path, Paths}
+
+import org.apache.hadoop
+import org.apache.hadoop.fs
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
   * Wrapper around the typesafe.config
@@ -31,17 +37,40 @@ import scala.io.Source
   */
 object UserConfig {
 
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  lazy val hadoopConf = new hadoop.conf.Configuration()
+  lazy val hdfs = hadoop.fs.FileSystem.get(hadoopConf)
+
+  def getProperPath(unchecked: String): String = {
+    if (unchecked.isEmpty) {
+      //logger.warn(s"using empty path")
+      unchecked
+    } else if (unchecked.startsWith("file:")) {
+      unchecked
+    } else if (hdfs.exists(new fs.Path(unchecked))) {
+      unchecked
+    } else if (Files.exists(Paths.get(unchecked))) {
+      "file://" + Paths.get(unchecked).toAbsolutePath.toString
+    } else {
+      logger.error(s"path doesn't exist on HDFS or Local FS: $unchecked")
+      ""
+    }
+  }
+
   object GenomeBuild extends Enumeration {
     val hg18 = Value("hg18")
     val hg19 = Value("hg19")
     val hg38 = Value("hg38")
   }
 
-  object ImportGenotypeType extends Enumeration {
+  object GenotypeFormat extends Enumeration {
     val vcf = Value("vcf")
     val imputed = Value("impute2")
-    val cachevcf = Value("cachedVcf")
-    val cacheimputed = Value("cachedImpute2")
+    //val bgen = Value("bgen")
+    //val cacheFullvcf = Value("cachedFullVcf")
+    val cacheVcf = Value("cachedVcf")
+    val cacheImputed = Value("cachedImpute2")
   }
 
   object Samples extends Enumeration {
@@ -92,10 +121,20 @@ object UserConfig {
     val no = Value("no")
   }
 
+  object DBFormat extends Enumeration {
+    val vcf: Value = Value("vcf")
+    val plain: Value = Value("plain")
+    val csv: Value = Value("csv")
+    val tsv: Value = Value("tsv")
+  }
+
   case class RootConfig(config: Config) extends UserConfig {
 
     val project = config.getString("project")
     val localDir = config.getString("localDir")
+
+    def local: Boolean = config.hasPath("local") && config.getBoolean("local")
+
     val outDir = localDir + "/output"
     val dbDir = config.getString("dbDir")
     val pipeline = config.getStringList("pipeline").asScala.toList
@@ -103,6 +142,7 @@ object UserConfig {
     val benchmark = config.getBoolean("benchmark")
     val debug = config.getBoolean("debug")
     val cache = config.getBoolean("cache")
+    val output: OutputConfig = OutputConfig(config.getConfig("output"), project)
 
     val qualityControl = QualityControlConfig(config.getConfig("qualityControl"))
 
@@ -117,19 +157,42 @@ object UserConfig {
     val phenotype = PhenotypeConfig(config.getConfig("phenotype"))
   }
 
+  case class OutputConfig(config: Config, proj: String) extends UserConfig {
+    val genotype = GenotypeConfig(config.getConfig("genotype"))
+    val results: Path = {
+      if (config.hasPath("results"))
+        Paths.get(config.getString("results")).toAbsolutePath
+      else
+        Paths.get(proj).toAbsolutePath
+    }
+  }
+
   case class GenotypeConfig(config: Config) extends UserConfig {
 
-    val format = ImportGenotypeType.withName(config.getString("format"))
+    def format = GenotypeFormat.withName(config.getString("format"))
 
-    val path = config.getString("path")
+    def pathRaw: String = config.getString("path")
 
+    def path = getProperPath(pathRaw)
+
+    def pathValid = path != ""
 
     //val filters = config.getStringList("filters").asScala.toArray
 
     val filters: LogExpr = LogicalParser.parse(config.getStringList("filters").asScala.toList)
 
-    val decompose: Boolean = config.getBoolean("decompose")
+    val export: Boolean = if (config.hasPath("export")) config.getBoolean("export") else false
+
+    val supersede: Boolean = if (config.hasPath("supersede")) config.getBoolean("supersede") else false
+
+    def save: Boolean = if (config.hasPath("save")) config.getBoolean("save") else false
+
+    def cache: Boolean = if (config.hasPath("cache")) config.getBoolean("cache") else false
+
+    val decompose: Boolean = if (config.hasPath("decompose")) config.getBoolean("decompose") else false
     //val genomeBuild = GenomeBuild.withName(config.getString("genomeBuild"))
+
+    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
 
     val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
@@ -153,7 +216,9 @@ object UserConfig {
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
-    val path = config.getString("path")
+    def pathRaw: String = config.getString("path")
+    def path = getProperPath(pathRaw)
+    def pathValid = path != ""
     val batch = config.getString("batch")
   }
 
@@ -164,6 +229,12 @@ object UserConfig {
     val save = config.getBoolean("save")
     val export = config.getBoolean("export")
     val pca = PCAConfig(config.getConfig("pca"))
+    def groups: List[String] = {
+      if (config.hasPath("groups"))
+        config.getStringList("groups").asScala.toList
+      else
+        List[String]()
+    }
   }
 
   case class PCAConfig(config: Config) extends UserConfig {
@@ -178,10 +249,35 @@ object UserConfig {
     def dbDir = config.getString("dbDir")
     def variants = config.getConfig("variants")
     def genes = config.getConfig("genes")
-    def RefSeq = config.getConfig("RefSeq")
+    def RefSeq = config.getConfig("db.RefSeq")
     def dbNSFP = config.getConfig("dbNSFP")
     def CADD = config.getConfig("CADD")
     def ExAC = config.getConfig("ExAC")
+    def dbList: List[String] = config.getConfig("db").root().keySet().asScala.toList
+    def db(name: String): DatabaseConfig = DatabaseConfig(config.getConfig(s"db.$name"))
+    def addInfo: Map[String, String] = {
+      if (config.hasPath("addInfo")) {
+        val keys = config.getConfig("addInfo").root().keySet().asScala.toList
+        keys.map(k => k -> config.getString(s"addInfo.$k")).toMap
+      } else {
+        Map.empty[String, String]
+      }
+    }
+  }
+
+  case class DatabaseConfig(config: Config) extends UserConfig {
+    def format: DBFormat.Value = DBFormat.withName(config.getString("format"))
+    def delimiter: String = format match {
+      case DBFormat.vcf => ""
+      case _ => config.getString("delimiter")
+    }
+    def header: Array[String] = format match {
+      case DBFormat.vcf => Array[String]()
+      case _ => config.getStringList("header").asScala.toArray
+    }
+    def pathRaw: String = config.getString("path")
+    def path: String = if (config.hasPath("path")) getProperPath(pathRaw) else ""
+    def pathValid: Boolean = path != ""
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {
@@ -302,7 +398,9 @@ object UserConfig {
   }
 
   case class StudyConfig(config: Config) extends UserConfig {
-    def path: String = config.getString("path")
+    def pathRaw: String = config.getString("path")
+    def path: String = getProperPath(pathRaw)
+    def pathValid: Boolean = path != ""
   }
 
 }

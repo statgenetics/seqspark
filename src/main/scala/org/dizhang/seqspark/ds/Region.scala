@@ -30,9 +30,9 @@ import breeze.linalg.{max, min}
 
 @SerialVersionUID(7737730001L)
 trait Region extends Serializable {
-  val chr: Byte
-  val start: Int
-  val end: Int
+  def chr: Byte
+  def start: Int
+  def end: Int
 
   override def toString = s"$chr:$start-$end"
   def length = end - start
@@ -86,14 +86,16 @@ case class Interval(chr: Byte, start: Int, end: Int) extends Region
 
 case class Named(chr: Byte, start: Int, end: Int, name: String) extends Region
 
-case class Variation(chr: Byte, start: Int, end: Int,
-                     ref: String, alt: String, var info: Option[String]) extends Region {
+case class Variation(chr: Byte, pos: Int, ref: String, alt: String, var info: Option[String]) extends Region {
+  def start = pos
+  def end = pos + 1
+
   def this(region: Region, ref: String, alt: String, info: Option[String] = None) = {
-    this(region.chr, region.start, region.end, ref, alt, info)
+    this(region.chr, region.start, ref, alt, info)
   }
   def mutType = Variant.mutType(ref, alt)
-  override def toString = s"$chr:$start-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
-  def toRegion: String = s"$chr:$start-$end[$ref|$alt]"
+  override def toString = s"$chr:$pos-$end[$ref|$alt]${info match {case None => ""; case Some(i) => i}}"
+  def toRegion: String = s"$chr:$pos-$end[$ref|$alt]"
 
   //def copy() = Variation(chr, start, end, ref, alt, info)
 
@@ -122,8 +124,8 @@ object Variation {
   def apply(x: String): Variation = {
     val p = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)\[([ATCG]+)\|([ATCG]+)\]""".r
     x match {
-      case p(c, s, e, r, a) =>
-        Variation(c.byte, s.toInt, e.toInt, r, a, None)
+      case p(c, s, _, r, a) =>
+        Variation(c.byte, s.toInt, r, a, None)
     }
   }
   implicit object VariationOrdering extends Ordering[Variation] {

@@ -1,6 +1,6 @@
 # SEQSpark Manual
 
-Zhang Di & Suzanne M. Leal
+Copyright 2016-2018 Zhang Di & Suzanne M. Leal
 
 [TOC]
 
@@ -28,14 +28,14 @@ To compile the source code and install:
 dolores@cluster: seqspark$ ./install --prefix ~/software/seqspark --db-dir /user/dolores/seqspark
 ```
 
-If you have never compiled `SEQSpark` before, it may take some time to download its dependencies. The `install` script not only compiles the source code, but also downloads the RefSeq and dbSNP databases. For other prebuilt databases, you need to use the script `seqspark-db`. The CADD database is quite large (65GB), so depending on the network connection it may take quite some time to download.
+If you have never compiled `SEQSpark` before, it may take some time to download its dependencies. By default, the `install` script not only compiles the source code, but also downloads the RefSeq and dbSNP databases and puts them to HDFS. For other prebuilt databases, you need to use the script `seqspark-db`. The CADD database is quite large (65GB), so depending on the network connection it may take quite some time to download.
 
 ### 1.3. How to run SEQSpark
 
 In the configuration file, specify the paths of the input genotype file (VCF) and a phenotype file (TSV), and the pipeline with the parameters you want to run. With the configuration file and all the necessary input files ready, you can perform your analysis as follows: 
 
 ```shell
-dolores@cluster: ~$ seqspark SingleStudy some.conf [spark-options]
+dolores@cluster: ~$ seqspark some.conf [spark-options]
 ```
 
 We will explain the parameters that can be set in the configuration file, and how to use them to perform data quality control, annotation and association tests in the following chapters.
@@ -231,7 +231,7 @@ In the `list` besides `snv` is now included five rare variant aggregate tests: `
 Now that the configuration file is ready, it can be run with `SEQSpark`:
 
 ```shell
-dolores@cluster demo$ seqspark SingleStudy demo.conf
+dolores@cluster demo$ seqspark demo.conf
 ```
 
 In the current directory, an `output` directory with be created, and there you can find:
@@ -722,6 +722,8 @@ dolores@workstation: conf$ cp log4j.properties.template log4j.properties
    export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath)
    export SPARK_WORKDER_MEMORY=52g
    export SPARK_WORKER_CORES=16
+   export SPARK_MASTER_HOST=localhost
+   export SPARK_LOCAL_IP=127.0.0.1
   ```
 
    Note: set `$SPARK_WORKER_MEMORY` and `$SPARK_WORKER_CORES` to a reasonable value for your server.
@@ -735,7 +737,8 @@ dolores@workstation: conf$ cp log4j.properties.template log4j.properties
    spark.driver.maxResultSize			 	 6g
    spark.serializer						org.apache.spark.serializer.KryoSerializer
    spark.rdd.compress						true
-   spark.kryoserializer.buffer.max			 1024m
+   spark.kryoserializer.buffer.max		 1024m
+   spark.sql.warehouse.dir				/user/dolores
   ```
 
    Note: set the memory usage options to reasonable values for your server.
@@ -941,6 +944,7 @@ dolores@node0: conf$ cp log4j.properties.template log4j.properties
    spark.serializer						org.apache.spark.serializer.KryoSerializer
    spark.rdd.compress						true
    spark.kryoserializer.buffer.max	      1024m
+   spark.sql.warehouse.dir				 /user/dolores
   ```
 
    Note: set the memory usage options to reasonable values for your server.

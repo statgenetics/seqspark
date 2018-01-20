@@ -19,8 +19,8 @@ package org.dizhang.seqspark.ds
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType}
-import org.dizhang.seqspark.util.{LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType, Samples}
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
 import scala.language.implicitConversions
@@ -42,6 +42,20 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     val bc = sc.broadcast(indicator)
     self.map(v => v.select(bc.value))
   }
+
+  /** select samples by all/none or phenotype name */
+  def samples(sampleExpr: Either[Samples.Value, String])
+             (implicit ssc: SeqContext): RDD[Variant[A]] = {
+    sampleExpr match {
+      case Left(Samples.all) => self
+      case Left(_) => self.map(_.toDummy)
+      case Right(col) =>
+        val pheno = Phenotype("phenotype")(ssc.sparkSession)
+        val select = pheno.indicate(col)
+        self.map(v => v.select(select))
+    }
+  }
+
   def toDummy: RDD[Variant[A]] = {
     self.map(v => v.toDummy)
   }
@@ -59,9 +73,9 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     }.groupByKey()
   }
 
-  def variants(cond: LogicalParser.LogExpr)(ssc: SingleStudyContext): RDD[Variant[A]] = {
+  def variants(cond: LogicalParser.LogExpr)(ssc: SeqContext): RDD[Variant[A]] = {
     if (cond == LogicalParser.T) {
-      logger.info("condition empty, no need to filter variants")
+      logger.debug("condition empty, no need to filter variants")
       self
     } else {
       val conf = ssc.userConfig
@@ -124,5 +138,18 @@ object VCF {
 
   implicit def toGeneralizedVCF[A: Genotype](data: RDD[Variant[A]]): VCF[A] = new VCF(data)
 
+  case class Format[A](name: String, num: Int, sep: String)
 
+  /**
+  case class
+
+  class header(version: String,
+               filter: Set[String],
+               format: Map[String, Format[_]],
+
+
+              ) {
+
+  }
+  */
 }

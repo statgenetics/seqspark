@@ -33,6 +33,13 @@ object Variant {
   val THRESHOLD = 0.25
   val MINIMIUM = 1000
 
+  /**
+    * Define info and meta class
+    *
+    * */
+  case class Info(original: String, addon: Map[String, String])
+
+
   def fill[A: Genotype](meta: Array[String], size: Int)(default: A): Variant[A] = {
     if (size == 0) {
       DummyVariant(meta, default)
@@ -126,6 +133,16 @@ object Variant {
         s = item.split("=")
         if item != "."
       } yield if (s.length == 1) s(0) -> "true" else s(0) -> s(1)).toMap
+  }
+
+  def serializeInfo(im: Map[String, String]): String = {
+    if (im.isEmpty)
+      "."
+    else
+      im.map{
+        case (k, v) =>
+          if (v == "true") k else s"$k=$v"
+      }.mkString(";")
   }
 
   def mutType(ref: String, alt: String): MutType.Value = {
@@ -239,6 +256,10 @@ abstract class Variant[A: Genotype] extends Serializable {
     this.meta(7) = s"$info;$key=$value"
   }
 
+  def updateInfo(im: Map[String, String]): Unit = {
+    this.meta(7) = Variant.serializeInfo(parseInfo ++ im)
+  }
+
   def parseFormat: Array[String] = {
     this.format.split(":")
   }
@@ -283,6 +304,8 @@ case class DummyVariant[A: Genotype](var meta: Array[String], default: A)
   def denseSize = 0
   def map[B: Genotype](f: A => B): DummyVariant[B] = DummyVariant(meta.clone(), f(default))
   def apply(i: Int): A = default
+
+  override def toString: String = s"$chr\t$pos\t$id\t$ref\t$alt\t$qual\t$filter\t$info"
 }
 
 

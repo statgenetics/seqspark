@@ -64,7 +64,7 @@ object Constant {
       val func = "SS_FUNC"
       val anno = "SS_ANNO"
       val informative = "SS_informative"
-      val maf = "SS_MAF"
+      val maf = "SS_AF"
       val batchMaf = "SS_batchMAF"
       val callRate = "SS_callRate"
       val batchCallRate = "SS_batchCallRate"
@@ -72,6 +72,7 @@ object Constant {
       val isFunctional = "SS_isFunctional"
       val batchSpecific = "SS_batchSpecific"
     }
+    val dbExists = "dbExists"
   }
 
   object Annotation {

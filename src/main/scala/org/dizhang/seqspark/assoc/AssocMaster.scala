@@ -30,7 +30,7 @@ import org.dizhang.seqspark.ds.{Genotype, Phenotype}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
-import org.dizhang.seqspark.util.{Constant, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.{Constant, LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
 
@@ -75,6 +75,19 @@ object AssocMaster {
         }).groupByKey()
     }
 
+    /**
+    val reified = annotated.map(p => p._1 -> p._2.toArray)
+    reified.count()
+    val msg =
+    reified.map{
+      case (g, vs) =>
+        val no_key = vs.zipWithIndex.filter(p => ! p._1.parseInfo.contains(IK.maf))
+          .map(p => (p._2, p._1.pos, p._1.parseInfo.keys.mkString(";")))
+        (g, no_key.mkString(","))
+    }.filter(_._2.nonEmpty).collect()
+
+    logger.debug(s"${msg.length} like this: ${msg.head.toString()}")
+    */
     val bcy = sc.broadcast(y)
     val bcControl = sc.broadcast(controls)
     val bcCov = sc.broadcast(cov)
@@ -243,10 +256,10 @@ object AssocMaster {
     encode.map(p => SumStat(nm.value, p._2).result)
   }
 
-  def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: String): Unit = {
+  def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: File): Unit = {
     //val header = implicitly[AssocMethod.Header[A]]
 
-    val pw = new PrintWriter(new java.io.File(outFile))
+    val pw = new PrintWriter(outFile)
     pw.write(s"${res.head._2.header}\n")
     res.sortBy(p =>
       p._2.pValue match {
@@ -260,7 +273,7 @@ object AssocMaster {
 }
 
 @SerialVersionUID(105L)
-class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
+class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
   val cnf = ssc.userConfig
   val sc = ssc.sparkContext
   val phenotype = Phenotype("phenotype")(ssc.sparkSession)
@@ -304,7 +317,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
                 logger.warn(s"failed getting covariates for $traitName, nor does PC specified. use None")
                 None
               case Right(dm) =>
-                logger.info(s"COV dimension: ${dm.rows} x ${dm.cols}")
+                logger.debug(s"COV dimension: ${dm.rows} x ${dm.cols}")
                 Some(dm)
             }
           } else
@@ -324,9 +337,18 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
     val methodConfig = config.method(method)
     val cond = LogicalParser.parse(methodConfig.misc.variants)
     val chosenVars = currentGenotype.variants(cond)(ssc)
+
+    //if (cnf.benchmark) {
+      //logger.info(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")
+    //}
+
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 
+    val outDir = cnf.output.results
+
     codings.cache()
+
+
     val permutation = methodConfig.resampling
     val clean = if (permutation) {
       codings.sortBy(p => p._2.size, ascending = false)
@@ -352,22 +374,24 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
       }
     }
 
-    if (method == "vt") {
-      val summary = codings.map{case (g, e) =>
-        val vt = e.asInstanceOf[Encode.VT]
-        s"$g variants: ${vt.vars.length} thresholds: ${vt.coding.length}"}.collect()
-      val pw = new PrintWriter(new File(s"output/encode_${method}_summary.txt"))
+      val summary = codings.map{
+        case (g, Encode.VT(c, v)) =>
+          s"$g variants: ${v.length} thresholds: ${c.length}"
+        case (g, e) =>
+          s"$g variants: ${e.numVars}"
+      }.collect()
+
+      val pw = new PrintWriter(outDir.resolve(s"encode_${method}_summary.txt").toFile)
       for (s <- summary) {
         pw.write(s"$s\n")
       }
       pw.close()
-    }
-
 
     val test = methodConfig.test
     val traitName = currentTrait._1
     val binary = config.`trait`(traitName).binary
     logger.info(s"run trait ${traitName} with method $method")
+
     if (methodConfig.`type` == MethodType.meta) {
       val res = rareMetalWorker(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf)
       res.cache()
@@ -375,10 +399,10 @@ class AssocMaster[A: Genotype](genotype: Data[A])(ssc: SingleStudyContext) {
       res.saveAsTextFile(cnf.input.genotype.path + s".${cnf.project}.summary.$traitName.txt")
     } else if (permutation) {
       val res = permutationTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).toArray
-      writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_${method}_perm")
+      writeResults(res.map(p => p._1 -> p._2), outDir.resolve(s"assoc_${currentTrait._1}_${method}_perm").toFile)
     } else {
       val res = asymptoticTest(clean, currentTrait._2, cov, binary, methodConfig)(sc, cnf).collect()
-      writeResults(res.map(p => p._1 -> p._2), s"output/assoc_${currentTrait._1}_$method")
+      writeResults(res.map(p => p._1 -> p._2), outDir.resolve(s"assoc_${currentTrait._1}_${method}").toFile)
     }
     logger.info(s"finished association tests for ${currentTrait._1} using $method")
   }

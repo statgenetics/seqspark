@@ -35,6 +35,10 @@ class PCA(input: RDD[Array[Double]]) extends Serializable {
 
   def prepare: RDD[Vector] = {
 
+    if (input.isEmpty()) {
+      logger.warn("no input for PCA")
+    }
+
     input.map(a => Vectors.dense(a))
 
     /**
@@ -59,7 +63,11 @@ class PCA(input: RDD[Array[Double]]) extends Serializable {
   def pc(n: Int): BDM[Double] = {
     val model = new SPCA(n)
     val data = this.prepare
-    val res = model.fit(data).pc.values
-    new BDM(res.length/n, n, res)
+    if (data.isEmpty()) {
+      new BDM[Double](0, 0)
+    } else {
+      val res = model.fit(data).pc.values
+      new BDM(res.length/n, n, res)
+    }
   }
 }

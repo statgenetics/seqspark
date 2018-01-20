@@ -18,11 +18,14 @@ package org.dizhang.seqspark.worker
 
 import java.io.{File, PrintWriter}
 
+import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.SeqContext
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
@@ -35,12 +38,24 @@ object Variants {
 
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
+
+  val varCnt = new LongAccumulator()
+
   def decompose(self: Data[String]): Data[String] = {
     logger.info("decompose multi-allelic variants")
     self.flatMap(v => decomposeVariant(v))
   }
 
-  def countByFunction[A](self: Data[A]): Unit = {
+  def titv[A](self: Data[A]): (Int, Int) = {
+    val cnt =
+    self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
+    if (cnt.isEmpty())
+      (0, 0)
+    else
+      cnt.reduce((a, b) => CounterElementSemiGroup.PairInt.op(a, b))
+  }
+
+  def countByFunction[A](self: Data[A])(implicit ssc: SeqContext): Unit = {
     val cnt = self.map(v =>
       if (v.parseInfo.contains(IK.anno)) {
         worstAnnotation(v.parseInfo(IK.anno)) -> 1
@@ -49,7 +64,9 @@ object Variants {
       }).countByKey()
       .toArray.sortBy(p => FM(p._1))
 
-    val pw = new PrintWriter(new File("output/annotation_summary.txt"))
+    val outDir = ssc.userConfig.output.results
+
+    val pw = new PrintWriter(outDir.resolve("annotation_summary.txt").toFile)
     for ((k, v) <- cnt) {
       pw.write(s"${k.toString}: $v\n")
     }
@@ -57,7 +74,7 @@ object Variants {
     val genes = self.flatMap(v =>
       v.parseInfo(InfoKey.anno).split(",,").map(g => g.split("::")(0))
     ).countByValue()
-    val pw2 = new PrintWriter(new File("output/variants_genes.txt"))
+    val pw2 = new PrintWriter(outDir.resolve("variants_genes.txt").toFile)
     for ((k, v) <- genes) {
       pw2.write(s"$k: $v\n")
     }
@@ -85,6 +102,28 @@ object Variants {
           }
         }
         newV.meta(4) = alleles(i)
+        /** trim the same bases after decomposing */
+        while (newV.ref.last == newV.alt.last && newV.ref.length > 1 && newV.alt.length > 1) {
+          newV.meta(3) = newV.ref.substring(0, newV.ref.length - 1)
+          newV.meta(4) = newV.alt.substring(0, newV.alt.length - 1)
+        }
+        while (newV.ref.head == newV.alt.head && newV.ref.length > 1 && newV.alt.length > 1) {
+          newV.meta(3) = newV.ref.substring(1)
+          newV.meta(4) = newV.alt.substring(1)
+          newV.meta(1) = s"${newV.pos.toInt + 1}"
+        }
+
+        /** parse info */
+        val info = newV.parseInfo.map{
+          case (k, va) =>
+            val s = va.split(",")
+            if (s.length == v.alleleNum - 1) {
+              k -> s(i - 1)
+            } else {
+              k -> va
+            }
+        }
+        newV.meta(7) = Variant.serializeInfo(info)
         newV
       }.filter{
         case SparseVariant(_,e,_,_) => e.nonEmpty

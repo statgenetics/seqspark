@@ -29,7 +29,7 @@ import org.dizhang.seqspark.ds.Variation
 import org.dizhang.seqspark.ds.SummaryStatistic._
 import org.dizhang.seqspark.meta.MetaMaster._
 import org.dizhang.seqspark.util.Constant.{Annotation, Variant}
-import org.dizhang.seqspark.util.MetaAnalysisContext
+import org.dizhang.seqspark.util.SeqContext
 import org.dizhang.seqspark.util.UserConfig.{MetaConfig, MethodType, RootConfig}
 import org.slf4j.LoggerFactory
 
@@ -37,7 +37,7 @@ import scala.annotation.tailrec
 /**
   * Created by zhangdi on 6/13/16.
   */
-class MetaMaster(metaContext: MetaAnalysisContext) {
+class MetaMaster(metaContext: SeqContext) {
   val logger = LoggerFactory.getLogger(this.getClass)
   def rootConfig = metaContext.userConfig
   def sc = metaContext.sparkContext
@@ -63,7 +63,7 @@ class MetaMaster(metaContext: MetaAnalysisContext) {
 
     /** single variant analysis */
     val snv = runSNV(annotated).collect()
-    AMA.writeResults(snv, "output/meta_snv")
+    AMA.writeResults(snv,rootConfig.output.results.resolve("meta_snv").toFile)
 
     /** gene based analyses
       * 1. filter variants based on MAF and functional annotation
@@ -84,7 +84,7 @@ class MetaMaster(metaContext: MetaAnalysisContext) {
         case MethodType.brv|MethodType.skat =>
           logger.info(s"Perform meta-analysis using method $m")
           val res = runMethod(grouped, m)(sc, metaConf).collect()
-          AMA.writeResults(res, s"output/meta_$m")
+          AMA.writeResults(res, rootConfig.output.results.resolve(s"meta_$m").toFile)
         case _ => logger.warn(s"This method ($m) is not supported in meta analysis")
       }
     }

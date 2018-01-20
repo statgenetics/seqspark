@@ -282,7 +282,17 @@ object Encode {
       config.maf.getString("source") match {
         case "pooled" => mafCount.map(_.ratio)
         case key =>
-          vars.map(v => v.parseInfo(key).toDouble)
+          vars.map{v =>
+            val info = v.parseInfo
+            if (! info.contains(key)) {
+              logger.warn(s"$key found in the INFO field, fall back to sample maf")
+              val mac = v.toCounter(genotype.toAAF, (0.0, 2.0)).reduce
+              mac._1/mac._2
+            } else {
+              info(key).toDouble
+            }
+
+          }
       }
     }
   }

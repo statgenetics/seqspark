@@ -16,22 +16,49 @@
 
 package org.dizhang.seqspark.worker
 
-import java.io.{File, PrintWriter}
+import java.io.PrintWriter
 
+import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
-import org.dizhang.seqspark.util.Constant.Genotype.{Raw}
-import org.dizhang.seqspark.util.{General, LogicalParser, SingleStudyContext}
+import org.dizhang.seqspark.util.Constant.Genotype.Raw
+import org.dizhang.seqspark.util.{General, LogicalParser, SeqContext}
 import org.dizhang.seqspark.util.UserConfig._
 import General._
 import org.slf4j.{Logger, LoggerFactory}
+import java.nio.file.Path
 
+import org.apache.spark.SparkContext
 /**
   * Genotype QC functions, currently are only for Raw VCF data
   */
 object Genotypes {
+
+  class GenoCounter[A](f: A => Boolean,
+                       private var _value: (Long, Long))
+    extends AccumulatorV2[A, (Long, Long)] {
+
+    def add(v: A): Unit = {
+      _value = if (f(v)) (value._1 + 1, value._2) else (value._1, value._2 + 1)
+    }
+    def copy(): GenoCounter[A] = new GenoCounter[A](f, value)
+
+    def isZero: Boolean = value == (0, 0)
+
+    def merge(other: AccumulatorV2[A, (Long, Long)]): Unit = {
+      _value = (value._1 + other.value._1, value._2 + other.value._2)
+    }
+
+    def reset: Unit = {
+      _value = (0, 0)
+    }
+
+    def value: (Long, Long) = _value
+  }
+
+
   val logger: Logger = LoggerFactory.getLogger(getClass)
-  def statGdGq(self: Data[String])(ssc: SingleStudyContext): Unit = {
+  def statGdGq(self: Data[String])(ssc: SeqContext): Unit = {
     logger.info("count genotype by DP and GQ ...")
 
     val sc = ssc.sparkContext
@@ -65,39 +92,52 @@ object Genotypes {
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")
-    val outdir = new File(conf.localDir + "/output")
-    outdir.mkdir()
-    writeBcnt(res, batchKeys, outdir.toString + "/callRate_by_dpgq.txt")
+
+    writeBcnt(res, batchKeys, conf.output.results.resolve("callRate_by_dpgq.txt"))
   }
 
-  def genotypeQC(self: Data[String], cond: LogicalParser.LogExpr): RDD[Variant[String]] = {
+  def genotypeQC(self: Data[String],
+                 cond: LogicalParser.LogExpr)
+                (sc: SparkContext): (RDD[Variant[String]], LongAccumulator) = {
+    val varCounter = new LongAccumulator()
+    sc.register(varCounter, "Variant counter")
+
+    self.map(_ => varCounter.add(1))
+
     logger.info("start genotype QC")
-    if (cond == LogicalParser.T) {
-      logger.info("no need to perform genotype QC")
-      self
-    } else {
-      //val first = self.first()
-      val fs = LogicalParser.names(cond)
-      logger.info(s"genotype QC criteria: ${LogicalParser.view(cond)}")
-      self.map { v =>
-        val fm = v.parseFormat.toList
-        val phased = Genotype.Raw.isPhased(v(0))
-        v.map { g =>
-          if (g.contains(":")) {
-            val mis = if (phased) {
-              Raw.diploidPhasedMis
-            } else if (Genotype.Raw.isDiploid(g)) {
-              Raw.diploidUnPhasedMis
+    val res =
+      if (cond == LogicalParser.T) {
+        logger.info("no need to perform genotype QC")
+        self
+      } else {
+        //val first = self.first()
+        //val fs = LogicalParser.names(cond)
+        logger.info(s"genotype QC criteria: ${LogicalParser.view(cond)}")
+        self.map { v =>
+          val fm = v.parseFormat.toList
+          val phased = Genotype.Raw.isPhased(v(0))
+          val rawCnt = v.toCounter(g => if (Genotype.Raw.isMis(g)) 0 else 1, 0).reduce
+          val resv = v.map { g =>
+            if (g.contains(":")) {
+              val mis = if (phased) {
+                Raw.diploidPhasedMis
+              } else if (Genotype.Raw.isDiploid(g)) {
+                Raw.diploidUnPhasedMis
+              } else {
+                Raw.monoploidMis
+              }
+              Genotype.Raw.qc(g, cond, fm, mis)
             } else {
-              Raw.monoploidMis
+              g
             }
-            Genotype.Raw.qc(g, cond, fm, mis)
-          } else {
-            g
           }
+          val cnt = resv.toCounter(g => if (Genotype.Raw.isMis(g)) 0 else 1, 0).reduce
+          resv.addInfo("SS_CleanGeno", cnt.toString)
+          resv.addInfo("SS_RawGeno", rawCnt.toString)
+          resv
         }
       }
-    }
+    (res, varCounter)
   }
 
   def toSimpleVCF(self: Data[String]): Data[Byte] = {
@@ -131,8 +171,8 @@ object Genotypes {
     }
   }
 
-  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: String) {
-    val pw = new PrintWriter(new File(outFile))
+  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
+    val pw = new PrintWriter(outFile.toFile)
     pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {
       val iter = cnt.keySet.iterator

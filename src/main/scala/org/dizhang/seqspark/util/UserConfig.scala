@@ -255,7 +255,12 @@ object UserConfig {
     def CADD = config.getConfig("CADD")
     def ExAC = config.getConfig("ExAC")
     def dbList: List[String] = config.getConfig("db").root().keySet().asScala.toList
-    def db(name: String): DatabaseConfig = DatabaseConfig(config.getConfig(s"db.$name"))
+    def db(name: String): DatabaseConfig = {
+      if (config.hasPath(s"db.$name"))
+        DatabaseConfig(config.getConfig(s"db.$name"))
+      else
+        DatabaseConfig(config.getConfig(name))
+    }
     def addInfo: Map[String, String] = {
       if (config.hasPath("addInfo")) {
         val keys = config.getConfig("addInfo").root().keySet().asScala.toList

@@ -125,7 +125,10 @@ object QualityControl {
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = Genotypes.toSimpleVCF(cleaned)
 
-    simpleVCF.persist(StorageLevel.MEMORY_ONLY_SER)
+    val markPass: Data[Byte] =
+      simpleVCF.variants(conf.qualityControl.variants, Some("SS_PASS"), filter = false)(ssc)
+
+    markPass.persist(StorageLevel.MEMORY_ONLY_SER)
 
     {
       val varCnt = simpleVCF.count()
@@ -142,7 +145,7 @@ object QualityControl {
     }//}
 
     /** 4. Variant level QC */
-    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
+    val res = markPass.variants(LogicalParser.parse("SS_PASS"))(ssc)
 
     //if (conf.benchmark) {
       //res.persist(StorageLevel.MEMORY_ONLY_SER)
@@ -237,7 +240,7 @@ object QualityControl {
     }
 
     /** Variant QC */
-    val res = input.variants(conf.qualityControl.variants)(ssc)
+    val res = input.variants(conf.qualityControl.variants, None, true)(ssc)
 
     if (conf.qualityControl.save) {
       res.cache()

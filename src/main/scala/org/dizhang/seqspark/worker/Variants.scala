@@ -25,7 +25,7 @@ import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
 import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.util.General._
-import org.dizhang.seqspark.util.SeqContext
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
@@ -39,7 +39,7 @@ object Variants {
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
 
-  val varCnt = new LongAccumulator()
+
 
   def decompose(self: Data[String]): Data[String] = {
     logger.info("decompose multi-allelic variants")
@@ -80,6 +80,11 @@ object Variants {
     }
     pw2.close()
   }
+
+  def countByGroup[A](self: Data[A])(implicit ssc: SeqContext): Unit = {
+    //val groups = ssc.userConfig.qualityControl.
+  }
+
 
   def decomposeVariant(v: Variant[String]): Array[Variant[String]] = {
     /** decompose multi-allelic variants to bi-allelic variants */
@@ -135,22 +140,28 @@ object Variants {
   @SerialVersionUID(100L)
   class VariantQC[A: Genotype](v: Variant[A]) extends Serializable {
     def geno = implicitly[Genotype[A]]
+
     def maf(controls: Option[Array[Boolean]]): Double = {
       val cache = v.parseInfo
-      if (cache.contains(InfoKey.mac)) {
-        val res = cache(InfoKey.mac).split(",").map(_.toDouble)
-        res(0)/res(1)
-      } else {
-        controls match {
-          case None =>
+      controls match {
+        case None =>
+          if (cache.contains(IK.mafAll)) {
+            cache(IK.mafAll).toDouble
+          } else {
             val res = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
-            v.addInfo(InfoKey.mac,s"${res._1},${res._2}")
+            v.addInfo(InfoKey.macAll,s"${res._1},${res._2}")
+            v.addInfo(IK.mafAll, res.ratio.toString)
             res.ratio
-          case Some(indi) =>
+          }
+        case Some(indi) =>
+          if (cache.contains(IK.mafCtrl)) {
+            cache(IK.mafCtrl).toDouble
+          } else {
             val res = v.select(indi).toCounter(geno.toAAF, (0.0, 2.0)).reduce
-            v.addInfo(InfoKey.mac, s"${res._1},${res._2}")
+            v.addInfo(InfoKey.macCtrl, s"${res._1},${res._2}")
+            v.addInfo(IK.mafCtrl, res.ratio.toString)
             res.ratio
-        }
+          }
       }
     }
     def informative: Boolean = {

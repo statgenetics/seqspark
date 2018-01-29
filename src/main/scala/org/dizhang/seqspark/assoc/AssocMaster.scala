@@ -309,7 +309,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
 
         val chooseSample = genotype.samples(indicator.value)(sc)
         val cond = LogicalParser.parse("informative")
-        val currentGenotype = chooseSample.variants(cond)(ssc)
+        val currentGenotype = chooseSample.variants(cond, None, true)(ssc)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
         val cov =
@@ -339,7 +339,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
     val config = cnf.association
     val methodConfig = config.method(method)
     val cond = LogicalParser.parse(methodConfig.misc.variants)
-    val chosenVars = currentGenotype.variants(cond)(ssc)
+    val chosenVars = currentGenotype.variants(cond, None, true)(ssc)
 
     if (cnf.benchmark) {
       logger.debug(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")

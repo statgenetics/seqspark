@@ -45,7 +45,7 @@ object Samples {
     val geno = implicitly[Genotype[A]]
 
     val cond = ssc.userConfig.qualityControl.pca.variants
-    val common = self.variants(cond)(ssc)
+    val common = self.variants(cond, None, true)(ssc)
     common.cache()
     if (ssc.userConfig.debug) {
       common.saveAsTextFile(ssc.userConfig.input.genotype.path + s".${ssc.userConfig.project}.pca")

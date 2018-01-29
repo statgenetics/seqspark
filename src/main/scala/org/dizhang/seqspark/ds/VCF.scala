@@ -73,7 +73,9 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     }.groupByKey()
   }
 
-  def variants(cond: LogicalParser.LogExpr)(ssc: SeqContext): RDD[Variant[A]] = {
+  def variants(cond: LogicalParser.LogExpr,
+               updateInfo: Option[String] = None,
+               filter: Boolean = true)(ssc: SeqContext): RDD[Variant[A]] = {
     if (cond == LogicalParser.T) {
       logger.debug("condition empty, no need to filter variants")
       self
@@ -96,6 +98,10 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
       self.filter{v =>
         val varMap = names.toArray.map{
           case "chr" => "chr" -> v.chr
+          case "pooledMaf" =>
+            "pooledMaf" -> v.maf(None).toString
+          case "controlsMaf" =>
+            "controlsMaf" -> v.maf(ctrlInd).toString
           case "maf" =>
             val maf = v.maf(ctrlInd).toString
             "maf" -> maf
@@ -128,7 +134,10 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
             val other = v.parseInfo.getOrElse(x, "0")
             x -> other
         }.toMap
-        LogicalParser.eval(cond)(varMap)
+
+        lazy val pass = LogicalParser.eval(cond)(varMap)
+        updateInfo.foreach(k => if (pass) v.addInfo(k))
+        filter || pass
       }
     }
   }

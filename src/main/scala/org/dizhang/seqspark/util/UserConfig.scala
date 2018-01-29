@@ -59,6 +59,15 @@ object UserConfig {
     }
   }
 
+  def getGroups(config: Config): List[Map[String, LogExpr]] = {
+    config.root().keySet().asScala.toList.map{grp =>
+      val grpConf = config.getConfig(grp)
+      grpConf.root().keySet().asScala.map(tag =>
+        tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
+      ).toMap
+    }
+  }
+
   object GenomeBuild extends Enumeration {
     val hg18 = Value("hg18")
     val hg19 = Value("hg19")
@@ -235,6 +244,15 @@ object UserConfig {
         config.getStringList("groups").asScala.toList
       else
         List[String]()
+    }
+  }
+
+  case class GroupConfig(config: Config) extends UserConfig {
+    def variants: List[Map[String, LogExpr]] = {
+      getGroups(config.getConfig("variants"))
+    }
+    def samples: List[Map[String, LogExpr]] = {
+      getGroups(config.getConfig("samples"))
     }
   }
 

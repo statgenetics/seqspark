@@ -56,7 +56,10 @@ object Constant {
 
   object Variant {
     object InfoKey {
+      val pass = "SS_PASS"
       val mac = "SS_MAC"
+      val macAll = "SS_MAC_ALL"
+      val macCtrl = "SS_MAC_CTRL"
       val mafAll = "SS_MAF_ALL"
       val mafCtrl = "SS_MAF_CTRL"
       val weight = "SS_WEIGHT"

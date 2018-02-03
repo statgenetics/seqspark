@@ -18,12 +18,11 @@ package org.dizhang.seqspark.assoc
 
 import breeze.linalg._
 import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
-import org.dizhang.seqspark.stat.{MultivariateNormal, Resampling, ScoreTest}
+import org.dizhang.seqspark.stat.{Resampling, ScoreTest}
 import org.dizhang.seqspark.util.General.RichDouble
 import org.slf4j.LoggerFactory
 
 import scala.language.existentials
-import scala.util.{Success, Try}
 
 /**
   * Variable threshold association method

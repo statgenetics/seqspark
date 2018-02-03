@@ -81,7 +81,6 @@ object Import {
 
   def fromVCF(ssc: SeqContext): Data[String] = {
 
-
     def pass(l: String)
             (logExpr: LogExpr,
              names: Set[String],
@@ -122,8 +121,6 @@ object Import {
           LogicalParser.evalExists(logExpr)(vmf ++ vmi) && in
         }
       }
-
-
     }
     logger.info("start import ...")
     val conf = ssc.userConfig

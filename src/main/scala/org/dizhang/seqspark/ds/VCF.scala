@@ -73,6 +73,34 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     }.groupByKey()
   }
 
+  /** the input groups
+    * Map[label, Map[grp, condition] ]
+    *
+    * */
+  def countBy(groups: Map[String, Map[String, LogicalParser.LogExpr]],
+              batch: Option[Array[String]],
+              controls: Option[Array[Boolean]])
+             (implicit sc: SparkContext): Map[String, Map[String, Int]] = {
+
+    def merge(m1: Map[String, Int], m2: Map[String, Int]): Map[String, Int] = {
+      m1 ++ (for ((k, n) <- m2) yield if (m1.contains(k)) k -> (n + m1(k)) else k -> n)
+    }
+
+    val bcBatch = sc.broadcast(batch)
+    val bcControls = sc.broadcast(controls)
+    val names = groups.flatMap(p => p._2.flatMap(x => LogicalParser.names(x._2))).toSet
+    self.map{v =>
+      val vm = v.compute(names, bcControls.value, bcBatch.value)
+      groups.map{
+        case (tag, m) => tag -> m.map{
+          case (grp, cond) => grp -> (if (LogicalParser.eval(cond)(vm)) 1 else 0)
+        }
+      }
+    }.reduce{(a, b) =>
+      a ++ (for ((k, m) <- b) yield if (a.contains(k)) k -> merge(m, a(k)) else k -> m)
+    }
+  }
+
   def variants(cond: LogicalParser.LogExpr,
                updateInfo: Option[String] = None,
                filter: Boolean = true)(ssc: SeqContext): RDD[Variant[A]] = {
@@ -137,7 +165,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
 
         lazy val pass = LogicalParser.eval(cond)(varMap)
         updateInfo.foreach(k => if (pass) v.addInfo(k))
-        filter || pass
+        !filter || pass
       }
     }
   }

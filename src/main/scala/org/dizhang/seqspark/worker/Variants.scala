@@ -16,15 +16,15 @@
 
 package org.dizhang.seqspark.worker
 
-import java.io.{File, PrintWriter}
+import java.io.PrintWriter
 
-import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
-import org.dizhang.seqspark.ds.{Genotype, SparseVariant, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, SparseVariant, Variant, SemiGroup}
 import org.dizhang.seqspark.util.Constant.Variant._
+import org.dizhang.seqspark.ds.VCF.toGeneralizedVCF
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -38,17 +38,17 @@ object Variants {
 
   implicit def convertToVQC[A: Genotype](v: Variant[A]): VariantQC[A] = new VariantQC(v)
 
-
-
-
   def decompose(self: Data[String]): Data[String] = {
     logger.info("decompose multi-allelic variants")
     self.flatMap(v => decomposeVariant(v))
   }
 
-  def titv[A](self: Data[A]): (Int, Int) = {
-    val cnt =
-    self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
+  def titv[A](self: Data[A])(implicit ssc: SeqContext): (Int, Int) = {
+    val group = ssc.userConfig.qualityControl.group.variants
+    val cnt = self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
+
+
+
     if (cnt.isEmpty())
       (0, 0)
     else
@@ -81,8 +81,23 @@ object Variants {
     pw2.close()
   }
 
-  def countByGroup[A](self: Data[A])(implicit ssc: SeqContext): Unit = {
-    //val groups = ssc.userConfig.qualityControl.
+  def countByGroups[A](self: Data[A])
+                      (implicit ssc: SeqContext): Unit = {
+
+    val group = ssc.userConfig.qualityControl.group.variants
+    val pheno = Phenotype("phenotype")(ssc.sparkSession)
+    val batch = pheno.batch(Pheno.batch)
+    val controls = pheno.control
+    val cnt = toGeneralizedVCF(self).countBy(group, batch, controls)(ssc.sparkContext)
+    val output = ssc.userConfig.output.results.resolve("qc.txt")
+    val pw = new PrintWriter(output.toFile)
+    pw.append("variants:\n")
+    cnt.foreach{
+      case (tag, m) => m.foreach{
+        case (grp, c) => pw.append(s"\t$tag.$grp:\t$c\n")
+      }
+    }
+    pw.close()
   }
 
 
@@ -141,6 +156,56 @@ object Variants {
   class VariantQC[A: Genotype](v: Variant[A]) extends Serializable {
     def geno = implicitly[Genotype[A]]
 
+    /** this method compute the dictionary that
+      * is needed for logical parser and counter
+      * */
+    def compute(names: Set[String],
+                controls: Option[Array[Boolean]],
+                batch: Option[Array[String]]): Map[String, String] = {
+      names.map{
+        case "chr" => "chr" -> v.chr
+          case "pooledMaf" =>
+            "pooledMaf" -> v.maf(None).toString
+          case "controlsMaf" =>
+            "controlsMaf" -> v.maf(controls).toString
+          case "maf" =>
+            val maf = v.maf(controls).toString
+            "maf" -> maf
+          case "informative" =>
+            if (v.informative) {
+              "informative" -> "1"
+            } else {
+              "notInformative" -> "1"
+            }
+          //case "batchMaf" => "batchMaf" -> v.batchMaf(ctrlInd, batch).values.min.toString
+          case "missingRate" =>
+            val mr = (1 - v.callRate).toString
+            "missingRate" -> mr
+          case "batchMissingRate" =>
+            val bmr = (1 - v.batchCallRate(batch).values.min).toString
+            "batchMissingRate" -> bmr
+          case "alleleNum" =>
+            val an = v.alleleNum.toString
+            "alleleNum" -> an
+          case "batchSpecific" =>
+            val bs = v.batchSpecific(batch).values.max.toString
+            "batchSpecific" -> bs
+          case "hwePvalue" =>
+            val hwe = v.hwePvalue(controls).toString
+            "hwePvalue" -> hwe
+          case "isFunctional" =>
+            val func = v.isFunctional.toString
+            "isFunctional" -> func
+          case "isTi" =>
+            "isTi" -> v.isTi.toString
+          case "isTv" =>
+            "isTv" -> v.isTv.toString
+          case x =>
+            val other = v.parseInfo.getOrElse(x, "0")
+            x -> other
+      }.toMap
+    }
+
     def maf(controls: Option[Array[Boolean]]): Double = {
       val cache = v.parseInfo
       controls match {
@@ -175,22 +240,29 @@ object Variants {
       }
     }
     def batchMaf(controls: Option[Array[Boolean]],
-                 batch: Array[String]): Map[String, Double] = {
+                 batch: Option[Array[String]]): Map[String, Double] = {
       if (v.parseInfo.contains(InfoKey.batchMaf)) {
         v.parseInfo(InfoKey.batchMaf).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
+      } else if (batch.isEmpty) {
+        Map("all" -> maf(controls))
       } else {
-        val keyFunc = (i: Int) => batch(i)
-        val rest = controls match {case None => v; case Some(c) => v.select(c)}
+        val (keyFunc, rest): (Int => String, Variant[A]) = controls match {
+          case None => (i => batch.get(i), v)
+          case Some(c) =>
+            val b = batch.get.zip(c).filter(_._2).map(_._1)
+            (i => b(i), v.select(c))
+        }
         val cnt = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-        val res = cnt.map{case (k, v) => k -> v.ratio}
-        val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+        val res = cnt.map{case (k, p) => k -> p.ratio}
+        val value = res.toArray.map{case (k, d) => s"$k->$d"}.mkString(",")
         v.addInfo(InfoKey.batchMaf, value)
         res
       }
     }
+
     def callRate: Double = {
       if (v.parseInfo.contains(InfoKey.callRate)) {
         v.parseInfo(InfoKey.callRate).toDouble
@@ -201,17 +273,19 @@ object Variants {
         res
       }
     }
-    def batchCallRate(batch: Array[String]): Map[String, Double] = {
+    def batchCallRate(batch: Option[Array[String]]): Map[String, Double] = {
       if (v.parseInfo.contains(InfoKey.batchCallRate)) {
         v.parseInfo(InfoKey.batchCallRate).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
+      } else if (batch.isEmpty) {
+        Map("all" -> callRate)
       } else {
-        val keyFunc = (i: Int) => batch(i)
+        val keyFunc = (i: Int) => batch.get(i)
         val cnt = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
-        val res = cnt.map{case (k, v) => k -> v.ratio}
-        val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+        val res = cnt.map{case (k, p) => k -> p.ratio}
+        val value = res.toArray.map{case (k, d) => s"$k->$d"}.mkString(",")
         v.addInfo(InfoKey.batchCallRate, value)
         res
       }
@@ -239,20 +313,26 @@ object Variants {
       }
     }
 
-    def batchSpecific(batch: Array[String]): Map[String, Double] = {
+    def batchSpecific(batch: Option[Array[String]]): Map[String, Double] = {
       if (v.parseInfo.contains(InfoKey.batchSpecific)) {
         v.parseInfo(InfoKey.batchSpecific).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
+      } else if (batch.isEmpty) {
+        val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
+        val res = math.min(cnt._1, cnt._2 - cnt._1)
+        val value = s"all->$res"
+        v.addInfo(IK.batchSpecific, value)
+        Map("all" -> res)
       } else {
         if (v.parseInfo.contains("dbSNP")) {
-          batch.map(b => b -> 0.0).toMap
+          batch.get.map(b => b -> 0.0).toMap
         } else {
-          val keyFunc = (i: Int) => batch(i)
+          val keyFunc = (i: Int) => batch.get(i)
           val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-          val res = cnt.map{case (k, v) => k -> math.min(v._1, v._2 - v._1)}
-          val value = res.toArray.map{case (k, v) => s"$k->$v"}.mkString(",")
+          val res = cnt.map{case (k, p) => k -> math.min(p._1, p._2 - p._1)}
+          val value = res.toArray.map{case (k, c) => s"$k->$c"}.mkString(",")
           v.addInfo(InfoKey.batchSpecific, value)
           res
         }

@@ -66,29 +66,38 @@ object Genotypes {
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
     val batch = conf.input.phenotype.batch
     val (batchKeys, keyFunc) = if (batch == "none") {
-      (Array("all"), (i: Int) => 0)
+      (Array("all"), (_: Int) => 0)
     } else {
-      val batchStr = phenotype.batch(batch)
-      if (batchStr.toSet.size == 1) {
-        (batchStr.slice(0,1), (i: Int) => 0)
-      } else {
-        val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray //the batch names
-        val batchMap = batchKeys.zipWithIndex.toMap //batch name indices
-        val batchIdx = batchStr.map(b => batchMap(b)) //individual -> batch index
-        (batchKeys, (i: Int) => batchIdx(i))
+      phenotype.batch(batch) match {
+        case None => (Array("all"), (_: Int) => 0)
+        case Some(batchStr) =>
+          if (batchStr.isEmpty) {
+            (Array("all"), (_: Int) => 0)
+          } else {
+            val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray //the batch names
+            val batchMap = batchKeys.zipWithIndex.toMap //batch name indices
+            val batchIdx = batchStr.map(b => batchMap(b)) //individual -> batch index
+            (batchKeys, (i: Int) => batchIdx(i))
+          }
       }
     }
     //logger.info("still all right?")
-    val first = self.first()
+    //val first = self.first()
+
+    /** broadcast the keyFunc
+      *
+      * */
+    val bcKeyFunc = sc.broadcast(keyFunc)
+
 
     val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
-    //val counter = Counter.CounterElementSemiGroup.Longs(400)
+
     /** this function works on raw data, so limit to a subset can greatly enhance the performance */
     val all = self.sample(withReplacement = false, frac).map{v =>
       /** some VCF do have variant specific format */
       val fm = v.format.split(":").toList
       v.toCounter(makeGdGq(_, fm), Map.empty[Int, Long])
-        .reduceByKey(keyFunc)}
+        .reduceByKey(bcKeyFunc.value)}
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")

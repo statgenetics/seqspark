@@ -300,8 +300,8 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
         val currentTrait = (traitName, tr)
         val methods = assocConf.methodList
         val indicator = sc.broadcast(phenotype.indicate(traitName))
-        val controls = if (phenotype.contains(Pheno.Header.control)) {
-          Some(phenotype.select(Pheno.Header.control).zip(indicator.value)
+        val controls = if (phenotype.contains(Pheno.control)) {
+          Some(phenotype.select(Pheno.control).zip(indicator.value)
             .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
         } else {
           None

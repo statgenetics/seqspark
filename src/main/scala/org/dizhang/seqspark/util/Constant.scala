@@ -39,19 +39,18 @@ object Constant {
   }
 
   object Pheno {
-    object Header {
-      val fid = "fid"
-      val iid = "iid"
-      val pid = "pid"
-      val mid = "mid"
-      val sex = "sex"
-      val control = "control"
-      val pcPrefix = "_pc"
-      val batch = "batch"
-    }
+
+    val fid = "fid"
+    val iid = "iid"
+    val pid = "pid"
+    val mid = "mid"
+    val sex = "sex"
+    val control = "control"
+    val pcPrefix = "_pc"
+    val batch = "batch"
     val delim = "\t"
     val mis = "NA"
-
+    val t = "1"
   }
 
   object Variant {

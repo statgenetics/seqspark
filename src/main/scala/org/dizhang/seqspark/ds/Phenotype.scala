@@ -140,24 +140,44 @@ trait Phenotype {
 
   def select(field: String): Array[Option[String]]
   def contains(field: String): Boolean
-  def sampleNames = this.select("iid").map(_.getOrElse("NA"))
-  def batch(field: String): Array[String] = {
-    this.select(field).map{
-      case None => s"$field:None"
-      case Some(s) => s
+  def sampleNames: Array[String] = this.select(Pheno.iid).map(_.getOrElse(Pheno.mis))
+  def batch(field: String): Option[Array[String]] = {
+    val raw = select(field)
+    if (raw.flatten.isEmpty) {
+      None
+    } else {
+      Some(raw.map{
+        case None => s"$field:None"
+        case Some(s) => s
+      })
     }
   }
-  def batch(fields: Array[String]): Array[String] = {
-    fields.map{ f =>
-      this.batch(f)
-    }.reduce((a, b) => a.zip(b).map(p => s"${p._1},${p._2}"))
+  def batch(fields: Array[String]): Option[Array[String]] = {
+    val merged =
+      fields.flatMap{f =>
+        this.batch(f)
+     }
+    if (merged.isEmpty)
+      None
+    else
+      Some(merged.reduce((a, b) => a.zip(b).map(p => s"${p._1},${p._2}")))
   }
+
+  def control: Option[Array[Boolean]] = {
+    if (this.contains(Pheno.control))
+      Some(this.indicate(Pheno.control, Pheno.t))
+    else
+      None
+  }
+
   def indicate(field: String): Array[Boolean] = {
-    this.select(field).map{
-      case None => false
-      case Some(s) => true
-    }
+    this.select(field).map(ov => ov.isDefined)
   }
+
+  def indicate(field: String, value: String): Array[Boolean] = {
+    this.select(field).map(ov => ov.isDefined && ov.get == value)
+  }
+
   def getTrait(y: String): Either[String, DV[Double]] = {
     val defined = this.select(y).filter(_.isDefined).map(_.get)
     if (defined.isEmpty) {

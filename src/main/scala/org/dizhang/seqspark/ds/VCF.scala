@@ -19,8 +19,8 @@ package org.dizhang.seqspark.ds
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
-import org.dizhang.seqspark.util.UserConfig.{MethodConfig, MethodType, Samples}
-import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
+import org.dizhang.seqspark.util.UserConfig.MethodConfig
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext, ConfigValue => CV}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
 import scala.language.implicitConversions
@@ -44,12 +44,12 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
   }
 
   /** select samples by all/none or phenotype name */
-  def samples(sampleExpr: Either[Samples.Value, String])
+  def samples(sampleExpr: CV.Samples)
              (implicit ssc: SeqContext): RDD[Variant[A]] = {
     sampleExpr match {
-      case Left(Samples.all) => self
-      case Left(_) => self.map(_.toDummy)
-      case Right(col) =>
+      case CV.Samples.all => self
+      case CV.Samples.none => self.map(_.toDummy)
+      case CV.Samples.by(col) =>
         val pheno = Phenotype("phenotype")(ssc.sparkSession)
         val select = pheno.indicate(col)
         self.map(v => v.select(select))

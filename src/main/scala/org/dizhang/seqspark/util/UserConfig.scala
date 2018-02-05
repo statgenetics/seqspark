@@ -20,7 +20,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-
+import ConfigValue._
 import scala.collection.JavaConverters._
 import scala.io.Source
 import java.nio.file.{Files, Path, Paths}
@@ -69,75 +69,7 @@ object UserConfig {
     }.toMap
   }
 
-  object GenomeBuild extends Enumeration {
-    val hg18 = Value("hg18")
-    val hg19 = Value("hg19")
-    val hg38 = Value("hg38")
-  }
 
-  object GenotypeFormat extends Enumeration {
-    val vcf = Value("vcf")
-    val imputed = Value("impute2")
-    //val bgen = Value("bgen")
-    //val cacheFullvcf = Value("cachedFullVcf")
-    val cacheVcf = Value("cachedVcf")
-    val cacheImputed = Value("cachedImpute2")
-  }
-
-  object Samples extends Enumeration {
-    val all = Value("all")
-    val none = Value("none")
-  }
-
-  object Variants extends Enumeration {
-    val all = Value("all")
-    val exome = Value("exome")
-    val none = Value("none")
-  }
-
-  object MutType extends Enumeration {
-    val snv = Value("snv")
-    val indel = Value("indel")
-    val cnv = Value("cnv")
-  }
-
-  object MethodType extends Enumeration {
-    val skat = Value("skat")
-    val skato = Value("skato")
-    val meta = Value("meta")
-    val cmc = Value("cmc")
-    val brv = Value("brv")
-    val snv = Value("snv")
-  }
-
-  object WeightMethod extends Enumeration {
-    val none = Value("none")
-    val equal = Value("equal")
-    val wss = Value("wss")
-    val erec = Value("erec")
-    val skat = Value("skat")
-    val annotation = Value("annotation")
-  }
-
-  object TestMethod extends Enumeration {
-    val score = Value("score")
-    //val lhr = Value("lhr")
-    val wald = Value("wald")
-  }
-
-  object ImputeMethod extends Enumeration {
-    val bestGuess = Value("bestGuess")
-    val meanDosage = Value("meanDosage")
-    val random = Value("random")
-    val no = Value("no")
-  }
-
-  object DBFormat extends Enumeration {
-    val vcf: Value = Value("vcf")
-    val plain: Value = Value("plain")
-    val csv: Value = Value("csv")
-    val tsv: Value = Value("tsv")
-  }
 
   case class RootConfig(config: Config) extends UserConfig {
 
@@ -207,23 +139,10 @@ object UserConfig {
 
     val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
-    val samples: Either[Samples.Value, String] = {
-      config.getString("samples") match {
-        case "all" => Left(Samples.all)
-        case "none" => Left(Samples.none)
-        case field => Right(field)
-      }
-    }
+    val samples: Samples = Samples(config.getString("samples"))
 
-    val variants: Either[Variants.Value, Regions] = {
-      val file = """file://(.+)""".r
-      config.getString("variants") match {
-        case "all" => Left(Variants.all)
-        case "exome" => Left(Variants.exome)
-        case file(f) => Right(Regions(Source.fromFile(f).getLines().map(Region(_))))
-        case x => Right(Regions(x.split(",").map(Region(_)).toIterator))
-      }
-    }
+    val variants: Variants = Variants(config.getString("variants"))
+
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
@@ -241,7 +160,6 @@ object UserConfig {
     val export = config.getBoolean("export")
     val pca = PCAConfig(config.getConfig("pca"))
     def group: GroupConfig = GroupConfig(config.getConfig("group"))
-    def count: d
   }
 
   case class GroupConfig(config: Config) extends UserConfig {

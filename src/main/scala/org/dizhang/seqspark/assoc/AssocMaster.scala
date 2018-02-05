@@ -26,10 +26,11 @@ import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.assoc.AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.{Genotype, Phenotype}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, SemiGroup}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.ConfigValue._
 import org.dizhang.seqspark.util.{Constant, LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory
   */
 object AssocMaster {
   /** constants */
-  val IntPair = CounterElementSemiGroup.PairInt
+  val IntPair = SemiGroup.PairInt
   val Permu = Constant.Permutation
   val F = Constant.Annotation.Feature
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)

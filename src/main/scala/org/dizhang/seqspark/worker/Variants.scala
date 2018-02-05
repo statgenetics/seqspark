@@ -52,7 +52,7 @@ object Variants {
     if (cnt.isEmpty())
       (0, 0)
     else
-      cnt.reduce((a, b) => CounterElementSemiGroup.PairInt.op(a, b))
+      cnt.reduce((a, b) => SemiGroup.PairInt.op(a, b))
   }
 
   def countByFunction[A](self: Data[A])(implicit ssc: SeqContext): Unit = {
@@ -81,14 +81,14 @@ object Variants {
     pw2.close()
   }
 
-  def countByGroups[A](self: Data[A])
+  def countByGroups[A: Genotype](self: Data[A])
                       (implicit ssc: SeqContext): Unit = {
 
     val group = ssc.userConfig.qualityControl.group.variants
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val batch = pheno.batch(Pheno.batch)
     val controls = pheno.control
-    val cnt = toGeneralizedVCF(self).countBy(group, batch, controls)(ssc.sparkContext)
+    val cnt = self.countBy(group, batch, controls)(ssc.sparkContext)
     val output = ssc.userConfig.output.results.resolve("qc.txt")
     val pw = new PrintWriter(output.toFile)
     pw.append("variants:\n")

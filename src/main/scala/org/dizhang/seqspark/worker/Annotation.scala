@@ -22,6 +22,7 @@ import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.ds.{Genotype, Variant}
 import org.dizhang.seqspark.util.{Constant, QueryParser, SeqContext}
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.ConfigValue._
 import org.slf4j.LoggerFactory
 import org.apache.hadoop
 import org.dizhang.seqspark.worker.Variants.countByFunction

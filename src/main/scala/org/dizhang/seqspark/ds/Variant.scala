@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.ds
 
-import org.dizhang.seqspark.util.UserConfig.MutType
+import org.dizhang.seqspark.util.ConfigValue.MutType
 
 import scala.collection.mutable
 import scala.reflect.ClassTag

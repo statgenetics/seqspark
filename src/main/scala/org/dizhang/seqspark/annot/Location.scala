@@ -24,7 +24,7 @@ import org.dizhang.seqspark.ds.{Region, Single, Variation}
 import org.dizhang.seqspark.util.Constant.Annotation
 import org.dizhang.seqspark.util.Constant.Annotation.Base.Base
 import org.dizhang.seqspark.util.Constant.Annotation._
-import org.dizhang.seqspark.util.UserConfig.MutType
+import org.dizhang.seqspark.util.ConfigValue.MutType
 
 /**
   * location of a gene with a specific splicing and translation.
@@ -70,7 +70,7 @@ final case class PLoc(geneName: String,
   def utr5 = Region(chr, start, cds.start)
   def utr3 = Region(chr, cds.end, end)
   def codon(p: Single, seq: mRNA, alt: Option[Base] = None): Codon = {
-    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
+    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1).head._2
     val intronsLen =
       sum(for (i <- 0 until exonIdx)
           yield exons(i + 1).start - exons(i).end)
@@ -89,7 +89,7 @@ final case class NLoc(geneName: String,
   def utr5 = Region(chr, cds.end, end)
   def utr3 = Region(chr, start, cds.start)
   def codon(p: Single, seq: mRNA, alt: Option[Base] = None): Codon = {
-    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1)(0)._2
+    val exonIdx = exons.zipWithIndex.filter(e => p overlap e._1).head._2
     val intronsLen =
       sum(for (i <- exonIdx until (exons.length - 1))
           yield exons(i + 1).start - exons(i).end)

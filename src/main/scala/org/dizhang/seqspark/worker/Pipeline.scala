@@ -18,7 +18,7 @@ package org.dizhang.seqspark.worker
 
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.ds.Genotype.Imp
-import org.dizhang.seqspark.util.UserConfig.GenotypeFormat
+import org.dizhang.seqspark.util.ConfigValue.GenotypeFormat
 import org.dizhang.seqspark.util.SeqContext
 //import scalaz.{Free, ~>, Id, Coyoneda}
 //import scalaz.syntax.traverse._

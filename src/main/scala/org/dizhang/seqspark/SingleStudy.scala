@@ -107,7 +107,7 @@ object SingleStudy {
 
     val sc = seqContext.sparkContext
 
-    Phenotype(cnf.input.phenotype.path, "phenotype")(ss)
+    Phenotype(cnf.input.phenotype, "phenotype")(ss)
 
     implicit val ssc = seqContext
     Pipeline(ssc)

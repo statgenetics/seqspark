@@ -72,8 +72,8 @@ object Counter {
   }
 
 
-  def addByKey[A](x: Map[Int, A], y: Map[Int, A])
-                (implicit sg: SemiGroup[A]): Map[Int, A] = {
+  def addByKey[A, B](x: Map[B, A], y: Map[B, A])
+                (implicit sg: SemiGroup[A]): Map[B, A] = {
     x ++ (for ((k, v) <- y) yield k -> sg.op(x.getOrElse(k, sg.zero), v))
   }
 
@@ -160,6 +160,7 @@ case class SparseCounter[A](elems: Map[Int, A], default: A, size: Int)
     sg.op(dense, sparse)
   }
   def reduceByKey[B](keyFunc: Int => B)(implicit sg: SemiGroup[A]): Map[B, A] = {
+
     val dense: Map[B, A] = elems.groupBy(x => keyFunc(x._1)).mapValues(
       c => c.values.reduce((a, b) => sg.op(a, b))
     ).map(identity)

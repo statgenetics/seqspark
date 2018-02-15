@@ -20,7 +20,7 @@ import java.io.PrintWriter
 
 import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
+import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant.Genotype.Raw
 import org.dizhang.seqspark.util.{General, LogicalParser, SeqContext}
 import org.dizhang.seqspark.util.UserConfig._
@@ -65,30 +65,12 @@ object Genotypes {
     val sc = ssc.sparkContext
     val conf = ssc.userConfig
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
-    val batch = conf.input.phenotype.batch
-    val (batchKeys, keyFunc) = if (batch == "none") {
-      (Array("all"), (_: Int) => 0)
-    } else {
-      phenotype.batch(batch) match {
-        case None => (Array("all"), (_: Int) => 0)
-        case Some(batchStr) =>
-          if (batchStr.isEmpty) {
-            (Array("all"), (_: Int) => 0)
-          } else {
-            val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray //the batch names
-            val batchMap = batchKeys.zipWithIndex.toMap //batch name indices
-            val batchIdx = batchStr.map(b => batchMap(b)) //individual -> batch index
-            (batchKeys, (i: Int) => batchIdx(i))
-          }
-      }
-    }
-    //logger.info("still all right?")
-    //val first = self.first()
+    val batch = phenotype.batch(conf.input.phenotype.batch)
 
     /** broadcast the keyFunc
       *
       * */
-    val bcKeyFunc = sc.broadcast(keyFunc)
+    val bcKeyFunc = sc.broadcast(batch.toKeyFunc)
 
 
     val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
@@ -103,7 +85,7 @@ object Genotypes {
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")
 
-    writeBcnt(res, batchKeys, conf.output.results.resolve("callRate_by_dpgq.txt"))
+    writeBcnt(res, batch.keys, conf.output.results.resolve("callRate_by_dpgq.txt"))
   }
 
   def genotypeQC(self: Data[String],
@@ -181,7 +163,7 @@ object Genotypes {
     }
   }
 
-  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
+  def writeBcnt(b: Map[Byte, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
     val pw = new PrintWriter(outFile.toFile)
     pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {

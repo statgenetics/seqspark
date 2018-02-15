@@ -150,6 +150,7 @@ object UserConfig {
     def path = getProperPath(pathRaw)
     def pathValid = path != ""
     val batch = config.getString("batch")
+    def samples: Samples = Samples(config.getString("samples"))
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
@@ -160,6 +161,8 @@ object UserConfig {
     val export = config.getBoolean("export")
     val pca = PCAConfig(config.getConfig("pca"))
     def group: GroupConfig = GroupConfig(config.getConfig("group"))
+    def countBy: List[String] = config.getStringList("count.by").asScala.toList
+    def titvBy: List[String] = config.getStringList("titv.by").asScala.toList
   }
 
   case class GroupConfig(config: Config) extends UserConfig {

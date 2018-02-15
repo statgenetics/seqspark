@@ -19,10 +19,12 @@ package org.dizhang.seqspark.ds
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.Regions
+import org.dizhang.seqspark.ds.Phenotype.Batch
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.{LogicalParser, SeqContext, ConfigValue => CV}
 import org.dizhang.seqspark.worker.Variants._
 import org.slf4j.{Logger, LoggerFactory}
+
 import scala.language.implicitConversions
 
 /**
@@ -78,7 +80,7 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     *
     * */
   def countBy(groups: Map[String, Map[String, LogicalParser.LogExpr]],
-              batch: Option[Array[String]],
+              batch: Batch,
               controls: Option[Array[Boolean]])
              (implicit sc: SparkContext): Map[String, Map[String, Int]] = {
 
@@ -101,11 +103,27 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     }
   }
 
+  /**
+  def withGroup(cond: Array[LogicalParser.LogExpr],
+                batch: Option[Array[String]],
+                controls: Option[Array[Boolean]])
+               (implicit sc: SparkContext): RDD[(Int, Variant[A])] = {
+    val bcBatch = sc.broadcast(batch)
+    val bcControls = sc.broadcast(controls)
+    self.map{v =>
+      cond.map(c => )
+    }
+  }
+  */
+
   def variants(cond: LogicalParser.LogExpr,
                updateInfo: Option[String] = None,
                filter: Boolean = true)(ssc: SeqContext): RDD[Variant[A]] = {
     if (cond == LogicalParser.T) {
       logger.debug("condition empty, no need to filter variants")
+      updateInfo.map{key =>
+        self.map(v => v.addInfo(key))
+      }
       self
     } else {
       val conf = ssc.userConfig

@@ -9,31 +9,31 @@ object SemiGroup {
   type MapCounter = Map[PairInt, Int]
   type MapCounterLong = Map[Int, Long]
 
-  case class Longs(n: Int) extends SemiGroup[Array[Long]] {
+  implicit object Longs extends SemiGroup[Array[Long]] {
     val zero: Array[Long] = Array.emptyLongArray
     def op(x: Array[Long], y: Array[Long]): Array[Long] = {
-      val res = x.clone()
-      for (i <- 0 until n) {
+      val res = if (x.length > y.length) x.clone() else y.clone()
+      for (i <- 0 until math.min(x.length, y.length)) {
         res(i) = x(i) + y(i)
       }
       res
     }
     def pow(x: Array[Long], k: Int): Array[Long] = {
       val res = x.clone()
-      for (i <- 0 until n) {
+      for (i <- x.indices) {
         res(i) = x(i) * k
       }
       res
     }
   }
 
-  case class Ints(n: Int) extends SemiGroup[Array[Int]] {
+  implicit object Ints extends SemiGroup[Array[Int]] {
 
     val zero: Array[Int] = Array.emptyIntArray
 
     def op(x: Array[Int], y: Array[Int]): Array[Int] = {
-      val res = x.clone()
-      for (i <- 0 until n) {
+      val res = if (x.length > y.length) x.clone() else y.clone()
+      for (i <- 0 until math.min(x.length, y.length)) {
         res(i) = x(i) + y(i)
       }
       res
@@ -41,7 +41,7 @@ object SemiGroup {
 
     def pow(x: Array[Int], k: Int): Array[Int] = {
       val res = x.clone()
-      for (i <- 0 until n) {
+      for (i <- x.indices) {
         res(i) = x(i) * k
       }
       res

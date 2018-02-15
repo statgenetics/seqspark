@@ -20,7 +20,8 @@ import java.io.PrintWriter
 
 import breeze.stats.distributions.ChiSquared
 import org.dizhang.seqspark.annot.VariantAnnotOp._
-import org.dizhang.seqspark.ds.{Genotype, Phenotype, SparseVariant, Variant, SemiGroup}
+import org.dizhang.seqspark.ds.Phenotype.{Batch, BatchDummy, BatchImpl}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, SemiGroup, SparseVariant, Variant}
 import org.dizhang.seqspark.util.Constant.Variant._
 import org.dizhang.seqspark.ds.VCF.toGeneralizedVCF
 import org.dizhang.seqspark.util.General._
@@ -83,8 +84,8 @@ object Variants {
 
   def countByGroups[A: Genotype](self: Data[A])
                       (implicit ssc: SeqContext): Unit = {
-
     val group = ssc.userConfig.qualityControl.group.variants
+    val countBy = ssc.userConfig.qualityControl.countBy
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val batch = pheno.batch(Pheno.batch)
     val controls = pheno.control
@@ -161,7 +162,7 @@ object Variants {
       * */
     def compute(names: Set[String],
                 controls: Option[Array[Boolean]],
-                batch: Option[Array[String]]): Map[String, String] = {
+                batch: Batch): Map[String, String] = {
       names.map{
         case "chr" => "chr" -> v.chr
           case "pooledMaf" =>
@@ -240,25 +241,23 @@ object Variants {
       }
     }
     def batchMaf(controls: Option[Array[Boolean]],
-                 batch: Option[Array[String]]): Map[String, Double] = {
-      if (v.parseInfo.contains(InfoKey.batchMaf)) {
-        v.parseInfo(InfoKey.batchMaf).split(",").map{kv =>
+                 batch: Batch): Map[String, Double] = {
+      val ctrlKey = if (controls.isDefined) "_CTRL" else ""
+      val batchMafKey = s"${IK.batchMaf}${ctrlKey}_${batch.name}"
+      if (v.parseInfo.contains(batchMafKey)) {
+        v.parseInfo(batchMafKey).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
-      } else if (batch.isEmpty) {
-        Map("all" -> maf(controls))
       } else {
-        val (keyFunc, rest): (Int => String, Variant[A]) = controls match {
-          case None => (i => batch.get(i), v)
-          case Some(c) =>
-            val b = batch.get.zip(c).filter(_._2).map(_._1)
-            (i => b(i), v.select(c))
+        val (b, rest): (Batch, Variant[A]) = controls match {
+          case None => batch -> v
+          case Some(c) => batch.select(c) -> v.select(c)
         }
-        val cnt = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-        val res = cnt.map{case (k, p) => k -> p.ratio}
+        val cnt = rest.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(b.toKeyFunc)
+        val res = cnt.map{case (k, p) => b.keys(k) -> p.ratio}
         val value = res.toArray.map{case (k, d) => s"$k->$d"}.mkString(",")
-        v.addInfo(InfoKey.batchMaf, value)
+        v.addInfo(batchMafKey, value)
         res
       }
     }
@@ -273,26 +272,28 @@ object Variants {
         res
       }
     }
-    def batchCallRate(batch: Option[Array[String]]): Map[String, Double] = {
+
+    def batchCallRate(batch: Batch): Map[String, Double] = {
+      val batchCallRateKey = s"${IK.batchCallRate}_${batch.name}"
       if (v.parseInfo.contains(InfoKey.batchCallRate)) {
         v.parseInfo(InfoKey.batchCallRate).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
-      } else if (batch.isEmpty) {
-        Map("all" -> callRate)
       } else {
-        val keyFunc = (i: Int) => batch.get(i)
-        val cnt = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(keyFunc)
-        val res = cnt.map{case (k, p) => k -> p.ratio}
+        val b = batch
+        val cnt = v.toCounter(geno.callRate, (1.0, 1.0)).reduceByKey(b.toKeyFunc)
+        val res = cnt.map{case (k, p) => b.keys(k) -> p.ratio}
         val value = res.toArray.map{case (k, d) => s"$k->$d"}.mkString(",")
         v.addInfo(InfoKey.batchCallRate, value)
         res
       }
     }
+
     def hwePvalue(controls: Option[Array[Boolean]]): Double = {
-      if (v.parseInfo.contains(InfoKey.hwePvalue)) {
-        v.parseInfo(InfoKey.hwePvalue).toDouble
+      val hpKey = s"${IK.hwePvalue}${if (controls.isDefined) "_CTRL" else ""}"
+      if (v.parseInfo.contains(hpKey)) {
+        v.parseInfo(hpKey).toDouble
       } else {
         val rest = controls match {
           case Some(c) => v.select(c)
@@ -308,32 +309,27 @@ object Variants {
         val chisq = (cnt._1 - eAA).square/eAA + (cnt._2 - eAa).square/eAa + (cnt._3 - eaa).square/eaa
         val dis = ChiSquared(1)
         val res = 1.0 - dis.cdf(chisq)
-        v.addInfo(InfoKey.hwePvalue, res.toString)
+        v.addInfo(hpKey, res.toString)
         res
       }
     }
 
-    def batchSpecific(batch: Option[Array[String]]): Map[String, Double] = {
-      if (v.parseInfo.contains(InfoKey.batchSpecific)) {
-        v.parseInfo(InfoKey.batchSpecific).split(",").map{kv =>
+    def batchSpecific(batch: Batch): Map[String, Double] = {
+      val bsKey = s"${IK.batchSpecific}_${batch.name}"
+      if (v.parseInfo.contains(bsKey)) {
+        v.parseInfo(bsKey).split(",").map{kv =>
           val s = kv.split("->")
           s(0) -> s(1).toDouble
         }.toMap
-      } else if (batch.isEmpty) {
-        val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduce
-        val res = math.min(cnt._1, cnt._2 - cnt._1)
-        val value = s"all->$res"
-        v.addInfo(IK.batchSpecific, value)
-        Map("all" -> res)
       } else {
         if (v.parseInfo.contains("dbSNP")) {
-          batch.get.map(b => b -> 0.0).toMap
+          batch.keys.map(b => b -> 0.0).toMap
         } else {
-          val keyFunc = (i: Int) => batch.get(i)
-          val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(keyFunc)
-          val res = cnt.map{case (k, p) => k -> math.min(p._1, p._2 - p._1)}
+          val b = batch
+          val cnt = v.toCounter(geno.toAAF, (0.0, 2.0)).reduceByKey(b.toKeyFunc)
+          val res = cnt.map{case (k, p) => b.keys(k) -> math.min(p._1, p._2 - p._1)}
           val value = res.toArray.map{case (k, c) => s"$k->$c"}.mkString(",")
-          v.addInfo(InfoKey.batchSpecific, value)
+          v.addInfo(bsKey, value)
           res
         }
       }

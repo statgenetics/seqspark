@@ -154,11 +154,7 @@ object Phenotype {
 
        dataFrame.createOrReplaceTempView(table)
 
-       pc.samples match {
-         case Samples.none => Dummy
-         case Samples.all => Distributed(dataFrame)
-         case Samples.by(b) => select(b, table)(spark)
-       }
+       Distributed(dataFrame)
      }
   }
 

@@ -86,6 +86,17 @@ object Variants {
                       (implicit ssc: SeqContext): Unit = {
     val group = ssc.userConfig.qualityControl.group.variants
     val countBy = ssc.userConfig.qualityControl.countBy
+    val grp = countBy.flatMap{key =>
+      group.get(key) match {
+        case Some(m) => Some(key -> m)
+        case None =>
+          logger.warn(s"group $key not defined")
+          None
+      }
+    }.toMap
+
+    grp.map{key =>}
+
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val batch = pheno.batch(Pheno.batch)
     val controls = pheno.control

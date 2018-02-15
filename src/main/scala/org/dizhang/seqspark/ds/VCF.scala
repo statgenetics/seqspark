@@ -120,8 +120,8 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
                updateInfo: Option[String] = None,
                filter: Boolean = true)(ssc: SeqContext): RDD[Variant[A]] = {
     if (cond == LogicalParser.T) {
-      logger.debug("condition empty, no need to filter variants")
-      updateInfo.map{key =>
+      logger.info("condition empty, no need to filter variants")
+      updateInfo.foreach{key =>
         self.map(v => v.addInfo(key))
       }
       self

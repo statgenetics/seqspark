@@ -79,10 +79,10 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
     * Map[label, Map[grp, condition] ]
     *
     * */
-  def countBy(groups: Map[String, Map[String, LogicalParser.LogExpr]],
+  def countBy(exprs: Array[LogicalParser.LogExpr],
               batch: Batch,
               controls: Option[Array[Boolean]])
-             (implicit sc: SparkContext): Map[String, Map[String, Int]] = {
+             (implicit sc: SparkContext): Array[Int] = {
 
     def merge(m1: Map[String, Int], m2: Map[String, Int]): Map[String, Int] = {
       m1 ++ (for ((k, n) <- m2) yield if (m1.contains(k)) k -> (n + m1(k)) else k -> n)
@@ -90,16 +90,12 @@ class VCF[A: Genotype](self: RDD[Variant[A]]) extends Serializable {
 
     val bcBatch = sc.broadcast(batch)
     val bcControls = sc.broadcast(controls)
-    val names = groups.flatMap(p => p._2.flatMap(x => LogicalParser.names(x._2))).toSet
+    val names = exprs.flatMap(x => LogicalParser.names(x)).toSet
     self.map{v =>
       val vm = v.compute(names, bcControls.value, bcBatch.value)
-      groups.map{
-        case (tag, m) => tag -> m.map{
-          case (grp, cond) => grp -> (if (LogicalParser.eval(cond)(vm)) 1 else 0)
-        }
-      }
+      exprs.map(e => LogicalParser.eval(e)(vm)).map(b => if (b) 1 else 0)
     }.reduce{(a, b) =>
-      a ++ (for ((k, m) <- b) yield if (a.contains(k)) k -> merge(m, a(k)) else k -> m)
+      SemiGroup.Ints.op(a, b)
     }
   }
 

@@ -132,6 +132,7 @@ object Samples {
   def titv[A: Genotype](self: Data[A])(ssc: SeqContext): Unit = {
     logger.info("compute ti/tv ratio")
     val geno = implicitly[Genotype[A]]
+
     val cntAll = self.map(v =>
       if (v.isTi) {
         (1.0, 0.0)

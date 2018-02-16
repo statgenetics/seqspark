@@ -48,8 +48,6 @@ object Variants {
     val group = ssc.userConfig.qualityControl.group.variants
     val cnt = self.map(v => if (v.isTi) (1,0) else if (v.isTv) (0, 1) else (0,0))
 
-
-
     if (cnt.isEmpty())
       (0, 0)
     else
@@ -95,19 +93,24 @@ object Variants {
       }
     }.toMap
 
-    grp.map{key =>}
+    case class GroupKey(group: String, key: String)
+
+    val grpKeys = grp.keys.flatMap(g => grp(g).keys.map(k => GroupKey(g, k))).toArray
+
+    val grpLogExpr = grpKeys.map{gk =>
+      grp(gk.group)(gk.key)
+    }
 
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
     val batch = pheno.batch(Pheno.batch)
     val controls = pheno.control
-    val cnt = self.countBy(group, batch, controls)(ssc.sparkContext)
+    val cnt = self.countBy(grpLogExpr, batch, controls)(ssc.sparkContext)
     val output = ssc.userConfig.output.results.resolve("qc.txt")
     val pw = new PrintWriter(output.toFile)
     pw.append("variants:\n")
-    cnt.foreach{
-      case (tag, m) => m.foreach{
-        case (grp, c) => pw.append(s"\t$tag.$grp:\t$c\n")
-      }
+    grpKeys.zip(cnt).foreach{
+      case (GroupKey(g, k), c) =>
+        pw.append(s"\t$g.$k:\t$c\n")
     }
     pw.close()
   }

@@ -200,6 +200,9 @@ object QualityControl {
       val ratio = Variants.titv(res)
       appendMsg(qc, "titv", s"afterQC: ${ratio._1.toDouble/ratio._2}")
       logger.info(s"titv ratio after QC: ${ratio._1.toDouble/ratio._2} = ${ratio._1}/${ratio._2}")
+      if (conf.qualityControl.titvBy.contains("samples")) {
+        Samples.titv(res)(ssc)
+      }
     }
 
     if (sums.contains("pca")) {

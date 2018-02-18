@@ -22,7 +22,7 @@ import breeze.linalg.DenseVector
 import breeze.stats.corrcoeff
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.IntervalTree
-import org.dizhang.seqspark.assoc.Encode
+import Variants.convertToVQC
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
 import org.dizhang.seqspark.stat.PCA
@@ -132,34 +132,67 @@ object Samples {
   def titv[A: Genotype](self: Data[A])(ssc: SeqContext): Unit = {
     logger.info("compute ti/tv ratio")
     val geno = implicitly[Genotype[A]]
+    val qcConf =ssc.userConfig.qualityControl
+    val basis = qcConf.group.variants
+    val titvBy = qcConf.titvBy.filterNot(_ == "samples")
+    case class GroupKey(group: String, key: String) {
+      override def toString: String = {
+        s"$group.$key"
+      }
+    }
+    val grp = titvBy.flatMap{g =>
+      basis.get(g) match {
+        case Some(m) => Some(g -> m)
+        case None =>
+          logger.warn(s"group $g not defined")
+          None
+      }
+    }.toMap
 
-    val cntAll = self.map(v =>
-      if (v.isTi) {
-        (1.0, 0.0)
-      } else if (v.isTv) {
-        (0.0, 1.0)
-      } else {
-        (0.0, 0.0)
-      }
-    ).reduce((a, b) => (a._1 + b._1, a._2 + b._2))
-    val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
-      if (v.isTi) {
-        v.toCounter(g => if (geno.isMis(g) || geno.isRef(g)) (0.0, 0.0) else (1.0, 0.0), (0.0, 0.0))
-      } else {
-        v.toCounter(g => if (geno.isMis(g) || geno.isRef(g)) (0.0, 0.0) else (0.0, 1.0), (0.0, 0.0))
-      }
-    }.reduce((a, b) => a ++ b)
+    val grpKeys = grp.flatMap(p => p._2.keys.map(k => GroupKey(p._1, k))).toArray
+
+    val grpLogExpr = grpKeys.map(gk => grp(gk.group)(gk.key))
+
+    val names = grpLogExpr.flatMap(le => LogicalParser.names(le)).toSet
+
     val pheno = Phenotype("phenotype")(ssc.sparkSession)
-    //val fid = pheno.select("fid").map(_.get)
-    val iid = pheno.select("iid").map(_.get)
+
+    val bcBatch = ssc.sparkContext.broadcast(pheno.batch(Pheno.batch))
+    val bcCtrl = ssc.sparkContext.broadcast(pheno.control)
+
+    def cntFunc(vm: Map[String, String], ti: Boolean): A => Array[Long] = {
+      g =>
+        grpLogExpr.map(le => LogicalParser.eval(le)(vm)).flatMap{b =>
+          if (b) {
+            if (ti) {
+              List(geno.toBRV(g, 0).toLong)
+            } else {
+              List(0L, geno.toBRV(g, 0).toLong)
+            }
+          } else {
+            List(0L, 0L)
+          }
+        }
+    }
+
+    val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
+      val vm = v.compute(names, bcCtrl.value, bcBatch.value)
+      v.toCounter(cntFunc(vm , v.isTv), Array.fill[Long](2 * grpKeys.length)(0L))
+    }.reduce((a, b) => a.++(b))
+
+
+    val iid = pheno.select(Pheno.iid).map(_.get)
     val outFile = ssc.userConfig.output.results.resolve("titv").toAbsolutePath.toFile
     val pw = new PrintWriter(outFile)
-    pw.write(s"#all,${cntAll._1},${cntAll._2}\n")
-    pw.write("iid,ti,tv\n")
-    for (i <- iid.indices) {
-      val c = cnt(i)
-      pw.write("%s,%.2f,%.2f\n" format (iid(i), c._1, c._2))
+    pw.write(s"iid,${grpKeys.flatMap(gk => List(s"${gk.toString}.ti", s"$gk.tv", s"$gk.ti/tv")).mkString(",")}\n")
+
+    cnt.toArray.zipWithIndex.foreach{
+      case (arr, i) =>
+        val res = grpKeys.indices.map(j =>
+          f"${arr(j * 2)}%d,${arr(j * 2 + 1)}%d,${arr(j * 2).toDouble/arr(j*2 + 1)}%.3f")
+        pw.write(s"${iid(i)}, ${res.mkString(",")}\n")
     }
+
     pw.close()
     logger.info("finished computing ti/tv")
   }

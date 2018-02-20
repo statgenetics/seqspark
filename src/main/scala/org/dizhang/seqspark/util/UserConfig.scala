@@ -60,13 +60,17 @@ object UserConfig {
   }
 
   def getGroups(config: Config): Map[String, Map[String, LogExpr]] = {
-    config.root().keySet().asScala.toList.map{grp =>
-      val grpConf = config.getConfig(grp)
-      grp ->
-        grpConf.root().keySet().asScala.map(tag =>
-          tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
-        ).toMap
-    }.toMap
+    if (config.isEmpty) {
+      Map[String, Map[String, LogExpr]]()
+    } else {
+      config.root().keySet().asScala.toList.map{grp =>
+        val grpConf = config.getConfig(grp)
+        grp ->
+          grpConf.root().keySet().asScala.map(tag =>
+            tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
+          ).toMap
+      }.toMap
+    }
   }
 
 

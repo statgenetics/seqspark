@@ -65,10 +65,15 @@ object UserConfig {
     } else {
       config.root().keySet().asScala.toList.map{grp =>
         val grpConf = config.getConfig(grp)
-        grp ->
-          grpConf.root().keySet().asScala.map(tag =>
-            tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
-          ).toMap
+        if (grpConf.isEmpty) {
+          grp -> Map[String, LogExpr]()
+        } else {
+          grp ->
+            grpConf.root().keySet().asScala.map(tag =>
+              tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
+            ).toMap
+
+        }
       }.toMap
     }
   }

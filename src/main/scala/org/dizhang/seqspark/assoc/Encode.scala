@@ -28,6 +28,7 @@ import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
 import org.dizhang.seqspark.util.ConfigValue._
+import org.dizhang.seqspark.variant.Variant
 
 import scala.collection.mutable
 

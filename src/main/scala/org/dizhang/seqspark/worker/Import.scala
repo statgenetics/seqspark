@@ -21,10 +21,11 @@ import org.apache.spark.util.AccumulatorV2
 import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.ds
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.{Genotype, Phenotype, Region, Variant}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, Region}
 import org.dizhang.seqspark.util.ConfigValue.{GenotypeFormat => GenoFormat}
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
 import org.dizhang.seqspark.util.{LogicalParser, SeqContext, ConfigValue => CV}
+import org.dizhang.seqspark.variant.Variant
 import org.dizhang.seqspark.worker.Genotypes.GenoCounter
 import org.slf4j.LoggerFactory
 

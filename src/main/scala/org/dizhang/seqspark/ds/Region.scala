@@ -17,6 +17,7 @@
 package org.dizhang.seqspark.ds
 
 import breeze.linalg.{max, min}
+import org.dizhang.seqspark.variant.Variant
 /**
   * Region on chromosome
   * position is 0-based and the interval is half open half closed

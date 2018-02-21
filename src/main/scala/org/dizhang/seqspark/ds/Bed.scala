@@ -16,6 +16,8 @@
 
 package org.dizhang.seqspark.ds
 
+import org.dizhang.seqspark.variant.Variant
+
 @SerialVersionUID(7737230001L)
 class Bed (arg1: Array[Byte], arg2: Array[Byte]) extends Serializable {
   /**

@@ -30,6 +30,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.Path
 
 import org.apache.spark.SparkContext
+import org.dizhang.seqspark.variant.Variant
 /**
   * Genotype QC functions, currently are only for Raw VCF data
   */

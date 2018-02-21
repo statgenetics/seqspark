@@ -20,10 +20,11 @@ import breeze.linalg._
 import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRandomGenerator}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
-import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
+import org.dizhang.seqspark.ds.{Genotype, Variation}
 import org.dizhang.seqspark.stat.{LCCSLiu, LinearRegression, ScoreTest}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
+import org.dizhang.seqspark.variant.Variant
 import org.scalatest.FlatSpec
 import org.slf4j.LoggerFactory
 

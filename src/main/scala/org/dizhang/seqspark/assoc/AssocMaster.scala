@@ -22,7 +22,7 @@ import breeze.linalg.{DenseMatrix, DenseVector, rank, sum}
 import org.apache.spark.{Partitioner, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.variant.VariantAnnotOp._
 import org.dizhang.seqspark.assoc.AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.ds.VCF._

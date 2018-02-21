@@ -22,9 +22,9 @@ import breeze.linalg.DenseVector
 import breeze.stats.corrcoeff
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.IntervalTree
-import Variants.convertToVQC
+import org.dizhang.seqspark.variant.VariantSummaryOp._
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
+import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype}
 import org.dizhang.seqspark.stat.PCA
 import org.dizhang.seqspark.util.Constant.{Hg19, Hg38, Pheno}
 import org.dizhang.seqspark.util.InputOutput._

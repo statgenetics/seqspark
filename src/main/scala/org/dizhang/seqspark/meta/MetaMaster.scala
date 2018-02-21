@@ -21,7 +21,7 @@ import breeze.linalg.{DenseMatrix => DM, DenseVector => DV}
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.variant.VariantAnnotOp._
 import org.dizhang.seqspark.annot.{IntervalTree, RefGene}
 import org.dizhang.seqspark.assoc.{SumStat, AssocMaster => AMA, AssocMethod => AME}
 import org.dizhang.seqspark.assoc.SumStat.{DefaultRMWResult, RMWResult}

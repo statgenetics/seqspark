@@ -22,7 +22,8 @@ import org.dizhang.seqspark.annot.Regions
 import org.dizhang.seqspark.ds.Phenotype.Batch
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.{LogicalParser, SeqContext, ConfigValue => CV}
-import org.dizhang.seqspark.worker.Variants._
+import org.dizhang.seqspark.variant.Variant
+import org.dizhang.seqspark.variant.VariantSummaryOp._
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions

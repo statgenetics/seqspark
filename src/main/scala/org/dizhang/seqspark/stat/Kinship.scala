@@ -18,8 +18,10 @@ package org.dizhang.seqspark.stat
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds._
+import org.dizhang.seqspark.variant._
 import breeze.linalg.{DenseVector, SparseVector, Vector}
 import org.apache.spark.SparkContext
+import org.dizhang.seqspark.variant.Variant
 
 import scala.collection.mutable.ArrayBuffer
 

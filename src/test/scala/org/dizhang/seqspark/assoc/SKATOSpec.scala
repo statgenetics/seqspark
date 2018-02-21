@@ -24,11 +24,12 @@ import breeze.stats.distributions.{Binomial, Gaussian, RandBasis, ThreadLocalRan
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.math3.random.MersenneTwister
 import org.dizhang.seqspark.assoc.SKATO.LiuPValue
-import org.dizhang.seqspark.ds.{Genotype, Variant, Variation}
-import org.dizhang.seqspark.stat.{LinearRegression}
+import org.dizhang.seqspark.ds.{Genotype, Variation}
+import org.dizhang.seqspark.stat.LinearRegression
 import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
 import org.dizhang.seqspark.util.UserConfig.MethodConfig
 import org.dizhang.seqspark.util.General._
+import org.dizhang.seqspark.variant.Variant
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 

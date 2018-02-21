@@ -22,12 +22,13 @@ import breeze.linalg.DenseMatrix
 import com.esotericsoftware.kryo.io.Output
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.Variant
 import org.dizhang.seqspark.util.Constant._
 import org.dizhang.seqspark.util.UserConfig.RootConfig
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import com.typesafe.config.Config
 import java.nio.file.Path
+
+import org.dizhang.seqspark.variant.Variant
 
 import scala.io.Source
 /**

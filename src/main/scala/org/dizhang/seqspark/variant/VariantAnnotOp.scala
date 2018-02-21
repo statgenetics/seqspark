@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Zhang Di
+ * Copyright 2018 Zhang Di
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark.annot
+package org.dizhang.seqspark.variant
+
 import org.apache.spark.broadcast.Broadcast
-import org.dizhang.seqspark.annot.VariantAnnotOp._
+import org.dizhang.seqspark.annot.{IntervalTree, Location, RefGene}
 import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant
-
+import VariantAnnotOp._
 import scala.language.implicitConversions
 /**
   * Created by zhangdi on 8/16/16.

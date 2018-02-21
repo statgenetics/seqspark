@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Zhang Di
+ * Copyright 2018 Zhang Di
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package org.dizhang.seqspark.ds
+package org.dizhang.seqspark.variant
 
+import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.ConfigValue.MutType
 
 import scala.collection.mutable

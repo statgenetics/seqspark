@@ -18,7 +18,8 @@ package org.dizhang.seqspark
 
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.ds.Genotype.Imp
-import org.dizhang.seqspark.ds.{Genotype, Variant}
+import org.dizhang.seqspark.ds.Genotype
+import org.dizhang.seqspark.variant.Variant
 
 /**
   * Created by zhangdi on 9/19/16.

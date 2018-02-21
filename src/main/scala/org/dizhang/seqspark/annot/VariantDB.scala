@@ -18,12 +18,13 @@ package org.dizhang.seqspark.annot
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.{Region, Variant, Variation}
+import org.dizhang.seqspark.ds.{Region, Variation}
 import org.slf4j.{Logger, LoggerFactory}
 import org.dizhang.seqspark.util.UserConfig.DatabaseConfig
 import org.dizhang.seqspark.worker.Variants
 import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.ConfigValue.DBFormat
+import org.dizhang.seqspark.variant.Variant
 
 import scala.collection.JavaConverters._
 /**

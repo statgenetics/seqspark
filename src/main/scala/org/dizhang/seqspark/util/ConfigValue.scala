@@ -35,6 +35,13 @@ object ConfigValue {
     val cacheImputed = Value("cachedImpute2")
   }
 
+  sealed trait Groups
+  object Groups {
+    case class Logical(name: String,
+                       data: Map[String, Map[String, LogicalParser.LogExpr]]) extends Groups
+    case class Categorical()
+  }
+
   sealed trait Samples
   object Samples {
     case object all extends Samples

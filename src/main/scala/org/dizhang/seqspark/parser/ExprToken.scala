@@ -16,20 +16,28 @@
 
 package org.dizhang.seqspark.parser
 
-sealed trait ExprToken
+import scala.util.parsing.input.Positional
 
-//
-case class LOG(base: Double) extends ExprToken
-case object MIN extends ExprToken
-case object MAX extends ExprToken
-case object SUM extends ExprToken
-case object ADD extends ExprToken
-case object SUB extends ExprToken
-case object MUL extends ExprToken
-case object DIV extends ExprToken
-case object T extends ExprToken
-case object F extends ExprToken
-case object AND extends ExprToken
-case object OR extends ExprToken
-case object NOT extends ExprToken
-case object LT
+sealed trait ExprToken extends Positional
+
+/** identifier */
+case class Identifier(name: String) extends ExprToken
+
+case class Keyword(name: String) extends ExprToken
+
+case class Delimiter(str: String) extends ExprToken
+
+case class Operator(name: String) extends ExprToken
+
+/** string */
+case class StringLit(value: String) extends ExprToken
+
+/** int */
+case class IntLit(value: Int) extends ExprToken
+
+/** double */
+case class DoubleLit(value: Double) extends ExprToken
+
+/** bool */
+case class BooleanLit(value: Boolean) extends ExprToken
+

@@ -6,21 +6,20 @@ organization := "org.dizhang"
 
 scalaVersion := "2.11.12"
 
-scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Ypartial-unification")
 
 libraryDependencies ++= Seq(
 	"org.slf4j" % "slf4j-api" % "1.7.5" % "provided",
 	"org.slf4j" % "slf4j-log4j12" % "1.7.5" % "provided",
-	"org.apache.spark" % "spark-core_2.11" % "2.1.0" % "provided",
-	"org.apache.spark" % "spark-sql_2.11" % "2.1.0" % "provided",
-	"org.apache.spark" % "spark-mllib_2.11" % "2.1.0" % "provided",
+	"org.apache.spark" % "spark-core_2.11" % "2.1.2" % "provided",
+	"org.apache.spark" % "spark-sql_2.11" % "2.1.2" % "provided",
+	"org.apache.spark" % "spark-mllib_2.11" % "2.1.2" % "provided",
 	"com.typesafe" % "config" % "1.2.1",
 	"org.scalanlp" %% "breeze" % "0.12",
 	"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-	//"net.java.dev.jna" % "jna" % "4.2.2",
-  //"com.chuusai" %% "shapeless" % "2.3.3"
-	"org.scalaz" %% "scalaz-core" % "7.2.4"
+  "org.typelevel" %% "spire" % "0.14.1",
+	"org.typelevel" %% "cats-free" % "1.0.1"
 )
 
 //resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"

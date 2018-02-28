@@ -18,10 +18,8 @@ package org.dizhang.seqspark.parser
 
 import scala.language.{existentials, higherKinds}
 
-trait ExprAlg[num, repr[_]] {
-  def intAlg: NumericAlg[Int, repr]
-  def doubleAlg: NumericAlg[Double, repr]
-  def numAlg: NumericAlg[num, repr]
+trait ExprAlg[repr[_]] {
+  def numAlg: NumberAlg[repr]
   def logicAlg: LogicAlg[repr]
   def stringAlg: StringAlg[repr]
 

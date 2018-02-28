@@ -19,8 +19,8 @@ package org.dizhang.seqspark.parser
 import scala.util.parsing.combinator.Parsers
 import scala.util.parsing.input.{NoPosition, Position, Reader}
 import scala.language.{higherKinds, existentials}
-
-class ExprParser[num, repr[_]](variantAlg: VariantAlg[num, repr]) extends Parsers {
+import spire.math.Number
+class ExprParser[repr[_]](variantAlg: VariantAlg[repr]) extends Parsers {
   override type Elem = ExprToken
 
 
@@ -41,7 +41,7 @@ class ExprParser[num, repr[_]](variantAlg: VariantAlg[num, repr]) extends Parser
 
   }
 
-  def arithExpr: Parser[repr[num]] = positioned[repr[num]]{
+  def arithExpr: Parser[repr[Number]] = positioned[repr[Number]]{
     arithTerm ~ rep(Operator("+") ~ arithTerm | Operator("-") ~ arithTerm) ^^ {
       case t ~ ts => ts.foldLeft(t){
         case (a, Operator("+") ~ b) => variantAlg.numAlg.add(a, b)
@@ -50,7 +50,7 @@ class ExprParser[num, repr[_]](variantAlg: VariantAlg[num, repr]) extends Parser
     }
   }
 
-  def arithTerm: Parser[repr[num]] = positioned[repr[num]]{
+  def arithTerm: Parser[repr[Number]] = positioned[repr[Number]]{
     arithFactor ~ rep(Operator("*") ~ arithFactor | Operator("/") ~ arithFactor) ^^ {
       case t ~ ts => ts.foldLeft(t){
         case (a, Operator("*") ~ b) => variantAlg.numAlg.mul(a, b)
@@ -59,7 +59,7 @@ class ExprParser[num, repr[_]](variantAlg: VariantAlg[num, repr]) extends Parser
     }
   }
 
-  def arithFactor: Parser[repr[num]]= positioned[repr[num]]{
+  def arithFactor: Parser[repr[Number]]= positioned[repr[Number]]{
     Delimiter("(") ~ arithExpr ~ Delimiter(")") ^^ {
       case Delimiter("(") ~ x ~ Delimiter(")") => x
     }

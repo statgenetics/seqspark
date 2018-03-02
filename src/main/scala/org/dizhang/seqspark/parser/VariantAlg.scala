@@ -22,7 +22,7 @@ import org.dizhang.seqspark.variant.Variant
 
 import scala.language.{existentials, higherKinds}
 
-trait VariantAlg[repr[_]] extends ExprAlg[repr] {
+trait VariantAlg[repr[_]] {
   def chr: repr[String]
   def pos: repr[Int]
   def ref: repr[String]

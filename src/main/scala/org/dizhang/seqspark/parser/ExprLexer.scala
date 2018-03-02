@@ -18,6 +18,7 @@ package org.dizhang.seqspark.parser
 
 import scala.collection.mutable
 import scala.util.parsing.combinator.RegexParsers
+import ExprToken._
 
 class ExprLexer(keywords: mutable.HashSet[String]) extends RegexParsers {
 
@@ -69,6 +70,7 @@ class ExprLexer(keywords: mutable.HashSet[String]) extends RegexParsers {
 }
 
 object ExprLexer {
+
   def apply(keywords: List[String] = List("ifElse")): ExprLexer = {
     val kws = mutable.HashSet(keywords: _*)
     new ExprLexer(kws)

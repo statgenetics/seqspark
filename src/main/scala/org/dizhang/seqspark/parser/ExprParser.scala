@@ -20,10 +20,11 @@ import scala.util.parsing.combinator.Parsers
 import scala.util.parsing.input.{NoPosition, Position, Reader}
 import scala.language.{higherKinds, existentials}
 import spire.math.Number
-class ExprParser[repr[_]](variantAlg: VariantAlg[repr]) extends Parsers {
+import ExprAST._
+import ExprToken._
+
+class ExprParser extends Parsers {
   override type Elem = ExprToken
-
-
 
   class ExprTokenReader(tokens: Seq[ExprToken]) extends Reader[ExprToken] {
     def first: ExprToken = tokens.head
@@ -32,14 +33,64 @@ class ExprParser[repr[_]](variantAlg: VariantAlg[repr]) extends Parsers {
     def rest: Reader[ExprToken] = new ExprTokenReader(tokens.tail)
   }
 
-  private def identifier: Parser[Identifier] = {
-    accept("identifier", {case id : Identifier => id})
+  /** literal */
+  def lit: Parser[ExprAST] = {
+    accept("literal", {
+      case IntLit(n) => Num(Number(n))
+      case DoubleLit(d) => Num(Number(d))
+      case BooleanLit(b) => Bool(b)
+      case StringLit(s) => Str(s)
+    })
   }
 
-
-  def program: Parser[repr[_]] = {
-
+  def opTok: Parser[ExprToken] = {
+    accept("operator", {
+      case x: Operator => x
+    })
   }
+
+  def id: Parser[ExprToken] = {
+    accept("identifier", {
+      case x: Identifier => x
+    })
+  }
+
+  def lparen: Parser[ExprToken] = {
+    accept("paren", {case Delimiter("(") =>Delimiter("(")})
+  }
+
+  def rparen: Parser[ExprToken] = {
+    accept("paren", {case Delimiter(")") =>Delimiter(")")})
+  }
+
+  def expr: Parser[ExprAST]
+
+  def simpleExpr: Parser[ExprAST] = lit | lparen ~ expr ~ rparen ^^ {
+    case _ ~ e ~ _ => Nest(e)
+  }
+
+  def binary: Parser[ExprAST] = expr ~ opTok ~ expr ^^ {
+    case e1 ~ Operator(op) ~ e2 => op match {
+      case "=="|"!="|">="|"<="|">"|"<" => Comp(op, e1, e2)
+      case "&&"|"and"|"And"|"AND" => And(e1, e2)
+      case "||"|"or"|"Or"|"AND" => Or(e1, e2)
+      case "*"|"/" => Mul(op, e1, e2)
+      case "+"|"-" => Add(op, e1, e2)
+    }
+  }
+
+  def unary: Parser[ExprAST] = opTok ~ simpleExpr ^^ {
+    case Operator(op) ~ e => op match {
+      case "!"|"not" => Not(e)
+      case "+"|"-" => Sign(op, e)
+    }
+  }
+
+  def variable: Parser[ExprAST] = id ^^ {
+    case Identifier(n) => Variable(n)
+  }
+
+  def func: Parser[ExprAST] = id ~
 
   def arithExpr: Parser[repr[Number]] = positioned[repr[Number]]{
     arithTerm ~ rep(Operator("+") ~ arithTerm | Operator("-") ~ arithTerm) ^^ {

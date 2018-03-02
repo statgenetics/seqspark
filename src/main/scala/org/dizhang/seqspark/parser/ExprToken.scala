@@ -20,24 +20,28 @@ import scala.util.parsing.input.Positional
 
 sealed trait ExprToken extends Positional
 
-/** identifier */
-case class Identifier(name: String) extends ExprToken
+object ExprToken {
 
-case class Keyword(name: String) extends ExprToken
+  /** identifier */
+  case class Identifier(name: String) extends ExprToken
 
-case class Delimiter(str: String) extends ExprToken
+  case class Keyword(name: String) extends ExprToken
 
-case class Operator(name: String) extends ExprToken
+  case class Delimiter(str: String) extends ExprToken
 
-/** string */
-case class StringLit(value: String) extends ExprToken
+  case class Operator(name: String) extends ExprToken
 
-/** int */
-case class IntLit(value: Int) extends ExprToken
+  /** string */
+  case class StringLit(value: String) extends ExprToken
 
-/** double */
-case class DoubleLit(value: Double) extends ExprToken
+  /** int */
+  case class IntLit(value: Int) extends ExprToken
 
-/** bool */
-case class BooleanLit(value: Boolean) extends ExprToken
+  /** double */
+  case class DoubleLit(value: Double) extends ExprToken
+
+  /** bool */
+  case class BooleanLit(value: Boolean) extends ExprToken
+
+}
 

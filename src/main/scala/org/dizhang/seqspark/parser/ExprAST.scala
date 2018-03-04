@@ -29,8 +29,6 @@ object ExprAST {
   case class Num(value: Number) extends ExprAST
   case class Str(value: String) extends ExprAST
 
-  /** variable */
-  case class Variable(name: String) extends ExprAST
 
   /** logical expressions */
   case class Or(expr1: ExprAST, expr2: ExprAST) extends ExprAST
@@ -48,9 +46,14 @@ object ExprAST {
                        branch1: ExprAST,
                        branch2: ExprAST) extends ExprAST
 
+  /** variable */
+  case class Variable(name: String) extends ExprAST
+
   /** function call */
   case class Func(name: String, args: List[ExprAST]) extends ExprAST
 
+  /** data structure */
+  case class Lst(exprs: List[ExprAST]) extends ExprAST
   case class Nest(expr: ExprAST) extends ExprAST
 }
 

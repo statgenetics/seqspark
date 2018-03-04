@@ -44,29 +44,21 @@ class ExprParser extends Parsers {
   }
 
   def opTok: Parser[ExprToken] = {
-    accept("operator", {
-      case x: Operator => x
-    })
+    accept("operator", { case x: Operator => x })
   }
 
   def id: Parser[ExprToken] = {
-    accept("identifier", {
-      case x: Identifier => x
-    })
+    accept("identifier", { case x: Identifier => x })
   }
 
-  def lparen: Parser[ExprToken] = {
-    accept("paren", {case Delimiter("(") =>Delimiter("(")})
-  }
-
-  def rparen: Parser[ExprToken] = {
-    accept("paren", {case Delimiter(")") =>Delimiter(")")})
+  def delimTok: Parser[ExprToken] = {
+    accept("delimiter", {case x: Delimiter => x})
   }
 
   def expr: Parser[ExprAST]
 
-  def simpleExpr: Parser[ExprAST] = lit | lparen ~ expr ~ rparen ^^ {
-    case _ ~ e ~ _ => Nest(e)
+  def simpleExpr: Parser[ExprAST] = lit | delimTok ~ expr ~ delimTok ^^ {
+    case Delimiter("(") ~ e ~ Delimiter(")") => Nest(e)
   }
 
   def binary: Parser[ExprAST] = expr ~ opTok ~ expr ^^ {
@@ -90,7 +82,7 @@ class ExprParser extends Parsers {
     case Identifier(n) => Variable(n)
   }
 
-  def func: Parser[ExprAST] = id ~
+  def func: Parser[ExprAST] = id ~ lparen ~ rep(expr) ~ rparen
 
   def arithExpr: Parser[repr[Number]] = positioned[repr[Number]]{
     arithTerm ~ rep(Operator("+") ~ arithTerm | Operator("-") ~ arithTerm) ^^ {

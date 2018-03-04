@@ -60,6 +60,8 @@ class ExprLexer(keywords: mutable.HashSet[String]) extends RegexParsers {
     ("("|")"|";") ^^ {d => Delimiter(d)}
   }
 
+
+
   def apply(code: String): Either[LexerError, List[ExprToken]] = {
     parse(tokens, code) match {
       case NoSuccess(msg, next) => Left(LexerError(Location(next.pos.line, next.pos.column), msg))

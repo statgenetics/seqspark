@@ -26,7 +26,7 @@ class ExprLexer extends RegexParsers {
   override val whiteSpace = "[ \t\r\f]+".r
 
   def tokens: Parser[List[ExprToken]] = {
-    phrase(rep1(processName | lit | operator | separator))
+    phrase(rep1(lit | operator | separator | processName))
   }
 
   protected def processName: Parser[ExprToken] = {
@@ -37,7 +37,7 @@ class ExprLexer extends RegexParsers {
 
   def lit: Parser[ExprToken] = stringLit | doubleLit | intLit | booleanLit
 
-  def operator: Parser[ExprToken] = or | and | not | add | mul | equal | comp
+  def operator: Parser[ExprToken] = or | and | add | mul | equal | comp | not
 
   def separator: Parser[ExprToken] = lparen | rparen | comma | dot
 
@@ -53,7 +53,7 @@ class ExprLexer extends RegexParsers {
   }
 
   def doubleLit: Parser[DoubleLit] = positioned[DoubleLit] {
-    """[+-]?(\d+\.\d*|\d*\.\d+)([eE][+-]?\d+)?""".r  ^^ {double => DoubleLit(double.toDouble)}
+    """[+-]?(\d+\.\d*|\d*\.\d+|\d+)([eE][+\-]?\d+)?""".r  ^^ {double => DoubleLit(double.toDouble)}
   }
 
   def booleanLit: Parser[BooleanLit] = positioned[BooleanLit]{

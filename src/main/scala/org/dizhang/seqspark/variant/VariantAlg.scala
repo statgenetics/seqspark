@@ -51,10 +51,10 @@ trait VariantAlg[repr[_]] {
 
 object VariantAlg {
 
-  def translate()
 
+  /**
   class VariantEval[A: Genotype](v: Variant[A]) extends VariantAlg[Eval] {
 
   }
-
+  */
 }

@@ -53,106 +53,19 @@ object ExprAST {
   /** function call */
   case class Func(name: String, args: List[ExprAST]) extends ExprAST
 
-  def typeInfer(data: ExprAST): Either[TypeError, ExprType] = {
-    data match {
-      case Bool(_) => Right(BoolType)
-      case Num(_) => Right(NumType)
-      case Str(_) => Right(StrType)
-      case Variable(_) => Right(VarType)
-      case Func(_, _) => Right(FuncType)
-      case Or(e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(BoolType), Right(BoolType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in Or(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case And(e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(BoolType), Right(BoolType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in And(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case Not(e) =>
-        val t = typeInfer(e)
-        t match {
-          case Left(_) => t
-          case Right(BoolType) => t
-          case Right(b) => Left(TypeError(s"type miss match in Not(t: ${b.toString})"))
-        }
-      case Comp(op, e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(NumType), Right(NumType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in ${op.toString}(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case Equal(op, e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(NumType), Right(NumType)) => t1
-          case (Right(StrType), Right(StrType)) => t1
-          case (Right(BoolType), Right(BoolType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in ${op.toString}(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case Sign(op, e) =>
-        val t = typeInfer(e)
-        t match {
-          case Left(_) => t
-          case Right(NumType) => t
-          case Right(b) => Left(TypeError(s"type miss match in ${op.toString}(t: ${b.toString})"))
-        }
-      case Add(op, e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(NumType), Right(NumType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in ${op.toString}(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case Mul(op, e1, e2) =>
-        val t1 = typeInfer(e1)
-        val t2 = typeInfer(e2)
-        (t1, t2) match {
-          case (Left(_), _) => t1
-          case (_, Left(_)) => t2
-          case (Right(NumType), Right(NumType)) => t1
-          case (Right(b1), Right(b2)) =>
-            Left(TypeError(s"type miss match in ${op.toString}(t1: ${b1.toString}, t2: ${b2.toString})"))
-        }
-      case IfElse(cond, e1, e2) =>
-        val t1 = typeInfer(cond)
-        val t2 = typeInfer(e1)
-        val t3 = typeInfer(e2)
-        (t1, t2, t3) match {
-          case (Left(_), _, _) => t1
-          case (_, Left(_), _) => t2
-          case (_, _, Left(_)) => t3
-          case (Right(BoolType), Right(x1), Right(x2)) =>
-            if (x1 == x2) {
-              t2
-            } else {
-              Left(TypeError(s"type miss match in ifelse(_, t1: ${x1.toString}, t2: ${x2.toString})"))
-            }
-          case (Right(x), _, _) =>
-            Left(TypeError(s"type miss match in ifelse(cond: ${x.toString}, _, _)"))
-        }
+  /** compile code and check type */
+  def compile(code: String): Either[CompilationError, ExprAST] = {
+    val untyped = for {
+      tokens <- ExprLexer()(code).right
+      ast <- ExprParser()(tokens).right
+    } yield ast
+
+    untyped match {
+      case Left(err) => untyped
+      case Right(ast) => typeInfer(ast) match {
+        case Left(te) => Left(te)
+        case _ => untyped
+      }
     }
   }
 }

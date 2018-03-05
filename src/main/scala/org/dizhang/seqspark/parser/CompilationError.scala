@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.parser
 
-sealed trait CompilationError
+sealed trait CompilationError extends Product with Serializable
 
 
 case class Location(line: Int, column: Int) {
@@ -25,6 +25,6 @@ case class Location(line: Int, column: Int) {
 
 case class LexerError(location: Location, msg: String) extends CompilationError
 
-case class ParserError(location: Location, msg: String) extends CompilationError
+case class ParserError(msg: String) extends CompilationError
 
 case class TypeError(msg: String) extends CompilationError

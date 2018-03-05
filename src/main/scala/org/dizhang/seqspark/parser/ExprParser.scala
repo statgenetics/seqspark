@@ -22,8 +22,11 @@ import scala.language.{existentials, higherKinds}
 import spire.math.Number
 import ExprAST._
 import ExprToken._
+import org.slf4j.{Logger, LoggerFactory}
 
 class ExprParser extends Parsers {
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
   override type Elem = ExprToken
 
   class ExprTokenReader(tokens: Seq[ExprToken]) extends Reader[ExprToken] {
@@ -50,8 +53,8 @@ class ExprParser extends Parsers {
 
   def numLit: Parser[ExprAST] = {
     accept("number literal", {
-      case IntLit(n) => Num(Number(n))
       case DoubleLit(d) => Num(Number(d))
+      case IntLit(n) => Num(Number(n))
     })
   }
 
@@ -63,12 +66,9 @@ class ExprParser extends Parsers {
   }
 
   /** function call */
-  def func0: Parser[ExprAST] = id ~ LeftParen ~ RightParen ^^ {
-    case Identifier(name) ~ _ ~ _ => Func(name, List[ExprAST]())
-  }
-
-  def func: Parser[ExprAST] =  id ~ LeftParen ~ expr ~ rep(Comma ~ expr) ~ RightParen ^^ {
-    case Identifier(name) ~ _ ~ t ~ ts ~ _ =>
+  def func: Parser[ExprAST] =  id ~ LeftParen ~ opt(expr ~ rep(Comma ~ expr)) ~ RightParen ^^ {
+    case Identifier(name) ~ _ ~ None ~ _ => Func(name, List[ExprAST]())
+    case Identifier(name) ~ _ ~ Some(t ~ ts) ~ _ =>
       val args = ts.foldLeft(List(t)){
         case (acc, _ ~ e) => e :: acc
       }.reverse
@@ -106,7 +106,7 @@ class ExprParser extends Parsers {
     case _ ~ e ~ _ => e
   }
 
-  def unaryExpr: Parser[ExprAST] = opt(NOT|addTok) ~ (simpleExpr|func0|func) ^^ {
+  def unaryExpr: Parser[ExprAST] = opt(NOT|addTok) ~ (func|simpleExpr) ^^ {
     case None ~ e => e
     case Some(NOT) ~ e => Not(e)
     case Some(ADD("+")) ~ e => Sign(Operators.Pos, e)
@@ -123,19 +123,15 @@ class ExprParser extends Parsers {
     }
   }
 
-  def and: Parser[ExprAST] = logicFactor ~ rep(AND ~ logicFactor) ^^ {
+  def and: Parser[ExprAST] = logicSimple ~ rep(AND ~ logicSimple) ^^ {
     case t ~ ts => ts.foldLeft(t){
       case (acc, _ ~ e) => And(acc, e)
     }
   }
 
-  def logicSimple: Parser[ExprAST] = boolLit | variable | equal | comp | LeftParen ~ or ~ RightParen ^^ {
-    case _ ~ e ~ _ => e
-  }
-
-  def logicFactor: Parser[ExprAST] = opt(NOT) ~ logicSimple ^^ {
-    case None ~ e => e
-    case Some(NOT) ~ e => Not(e)
+  def logicSimple: Parser[ExprAST] = equal | comp | opt(NOT) ~ LeftParen ~ or ~ RightParen ^^ {
+    case None ~ _ ~ e ~ _ => e
+    case Some(_) ~ _ ~ e ~ _ => Not(e)
   }
 
   def equal: Parser[ExprAST] = unaryExpr ~ equalTok ~ unaryExpr ^^ {
@@ -165,4 +161,16 @@ class ExprParser extends Parsers {
     }
   }
 
+  def apply(tokens: List[ExprToken]): Either[ParserError, ExprAST] = {
+    val reader = new ExprTokenReader(tokens)
+    expr(reader) match {
+      case NoSuccess(msg, _) => Left(ParserError(msg))
+      case Success(result, _) => Right(result)
+    }
+  }
+
+}
+
+object ExprParser {
+  def apply(): ExprParser = new ExprParser()
 }

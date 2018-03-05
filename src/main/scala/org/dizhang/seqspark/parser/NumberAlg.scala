@@ -123,12 +123,12 @@ object NumberAlg {
     def max(xs: List[View[Number]]): View[Number] = View(s"max(${xs.map(_.info).mkString(",")})")
     def mean(xs: List[View[Number]]): View[Number] = View(s"mean(${xs.map(_.info).mkString(",")})")
     def neg(x: View[Number]): View[Number] = View(s"-${x.info}")
-    def lt(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} < ${b.info})")
-    def le(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} <= ${b.info})")
-    def gt(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} > ${b.info})")
-    def ge(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} >= ${b.info})")
-    def eq(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} == ${b.info})")
-    def ne(a: View[Number], b: View[Number]): View[Number] = View(s"(${a.info} != ${b.info})")
+    def lt(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} < ${b.info})")
+    def le(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} <= ${b.info})")
+    def gt(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} > ${b.info})")
+    def ge(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} >= ${b.info})")
+    def eq(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} == ${b.info})")
+    def ne(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} != ${b.info})")
   }
 
 }

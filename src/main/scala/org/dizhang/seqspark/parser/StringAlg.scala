@@ -38,8 +38,8 @@ object StringAlg {
 
   class StringView extends StringAlg[View] {
     def lit(x: String): View[String] = View(x)
-    def eq(a: View[String], b: View[String]): View[String] = View(s"${a.info} == ${b.info}")
-    def ne(a: View[String], b: View[String]): View[String] = View(s"${a.info} != ${b.info}")
+    def eq(a: View[String], b: View[String]): View[Boolean] = View(s"${a.info} == ${b.info}")
+    def ne(a: View[String], b: View[String]): View[Boolean] = View(s"${a.info} != ${b.info}")
     def concat(a: View[String], b: View[String]): View[String] = View(s"${a.info} + ${b.info}")
   }
 

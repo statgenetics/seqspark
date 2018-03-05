@@ -25,12 +25,6 @@ object ExprToken {
   /** identifier */
   case class Identifier(name: String) extends ExprToken
 
-  case class Keyword(name: String) extends ExprToken
-
-  case class Delimiter(str: String) extends ExprToken
-
-  case class Operator(name: String) extends ExprToken
-
   /** string */
   case class StringLit(value: String) extends ExprToken
 
@@ -43,5 +37,29 @@ object ExprToken {
   /** bool */
   case class BooleanLit(value: Boolean) extends ExprToken
 
+  /** if else */
+  case object IFELSE extends ExprToken
+
+  /** delimiters */
+  case object LeftParen extends ExprToken
+
+  case object RightParen extends ExprToken
+
+  case object Comma extends ExprToken
+
+  case object Dot extends ExprToken
+
+  /** logical operators */
+  case object OR extends ExprToken
+  case object AND extends ExprToken
+  case object NOT extends ExprToken
+
+  /** arithmetic operators */
+  case class ADD(name: String) extends ExprToken
+  case class MUL(name: String) extends ExprToken
+
+  /** comparison operators */
+  case class EQUAL(name: String) extends ExprToken
+  case class COMP(name: String) extends ExprToken
 }
 

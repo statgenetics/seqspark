@@ -14,15 +14,20 @@
  *    limitations under the License.
  */
 
-package org.dizhang.seqspark.parser
+package org.dizhang.seqspark.variant
 
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.parser.Interpreter.Eval
-import org.dizhang.seqspark.variant.Variant
+import org.dizhang.seqspark.parser.{LogicAlg, NumberAlg, StringAlg}
 
 import scala.language.{existentials, higherKinds}
 
 trait VariantAlg[repr[_]] {
+
+  def numAlg: NumberAlg[repr]
+  def stringAlg: StringAlg[repr]
+  def logicAlg: LogicAlg[repr]
+
   def chr: repr[String]
   def pos: repr[Int]
   def ref: repr[String]
@@ -45,6 +50,8 @@ trait VariantAlg[repr[_]] {
 }
 
 object VariantAlg {
+
+  def translate()
 
   class VariantEval[A: Genotype](v: Variant[A]) extends VariantAlg[Eval] {
 

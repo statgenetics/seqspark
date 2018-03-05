@@ -20,62 +20,53 @@ import scala.language.{existentials, higherKinds}
 
 object Operators {
 
-  sealed trait ExprOp {
-    type Input
-    type Output
-  }
+  sealed trait AddOp
 
-  sealed trait BinaryOperator extends ExprOp
+  sealed trait MulOp
 
-  sealed trait UnaryOperator extends ExprOp
+  sealed trait SignOp
 
+  sealed trait EqualOp
 
-
+  sealed trait CompOp
 
   /** + operator*/
-  case object Add extends BinaryOperator
+  case object Add extends AddOp
 
   /** - operator */
-  case object Sub extends BinaryOperator
+  case object Sub extends AddOp
 
   /** * operator */
-  case object Mul extends BinaryOperator
+  case object Mul extends MulOp
 
   /** / operator */
-  case object Div extends BinaryOperator
+  case object Div extends MulOp
 
-  case object Pos extends UnaryOperator
+  /** % */
+  case object Mod extends MulOp
 
-  case object Neg extends UnaryOperator
+  /** + */
+  case object Pos extends SignOp
 
-
-  /** && and */
-  case object And extends BinaryOperator
-
-  /** || or */
-  case object Or extends BinaryOperator
-
-  /** ! not */
-  case object Not extends UnaryOperator
+  /** - */
+  case object Neg extends SignOp
 
   /** < */
-  case object LT extends BinaryOperator
+  case object LT extends CompOp
 
   /** <= */
-  case object LE extends BinaryOperator
+  case object LE extends CompOp
 
   /** > */
-  case object GT extends BinaryOperator
+  case object GT extends CompOp
 
   /** >= */
-  case object GE extends BinaryOperator
+  case object GE extends CompOp
 
   /** == */
-  case object EQ extends BinaryOperator
+  case object EQ extends EqualOp
 
   /** != */
-  case object NE extends BinaryOperator
-
-  case object Concat extends BinaryOperator
+  case object NE extends EqualOp
 
 }

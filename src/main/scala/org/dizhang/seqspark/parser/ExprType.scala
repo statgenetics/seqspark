@@ -16,23 +16,12 @@
 
 package org.dizhang.seqspark.parser
 
-object Functions {
+sealed trait ExprType
 
-  sealed trait Func
-
-  sealed trait StringFunction extends Func
-  sealed trait NumberFunction extends Func
-  sealed trait BooleanFunction extends Func
-  sealed trait ReturnList extends Func
-
-  case object Sum extends NumberFunction
-  case object Min extends NumberFunction
-  case object Max extends NumberFunction
-  case object Mean extends NumberFunction
-  case object Log extends NumberFunction
-  case object Exp extends NumberFunction
-
-  case object Exists extends BooleanFunction
-
-
+object ExprType {
+  object NumType extends ExprType
+  object StrType extends ExprType
+  object BoolType extends ExprType
+  object VarType extends ExprType
+  object FuncType extends ExprType
 }

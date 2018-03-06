@@ -65,7 +65,7 @@ object UserConfig {
     } else {
       config.root().keySet().asScala.toList.map{grp =>
         val grpConf = config.getConfig(grp)
-        if (grpConf.isEmpty || ! grpConf.hasPath(grp)) {
+        if (grpConf.isEmpty || ! config.hasPath(grp)) {
           grp -> Map[String, LogExpr]()
         } else {
           grp ->

@@ -28,6 +28,8 @@ class LogicalParserSpec extends FlatSpec with Matchers {
 
   "A LogicalParser" should "be able to constructed" in {
     val lp = LogicalParser.parse("INFO.AN>3800 and INFO.AC>38")
+    LogicalParser.parse(List("maf < 0.01 or maf > 0.99", "SS_PASS"))
+    LogicalParser.parse(List("maf >= 0.01", "maf <= 0.99", "SS_PASS"))
   }
 
   "A LogicalParser" should "eval to true" in {

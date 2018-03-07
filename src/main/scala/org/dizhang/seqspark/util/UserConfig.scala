@@ -64,10 +64,13 @@ object UserConfig {
       Map[String, Map[String, LogExpr]]()
     } else {
       config.root().keySet().asScala.toList.map{grp =>
+        logger.info(s"group name: ${grp}")
         val grpConf = config.getConfig(grp)
-        if (grpConf.isEmpty || ! grpConf.hasPath(grp)) {
+        if (grpConf.isEmpty || ! config.hasPath(grp)) {
+          logger.info(s"what: ${grpConf}")
           grp -> Map[String, LogExpr]()
         } else {
+          logger.info(s"haha: ${grpConf}")
           grp ->
             grpConf.root().keySet().asScala.map(tag =>
               if (grpConf.hasPath(tag)) {

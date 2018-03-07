@@ -19,6 +19,7 @@ package org.dizhang.seqspark.util
 import org.dizhang.seqspark.util.LogicalParser._
 
 import scala.util.parsing.combinator.JavaTokenParsers
+
 /**
   * Created by zhangdi on 11/23/16.
   */
@@ -56,14 +57,14 @@ object LogicalParser {
     if (input.isEmpty || input.forall(_.isEmpty))
       T
     else
-      parse(input.reduce((a,b) => s"($a) and ($b)"))
+      input.map(c => parse(c)).reduce((a, b) => AND(a, b))
   }
 
   def parse(input: String): LogExpr = {
     if (input.isEmpty)
       T
     else
-      new LogicalParser().parse(input).get
+      new LogicalParser().parse(input).getOrElse(Error(input))
   }
 
   sealed trait LogExpr
@@ -81,6 +82,7 @@ object LogicalParser {
   case class AND(e1: LogExpr, e2: LogExpr) extends LogExpr
   case class OR(e1: LogExpr, e2: LogExpr) extends LogExpr
   case class Not(expr: LogExpr) extends LogExpr
+  case class Error(msg: String) extends LogExpr
 
   def evalExists(logExpr: LogExpr)(vm: Map[String, List[String]]): Boolean ={
     logExpr match {

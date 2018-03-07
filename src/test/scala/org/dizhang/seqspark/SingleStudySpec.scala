@@ -64,11 +64,11 @@ class SingleStudySpec extends IntegrationSpec with SharedTestData {
     runPipeline(readConf("anno.conf"))
   }
 
-  ignore should "run qc" in {
+  it should "run qc" in {
     runPipeline(readConf("qc.conf"))
   }
 
-  it should "run association" in {
+  ignore should "run association" in {
     runPipeline(readConf("assoc.conf"))
   }
 

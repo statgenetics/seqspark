@@ -182,7 +182,7 @@ object Samples {
 
 
     val iid = pheno.select(Pheno.iid).map(_.get)
-    val outFile = ssc.userConfig.output.results.resolve("titv").toAbsolutePath.toFile
+    val outFile = ssc.userConfig.output.results.resolve("titv.txt").toAbsolutePath.toFile
     val pw = new PrintWriter(outFile)
     pw.write(s"iid,${grpKeys.flatMap(gk => List(s"${gk.toString}.ti", s"$gk.tv", s"$gk.ti/tv")).mkString(",")}\n")
 
@@ -190,7 +190,7 @@ object Samples {
       case (arr, i) =>
         val res = grpKeys.indices.map(j =>
           f"${arr(j * 2)}%d,${arr(j * 2 + 1)}%d,${arr(j * 2).toDouble/arr(j*2 + 1)}%.3f")
-        pw.write(s"${iid(i)}, ${res.mkString(",")}\n")
+        pw.write(s"${iid(i)},${res.mkString(",")}\n")
     }
 
     pw.close()

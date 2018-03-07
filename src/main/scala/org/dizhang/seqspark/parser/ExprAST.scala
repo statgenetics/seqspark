@@ -61,7 +61,7 @@ object ExprAST {
     } yield ast
 
     untyped match {
-      case Left(err) => untyped
+      case Left(_) => untyped
       case Right(ast) => typeInfer(ast) match {
         case Left(te) => Left(te)
         case _ => untyped

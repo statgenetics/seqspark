@@ -18,7 +18,7 @@ package org.dizhang.seqspark.variant
 
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.parser.Interpreter.Eval
-import org.dizhang.seqspark.parser.{LogicAlg, NumberAlg, StringAlg}
+import org.dizhang.seqspark.parser.{ExprAST, LogicAlg, NumberAlg, StringAlg}
 
 import scala.language.{existentials, higherKinds}
 
@@ -51,10 +51,14 @@ trait VariantAlg[repr[_]] {
 
 object VariantAlg {
 
-
-  /**
   class VariantEval[A: Genotype](v: Variant[A]) extends VariantAlg[Eval] {
+    def numAlg = new NumberAlg.NumberEval
+    def stringAlg = new StringAlg.StringEval
+    def logicalAlg = new LogicAlg.LogicEval
 
+    def apply(expr: ExprAST): Eval[String] = {
+      
+    }
   }
-  */
+
 }

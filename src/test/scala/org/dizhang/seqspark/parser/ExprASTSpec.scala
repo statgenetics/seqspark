@@ -29,10 +29,16 @@ class ExprASTSpec extends UnitSpec {
     show("x > 1 || y == '2' and (z ne 7.5 || j)")
   }
 
-  it should "parse compound logical expressions"
+  it should "parse compound logical expressions" in {
+    show("! maf or ! maf() and ! maf(b)")
+  }
 
   it should "parse simple arithmetic expressions" in {
     show("log(maf())/7.5")
+    show("min(maf(batch)) + 2.4 + -min(x)")
   }
 
+  it should "catch type errors" in {
+    show("5 and true")
+  }
 }

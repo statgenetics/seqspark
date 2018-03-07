@@ -100,11 +100,11 @@ class ExprParser extends Parsers {
   /** expression
     * either logical or arithmetic
     * */
-  def expr: Parser[ExprAST] = ifelse | or | add
+  def expr: Parser[ExprAST] = or
 
   def simpleExpr: Parser[ExprAST] = lit | variable | LeftParen ~ expr ~ RightParen ^^ {
     case _ ~ e ~ _ => e
-  }
+  } | ifelse
 
   def unaryExpr: Parser[ExprAST] = opt(NOT|addTok) ~ (func|simpleExpr) ^^ {
     case None ~ e => e
@@ -132,7 +132,7 @@ class ExprParser extends Parsers {
   def logicSimple: Parser[ExprAST] = equal | comp | opt(NOT) ~ LeftParen ~ or ~ RightParen ^^ {
     case None ~ _ ~ e ~ _ => e
     case Some(_) ~ _ ~ e ~ _ => Not(e)
-  }
+  } | add
 
   def equal: Parser[ExprAST] = unaryExpr ~ equalTok ~ unaryExpr ^^ {
     case e1 ~ EQUAL("==") ~ e2 => Equal(Operators.EQ, e1, e2)

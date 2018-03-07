@@ -165,7 +165,7 @@ object Samples {
         grpLogExpr.map(le => LogicalParser.eval(le)(vm)).flatMap{b =>
           if (b) {
             if (ti) {
-              List(geno.toBRV(g, 0).toLong)
+              List(geno.toBRV(g, 0).toLong, 0L)
             } else {
               List(0L, geno.toBRV(g, 0).toLong)
             }
@@ -177,7 +177,7 @@ object Samples {
 
     val cnt = self.filter(v => v.isTi || v.isTv).map{v =>
       val vm = v.compute(names, bcCtrl.value, bcBatch.value)
-      v.toCounter(cntFunc(vm , v.isTv), Array.fill[Long](2 * grpKeys.length)(0L))
+      v.toCounter(cntFunc(vm , v.isTi), Array.fill[Long](2 * grpKeys.length)(0L))
     }.reduce((a, b) => a.++(b))
 
 

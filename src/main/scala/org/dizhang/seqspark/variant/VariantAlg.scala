@@ -51,14 +51,6 @@ trait VariantAlg[repr[_]] {
 
 object VariantAlg {
 
-  class VariantEval[A: Genotype](v: Variant[A]) extends VariantAlg[Eval] {
-    def numAlg = new NumberAlg.NumberEval
-    def stringAlg = new StringAlg.StringEval
-    def logicalAlg = new LogicAlg.LogicEval
 
-    def apply(expr: ExprAST): Eval[String] = {
-      
-    }
-  }
 
 }

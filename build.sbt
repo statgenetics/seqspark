@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
 	"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
   "org.typelevel" %% "spire" % "0.14.1",
-	"org.typelevel" %% "cats-free" % "1.0.1"
+	"org.typelevel" %% "cats-free" % "1.0.1",
+	"org.typelevel" %% "cats-core" % "1.0.1"
 )
 
 //resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
@@ -28,7 +29,11 @@ resolvers ++= Seq(
 	Resolver.sonatypeRepo("releases"),
 	Resolver.sonatypeRepo("snapshots")
 )
+
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+
 
 assemblyMergeStrategy in assembly := {
 	case "reference.conf"                            => MergeStrategy.concat

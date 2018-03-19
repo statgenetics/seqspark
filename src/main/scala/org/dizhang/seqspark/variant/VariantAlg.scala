@@ -18,7 +18,9 @@ package org.dizhang.seqspark.variant
 
 import org.dizhang.seqspark.ds.Genotype
 import org.dizhang.seqspark.parser.Interpreter.Eval
-import org.dizhang.seqspark.parser.{ExprAST, LogicAlg, NumberAlg, StringAlg}
+import org.dizhang.seqspark.parser._
+import cats._
+import cats.implicits._
 
 import scala.language.{existentials, higherKinds}
 
@@ -51,6 +53,14 @@ trait VariantAlg[repr[_]] {
 
 object VariantAlg {
 
+  def translate[repr[_]: Interpreter](exprAST: ExprAST, alg: VariantAlg[repr]): repr[?] = {
+    ExprType.typeInfer(exprAST) match {
+      case Left(error) => _
+    }
 
+    exprAST match {
+      case
+    }
+  }
 
 }

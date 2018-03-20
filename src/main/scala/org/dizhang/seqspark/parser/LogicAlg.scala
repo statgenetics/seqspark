@@ -24,6 +24,8 @@ trait LogicAlg[repr[_]] {
   def and(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
   def or(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
   def not(x: repr[Boolean]): repr[Boolean]
+  def eq(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
+  def ne(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
 }
 
 object LogicAlg {
@@ -32,12 +34,24 @@ object LogicAlg {
     def and(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = Eval(a.value && b.value)
     def or(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = Eval(a.value || b.value)
     def not(x: Eval[Boolean]): Eval[Boolean] = Eval(! x.value)
+    def eq(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
+      Eval(a.value == b.value)
+    }
+    def ne(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
+      Eval(a.value != b.value)
+    }
   }
 
   class LogicView extends LogicAlg[View] {
     def lit(x: Boolean): View[Boolean] = View(x.toString)
-    def and(a: View[Boolean], b: View[Boolean]): View[Boolean] = View(s"(${a.info} and ${b.info})")
+    def and(a: View[Boolean], b: View[Boolean]): View[Boolean] = View(s"${a.info} and ${b.info}")
     def or(a: View[Boolean], b: View[Boolean]): View[Boolean] = View(s"(${a.info} or ${b.info})")
-    def not(x: View[Boolean]): View[Boolean] = View(s"not ${x.info}")
+    def not(x: View[Boolean]): View[Boolean] = View(s"not (${x.info})")
+    def eq(a: View[Boolean], b: View[Boolean]): View[Boolean] = {
+      View(s"${a.info} == ${b.info}")
+    }
+    def ne(a: View[Boolean], b: View[Boolean]): View[Boolean] = {
+      View(s"${a.info} != ${b.info}")
+    }
   }
 }

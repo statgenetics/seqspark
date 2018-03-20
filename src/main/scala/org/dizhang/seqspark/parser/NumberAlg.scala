@@ -40,13 +40,13 @@ trait NumberAlg[repr[_]] {
 
   def log(x: repr[Number]): repr[Number]
 
-  def sum(xs: List[repr[Number]]): repr[Number]
+  def sum(xs: repr[Number]*): repr[Number]
 
-  def max(xs: List[repr[Number]]): repr[Number]
+  def max(xs: repr[Number]*): repr[Number]
 
-  def min(xs: List[repr[Number]]): repr[Number]
+  def min(xs: repr[Number]*): repr[Number]
 
-  def mean(xs: List[repr[Number]]): repr[Number]
+  def mean(xs: repr[Number]*): repr[Number]
 
   def lt(a: repr[Number], b: repr[Number]): repr[Boolean]
 
@@ -76,11 +76,11 @@ object NumberAlg {
     def add(a: Eval[Number], b: Eval[Number]): Eval[Number] = Eval(a.value + b.value)
     def sub(a: Eval[Number], b: Eval[Number]): Eval[Number] = Eval(a.value - b.value)
     def mul(a: Eval[Number], b: Eval[Number]): Eval[Number] = Eval(a.value * b.value)
-    def sum(xs: List[Eval[Number]]): Eval[Number] =
+    def sum(xs: Eval[Number]*): Eval[Number] =
       Eval(xs.tail.foldLeft(xs.head.value)((a, b) => a + b.value))
-    def min(xs: List[Eval[Number]]): Eval[Number] =
+    def min(xs: Eval[Number]*): Eval[Number] =
       Eval(xs.tail.foldLeft(xs.head.value)((a, b) => spire.math.min(a, b.value)))
-    def max(xs: List[Eval[Number]]): Eval[Number] =
+    def max(xs: Eval[Number]*): Eval[Number] =
       Eval(xs.tail.foldLeft(xs.head.value)((a, b) => spire.math.max(a, b.value)))
 
     def lt(a: Eval[Number], b: Eval[Number]): Eval[Boolean] = Eval(a.value < b.value)
@@ -105,7 +105,7 @@ object NumberAlg {
 
     def pow(a: Eval[Number], b: Eval[Number]): Eval[Number] = Eval(a.value.pow(b.value))
 
-    def mean(xs: List[Eval[Number]]): Eval[Number] = Eval(sum(xs).value/Number(xs.length))
+    def mean(xs: Eval[Number]*): Eval[Number] = Eval(sum(xs: _*).value/Number(xs.length))
   }
 
   class NumberView extends NumberAlg[View] {
@@ -118,10 +118,10 @@ object NumberAlg {
     def mod(a: View[Number], b: View[Number]): View[Number] = View(s"${a.info} % ${b.info}")
     def pow(a: View[Number], b: View[Number]): View[Number] = View(s"pow(${a.info}, ${b.info})")
     def log(x: View[Number]): View[Number] = View(s"log(${x.info})")
-    def sum(xs: List[View[Number]]): View[Number] = View(s"sum(${xs.map(_.info).mkString(",")})")
-    def min(xs: List[View[Number]]): View[Number] = View(s"min(${xs.map(_.info).mkString(",")})")
-    def max(xs: List[View[Number]]): View[Number] = View(s"max(${xs.map(_.info).mkString(",")})")
-    def mean(xs: List[View[Number]]): View[Number] = View(s"mean(${xs.map(_.info).mkString(",")})")
+    def sum(xs: View[Number]*): View[Number] = View(s"sum(${xs.map(_.info).mkString(",")})")
+    def min(xs: View[Number]*): View[Number] = View(s"min(${xs.map(_.info).mkString(",")})")
+    def max(xs: View[Number]*): View[Number] = View(s"max(${xs.map(_.info).mkString(",")})")
+    def mean(xs: View[Number]*): View[Number] = View(s"mean(${xs.map(_.info).mkString(",")})")
     def neg(x: View[Number]): View[Number] = View(s"-${x.info}")
     def lt(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} < ${b.info})")
     def le(a: View[Number], b: View[Number]): View[Boolean] = View(s"(${a.info} <= ${b.info})")

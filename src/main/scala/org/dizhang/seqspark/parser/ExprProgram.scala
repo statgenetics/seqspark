@@ -21,8 +21,8 @@ import cats.{Applicative, Monad, Monoid, FlatMap, Semigroup}
 import cats.data.Const
 import scala.language.higherKinds
 
-trait ExprProgram[Alg[_[_]], A] {
-  def apply[repr[_]](alg: Alg[repr]) : repr[A]
+trait ExprProgram[Alg[_[_]], Constraint[_[_]], A] {
+  def apply[repr[_]: Constraint](alg: Alg[repr]) : repr[A]
 }
 
 

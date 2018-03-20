@@ -15,7 +15,7 @@
  */
 
 package org.dizhang.seqspark.parser
-
+import cats.{Applicative, Monad, Monoid, FlatMap, Semigroup}
 trait Interpreter[T]
 
 object Interpreter {

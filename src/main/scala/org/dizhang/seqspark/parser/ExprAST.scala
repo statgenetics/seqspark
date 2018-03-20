@@ -69,26 +69,6 @@ object ExprAST {
     }
   }
 
-
-  def program[repr[_]](exprAST: ExprAST)
-                      (implicit kvStore: KVStore[repr],
-                       numberAlg: NumberAlg[repr],
-                       stringAlg: StringAlg[repr],
-                       logicAlg: LogicAlg[repr]): repr[_] = {
-    exprAST match {
-      case Bool(v) => logicAlg.lit(v)
-      case Num(v) => numberAlg.lit(v)
-      case Str(v) => stringAlg.lit(v)
-      case Or(e1, e2) => logicAlg.or(program(e1), program(e2))
-      case And(e1, e2) => logicAlg.and(program(e1), program(e2))
-      case Not(e) => logicAlg.not(program(e))
-      case Comp(op, e1, e2) => op match {
-        case Operators.LT => numberAlg.le(program(e1), program(e2))
-        case Operators.LE =>
-      }
-    }
-  }
-
   def view(exprAST: ExprAST): String = {
     exprAST match {
       case Bool(v) => v.toString

@@ -18,6 +18,7 @@ package org.dizhang.seqspark.parser
 
 import scala.language.{existentials, higherKinds}
 import Interpreter._
+import cats.Eval
 
 trait LogicAlg[repr[_]] {
   def lit(x: Boolean): repr[Boolean]
@@ -29,6 +30,8 @@ trait LogicAlg[repr[_]] {
 }
 
 object LogicAlg {
+
+
   class LogicEval extends LogicAlg[Eval] {
     def lit(x: Boolean): Eval[Boolean] = Eval(x)
     def and(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = Eval(a.value && b.value)
@@ -41,6 +44,7 @@ object LogicAlg {
       Eval(a.value != b.value)
     }
   }
+
 
   class LogicView extends LogicAlg[View] {
     def lit(x: Boolean): View[Boolean] = View(x.toString)

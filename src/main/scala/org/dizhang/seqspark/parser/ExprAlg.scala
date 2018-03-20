@@ -23,7 +23,7 @@ import ExprType._
 trait ExprAlg[repr[_]] {
   def get[A](key: String): repr[A]
   def call[A](key: String): repr[A]
-  def call[A](key: String, args: repr[_]*): repr[List[A]]
+  def call[A](key: String, batch: String): repr[List[A]]
   def error(err: String): repr[String]
   def ifelse[A](cond: repr[Boolean], b1: repr[A], b2: repr[A]): repr[A]
 }
@@ -95,7 +95,10 @@ object ExprAlg {
           else
             numberAlg.pow(xs.head, xs(1))
         case (f, Nil) => exprAlg.call(f)
-        case (f, xs) => exprAlg.call(f, xs:_*)
+        case (f, _) => args match {
+          case Str(b) :: Nil => exprAlg.call(f, b)
+          case _ => exprAlg.error(s"cannot call $f in this way")
+        }
       }
     }
   }

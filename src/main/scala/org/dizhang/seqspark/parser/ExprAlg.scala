@@ -19,16 +19,19 @@ package org.dizhang.seqspark.parser
 import scala.language.higherKinds
 import ExprAST._
 import ExprType._
+import cats.Eval
+import cats.data.Const
 
 trait ExprAlg[repr[_]] {
   def get[A](key: String): repr[A]
   def call[A](key: String): repr[A]
   def call[A](key: String, batch: String): repr[List[A]]
   def error(err: String): repr[String]
-  def ifelse[A](cond: repr[Boolean], b1: repr[A], b2: repr[A]): repr[A]
+  //def ifelse[A](cond: repr[Boolean], b1: repr[A], b2: repr[A]): repr[A]
 }
 
 object ExprAlg {
+
 
     def program[repr[_]](exprAST: ExprAST)
                       (implicit exprAlg: ExprAlg[repr],
@@ -73,7 +76,7 @@ object ExprAlg {
         case Operators.Div => numberAlg.sub(program(e1), program(e2))
         case Operators.Mod => numberAlg.sub(program(e1), program(e2))
       }
-      case IfElse(cond, b1, b2) => exprAlg.ifelse(program(cond), program(b1), program(b2))
+      case IfElse(cond, b1, b2) => logicAlg.ifelse(program(cond), program(b1), program(b2))
       case Variable(n) => exprAlg.get(n)
       case Func(n, args) => (n.toLowerCase, args.map(e => program(e))) match {
         case ("sum", xs) =>

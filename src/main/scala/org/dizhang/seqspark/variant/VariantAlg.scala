@@ -17,7 +17,7 @@
 package org.dizhang.seqspark.variant
 
 import org.dizhang.seqspark.ds.Genotype
-import org.dizhang.seqspark.parser.Interpreter.Eval
+import org.dizhang.seqspark.parser.Container.Eval
 import org.dizhang.seqspark.parser._
 import cats._
 import cats.implicits._
@@ -53,7 +53,7 @@ trait VariantAlg[repr[_]] {
 
 object VariantAlg {
 
-  def translate[repr[_]: Interpreter](exprAST: ExprAST, alg: VariantAlg[repr]): repr[?] = {
+  def translate[repr[_]: Container](exprAST: ExprAST, alg: VariantAlg[repr]): repr[?] = {
     ExprType.typeInfer(exprAST) match {
       case Left(error) => _
     }

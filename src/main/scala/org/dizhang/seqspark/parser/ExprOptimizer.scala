@@ -19,7 +19,7 @@ import cats.arrow.FunctionK
 import cats.{Applicative, Monad, Monoid, FlatMap, Semigroup}
 import cats.data.Const
 import scala.language.higherKinds
-import Interpreter._
+import cats.Eval
 trait ExprOptimizer[Alg[_[_]], repr[_]] {
 
   type M
@@ -48,17 +48,34 @@ object ExprOptimizer {
   /** variables, function calls without argument, and function calls with one argument */
   type Cache = (Set[String], Set[String], Set[BatchCall])
 
+  val emptyCache = (Set[String](), Set[String](), Set[BatchCall]())
+
   implicit object cache extends Monoid[Cache] {
-    def empty: Cache = (Set[String](), Set[String](), Set[BatchCall]())
+    def empty: Cache = emptyCache
     def combine(x: Cache, y: Cache): Cache = {
       (x._1 ++ y._1, x._2 ++ y._2, x._3 ++ y._3)
     }
   }
 
+  class ExprExtracter extends ExprAlg[Const[Cache, ?]] {
+    def get[A](key: String) =  Const((Set(key), Set[String](), Set[BatchCall]()))
+    def call[A](key: String) = Const((Set[String](), Set(key), Set[BatchCall]()))
+    def call[A](key: String, batch: String) =
+      Const((Set[String](), Set[String](), Set(BatchCall(key, batch))))
+    def error(err: String) = Const(emptyCache)
+  }
+
+
   implicit val staticOptimizer: ExprOptimizer[ExprAlg, Eval] = new ExprOptimizer[ExprAlg, Eval] {
     type M = Cache
     def monoidM: Monoid[M] = cache
 
-    override def monadRepr: Monad[Eval] =
+    def monadRepr: Monad[Eval] = Monad[Eval]
+
+    def extract: ExprAlg[Const[Cache, ?]] = new ExprExtracter
+
+    def rebuild(m: Cache, alg: ExprAlg[Eval]): Eval[ExprAlg[Eval]] = {
+      
+    }
   }
 }

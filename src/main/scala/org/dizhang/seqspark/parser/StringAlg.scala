@@ -16,7 +16,7 @@
 
 package org.dizhang.seqspark.parser
 
-import org.dizhang.seqspark.parser.Interpreter._
+import org.dizhang.seqspark.parser.Container._
 
 import scala.language.{existentials, higherKinds}
 

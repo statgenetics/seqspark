@@ -17,7 +17,7 @@
 package org.dizhang.seqspark.parser
 
 import scala.language.{existentials, higherKinds}
-import Interpreter._
+import Container.View
 import cats.Eval
 
 trait LogicAlg[repr[_]] {
@@ -27,21 +27,48 @@ trait LogicAlg[repr[_]] {
   def not(x: repr[Boolean]): repr[Boolean]
   def eq(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
   def ne(a: repr[Boolean], b: repr[Boolean]): repr[Boolean]
+  def ifelse[A](cond: repr[Boolean], b1: repr[A], b2: repr[A]): repr[A]
 }
 
 object LogicAlg {
 
 
   class LogicEval extends LogicAlg[Eval] {
-    def lit(x: Boolean): Eval[Boolean] = Eval(x)
-    def and(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = Eval(a.value && b.value)
-    def or(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = Eval(a.value || b.value)
-    def not(x: Eval[Boolean]): Eval[Boolean] = Eval(! x.value)
+    def lit(x: Boolean): Eval[Boolean] = Eval.now(x)
+    def and(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
+      for {
+        x <- a
+        y <- b
+      } yield x && y
+    }
+    def or(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
+      for {
+        x <- a
+        y <- b
+      } yield x || y
+    }
+    def not(a: Eval[Boolean]): Eval[Boolean] = {
+      for (x <- a) yield ! x
+    }
     def eq(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
-      Eval(a.value == b.value)
+      for {
+        x <- a
+        y <- b
+      } yield x == y
     }
     def ne(a: Eval[Boolean], b: Eval[Boolean]): Eval[Boolean] = {
-      Eval(a.value != b.value)
+      for {
+        x <- a
+        y <- b
+      } yield x != y
+    }
+
+    def ifelse[A](cond: Eval[Boolean], b1: Eval[A], b2: Eval[A]): Eval[A] = {
+      for {
+        c <- cond
+        x <- b1
+        y <- b2
+      } if (c) x else y
     }
   }
 
@@ -56,6 +83,9 @@ object LogicAlg {
     }
     def ne(a: View[Boolean], b: View[Boolean]): View[Boolean] = {
       View(s"${a.info} != ${b.info}")
+    }
+    def ifelse[A](cond: View[Boolean], b1: View[A], b2: View[A]): View[A] = {
+      View(s"if (${cond.info}) {${b1.info}} else {${b2.info}}")
     }
   }
 }

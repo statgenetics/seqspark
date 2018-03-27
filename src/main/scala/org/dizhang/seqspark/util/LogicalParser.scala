@@ -47,7 +47,10 @@ class LogicalParser extends JavaTokenParsers with Serializable {
       case name~"!="~value => NE(name, value.toDouble)
     }
   def existence: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r ^^ (name => EX(name))
+    opt("!"|"not") ~ """[a-zA-Z_]\w*""".r ^^ {
+      case None ~ name => EX(name)
+      case Some(_) ~ name => Not(EX(name))
+    }
   def parse(input: String): ParseResult[LogExpr] = this.parseAll(expr, input)
 }
 

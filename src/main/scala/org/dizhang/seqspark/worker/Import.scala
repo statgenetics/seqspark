@@ -19,13 +19,16 @@ package org.dizhang.seqspark.worker
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
 import org.dizhang.seqspark.annot.Regions
+import org.dizhang.seqspark.ds
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.ds.{Genotype, Phenotype, Region, Variant}
-import org.dizhang.seqspark.util.UserConfig.{GenotypeFormat => GenoFormat}
+import org.dizhang.seqspark.util.ConfigValue.{GenotypeFormat => GenoFormat}
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-import org.dizhang.seqspark.util.{LogicalParser, SeqContext, UserConfig => UC}
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext, ConfigValue => CV}
 import org.dizhang.seqspark.worker.Genotypes.GenoCounter
 import org.slf4j.LoggerFactory
+
+import scala.io.Source
 
 
 /**
@@ -81,7 +84,6 @@ object Import {
 
   def fromVCF(ssc: SeqContext): Data[String] = {
 
-
     def pass(l: String)
             (logExpr: LogExpr,
              names: Set[String],
@@ -122,8 +124,6 @@ object Import {
           LogicalParser.evalExists(logExpr)(vmf ++ vmi) && in
         }
       }
-
-
     }
     logger.info("start import ...")
     val conf = ssc.userConfig
@@ -132,7 +132,7 @@ object Import {
 
     val imConf = conf.input.genotype
     val noSample = imConf.samples match {
-      case Left(UC.Samples.none) => true
+      case CV.Samples.none => true
       case _ => false
     }
     val filter = imConf.filters
@@ -141,21 +141,30 @@ object Import {
     val default = "0/0"
     /** prepare a regions tree to filter variants */
     val regions = sc.broadcast(imConf.variants match {
-      case Left(UC.Variants.all) =>
+      case CV.Variants.all =>
         logger.info("using all variants")
         None
-      case Left(UC.Variants.exome) =>
+      case CV.Variants.exome =>
         logger.info("using variants on exome")
         //val coord = conf.annotation.RefSeq.getString("coord")
         //val exome = sc.broadcast(Regions.makeExome(coord)(sc))
         val coord = conf.annotation.RefSeq.getString("coord")
         Some(Regions.makeExome(coord)(sc))
-      case Left(_) =>
-        logger.info("using all variants")
-        None
-      case Right(tree) =>
-        logger.info(s"using user specified regions")
-        Some(tree)
+      case CV.Variants.from(file) =>
+        logger.info(s"using user specified regions in file ${file.toString}")
+        Some(Regions(Source.fromFile(file).getLines().map(r => Region(r))))
+      case CV.Variants.by(regionExpr) =>
+        val regionArr = regionExpr.split(",").map(r => Region(r)).filter{
+          case Region.Empty => false
+          case _ => true
+        }
+        if (regionArr.isEmpty) {
+          logger.warn(s"not able to parse regions from $regionExpr, fallback to use all variants")
+          None
+        } else {
+          logger.info(s"using user specified regions: ${regionArr.mkString(",")}")
+          Some(Regions(regionArr.toIterator))
+        }
     })
     /** filter variants based on meta information
       * before making the actual genotype data for each sample
@@ -172,8 +181,8 @@ object Import {
       s1
     } else {
       imConf.samples match {
-        case Left(_) => s1
-        case Right(s) =>
+        case CV.Samples.none|CV.Samples.all => s1
+        case CV.Samples.by(s) =>
           val samples = pheno.indicate(s)
           Phenotype.select(s, "phenotype")(ssc.sparkSession)
           s1.samples(samples)(sc)

@@ -27,6 +27,7 @@ import org.dizhang.seqspark.util.Constant
 import org.dizhang.seqspark.util.Constant.Variant.InfoKey
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.ConfigValue._
 
 import scala.collection.mutable
 
@@ -54,7 +55,7 @@ object Encode {
     def isCommon(cutoff: Double): Boolean = ! isRare(cutoff)
   }
 
-  object CmcAddNaAdjust extends Counter.CounterElementSemiGroup[Double] {
+  object CmcAddNaAdjust extends SemiGroup[Double] {
     def zero = 0.0
 
     def pow(x: Double, i: Int) =
@@ -71,7 +72,7 @@ object Encode {
   }
 
 
-  val BrvAddNaAdjust = Counter.CounterElementSemiGroup.AtomDouble
+  val BrvAddNaAdjust = SemiGroup.AtomDouble
 
   def erecDelta(n: Int): Double = {
     /** The authors just said the sample size needed is very large, but not how large
@@ -304,6 +305,7 @@ object Encode {
 
   }
 
+  // TODO: need to add support for arbitary INFO key
   sealed trait SimpleWeight[A] extends BRV[A] {
     def weight: DenseVector[Double] = {
       val mafDV: DenseVector[Double] = DenseVector(maf)

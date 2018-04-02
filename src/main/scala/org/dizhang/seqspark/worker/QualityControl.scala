@@ -21,7 +21,7 @@ import java.io.PrintWriter
 import org.apache.spark.storage.StorageLevel
 import org.dizhang.seqspark.ds.VCF._
 import org.dizhang.seqspark.util.Constant.Variant.InfoKey
-import org.dizhang.seqspark.util.SeqContext
+import org.dizhang.seqspark.util.{LogicalParser, SeqContext}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
@@ -125,21 +125,27 @@ object QualityControl {
     /** 3. convert to Byte genotype */
     val simpleVCF: Data[Byte] = Genotypes.toSimpleVCF(cleaned)
 
-    simpleVCF.persist(StorageLevel.MEMORY_ONLY_SER)
+    val markPass: Data[Byte] =
+      simpleVCF.variants(conf.qualityControl.variants, Some("SS_PASS"), filter = false)(ssc)
+
+    markPass.persist(StorageLevel.MEMORY_ONLY_SER)
 
     {
       val varCnt = simpleVCF.count()
       val varMsg = s"$varCnt variants before QC"
       logger.info(varMsg)
       appendMsg(qc, "variants", s"beforeQC: $varCnt")
-      val genoCnt = simpleVCF.map(v => v.parseInfo("SS_RawGeno").toInt).reduce((a, b) => a + b)
-      val genoMsg = s"$genoCnt genotypes before QC"
-      logger.info(genoMsg)
-      appendMsg(qc, "genotypes", s"beforeQC: $genoCnt")
+
+      if (conf.qualityControl.genotypes != LogicalParser.T) {
+        val genoCnt = simpleVCF.map(v => v.parseInfo("SS_RawGeno").toInt).reduce((a, b) => a + b)
+        val genoMsg = s"$genoCnt genotypes before QC"
+        logger.info(genoMsg)
+        appendMsg(qc, "genotypes", s"beforeQC: $genoCnt")
+      }
     }//}
 
     /** 4. Variant level QC */
-    val res = simpleVCF.variants(conf.qualityControl.variants)(ssc)
+    val res = markPass.variants(LogicalParser.parse("SS_PASS"))(ssc)
 
     //if (conf.benchmark) {
       //res.persist(StorageLevel.MEMORY_ONLY_SER)
@@ -147,8 +153,6 @@ object QualityControl {
     {
       val varCnt = res.count()
       logger.info(s"$varCnt variants after variant level QC")
-      val genoCnt = if (res.isEmpty()) 0 else res.map(v => v.parseInfo("SS_CleanGeno").toInt).reduce((a, b) => a + b)
-      logger.info(s"$genoCnt genotypes after QC")
       val maf = res.map { v =>
         val info = v.parseInfo
         if (info.contains(InfoKey.maf)) {
@@ -166,9 +170,14 @@ object QualityControl {
       logger.info(s"$commonCnt common variants by annotation")
 
       appendMsg(qc, "variants", s"afterQC: $varCnt")
-      appendMsg(qc, "genotypes", s"afterQC: $genoCnt")
       appendMsg(qc, "variants", s"afterQC(rare): $rareCnt")
       appendMsg(qc, "variants", s"afterQC(common): $commonCnt")
+
+      if  (conf.qualityControl.genotypes != LogicalParser.T) {
+        val genoCnt = if (res.isEmpty()) 0 else res.map(v => v.parseInfo("SS_CleanGeno").toInt).reduce((a, b) => a + b)
+        logger.info(s"$genoCnt genotypes after QC")
+        appendMsg(qc, "genotypes", s"afterQC: $genoCnt")
+      }
     }
       //}
 
@@ -191,6 +200,9 @@ object QualityControl {
       val ratio = Variants.titv(res)
       appendMsg(qc, "titv", s"afterQC: ${ratio._1.toDouble/ratio._2}")
       logger.info(s"titv ratio after QC: ${ratio._1.toDouble/ratio._2} = ${ratio._1}/${ratio._2}")
+      if (conf.qualityControl.titvBy.contains("samples")) {
+        Samples.titv(res)(ssc)
+      }
     }
 
     if (sums.contains("pca")) {
@@ -231,7 +243,7 @@ object QualityControl {
     }
 
     /** Variant QC */
-    val res = input.variants(conf.qualityControl.variants)(ssc)
+    val res = input.variants(conf.qualityControl.variants, None, true)(ssc)
 
     if (conf.qualityControl.save) {
       res.cache()

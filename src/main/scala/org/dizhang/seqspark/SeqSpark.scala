@@ -23,7 +23,7 @@ import com.typesafe.config.ConfigFactory
 import org.apache.spark.sql.SparkSession
 import org.dizhang.seqspark.util.General._
 import org.dizhang.seqspark.util.{Constant, QueryParser, SeqContext}
-import org.dizhang.seqspark.util.UserConfig.{AnnotationConfig, DBFormat, RootConfig}
+import org.dizhang.seqspark.util.UserConfig.{AnnotationConfig, RootConfig}
 import org.dizhang.seqspark.worker.Annotation.logger
 import org.slf4j.LoggerFactory
 

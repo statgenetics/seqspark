@@ -20,10 +20,11 @@ import java.io.PrintWriter
 
 import org.apache.spark.util.{AccumulatorV2, LongAccumulator}
 import org.apache.spark.rdd.RDD
-import org.dizhang.seqspark.ds.{Counter, Genotype, Phenotype, Variant}
+import org.dizhang.seqspark.ds._
 import org.dizhang.seqspark.util.Constant.Genotype.Raw
 import org.dizhang.seqspark.util.{General, LogicalParser, SeqContext}
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.ConfigValue.ImputeMethod
 import General._
 import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.Path
@@ -64,36 +65,27 @@ object Genotypes {
     val sc = ssc.sparkContext
     val conf = ssc.userConfig
     val phenotype = Phenotype("phenotype")(ssc.sparkSession)
-    val batch = conf.input.phenotype.batch
-    val (batchKeys, keyFunc) = if (batch == "none") {
-      (Array("all"), (i: Int) => 0)
-    } else {
-      val batchStr = phenotype.batch(batch)
-      if (batchStr.toSet.size == 1) {
-        (batchStr.slice(0,1), (i: Int) => 0)
-      } else {
-        val batchKeys = batchStr.zipWithIndex.toMap.keys.toArray //the batch names
-        val batchMap = batchKeys.zipWithIndex.toMap //batch name indices
-        val batchIdx = batchStr.map(b => batchMap(b)) //individual -> batch index
-        (batchKeys, (i: Int) => batchIdx(i))
-      }
-    }
-    //logger.info("still all right?")
-    val first = self.first()
+    val batch = phenotype.batch(conf.input.phenotype.batch)
+
+    /** broadcast the keyFunc
+      *
+      * */
+    val bcKeyFunc = sc.broadcast(batch.toKeyFunc)
+
 
     val frac: Double = conf.qualityControl.config.getDouble("gdgq.fraction")
-    //val counter = Counter.CounterElementSemiGroup.Longs(400)
+
     /** this function works on raw data, so limit to a subset can greatly enhance the performance */
     val all = self.sample(withReplacement = false, frac).map{v =>
       /** some VCF do have variant specific format */
       val fm = v.format.split(":").toList
       v.toCounter(makeGdGq(_, fm), Map.empty[Int, Long])
-        .reduceByKey(keyFunc)}
+        .reduceByKey(bcKeyFunc.value)}
     //logger.info("going to reduce")
     val res = all.reduce((a, b) => Counter.addByKey(a, b))
     //logger.info("what about now")
 
-    writeBcnt(res, batchKeys, conf.output.results.resolve("callRate_by_dpgq.txt"))
+    writeBcnt(res, batch.keys, conf.output.results.resolve("callRate_by_dpgq.txt"))
   }
 
   def genotypeQC(self: Data[String],
@@ -171,7 +163,7 @@ object Genotypes {
     }
   }
 
-  def writeBcnt(b: Map[Int, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
+  def writeBcnt(b: Map[Byte, Map[Int, Long]], batchKeys: Array[String], outFile: Path) {
     val pw = new PrintWriter(outFile.toFile)
     pw.write("batch\tdp\tgq\tcount\n")
     for ((i, cnt) <- b) {

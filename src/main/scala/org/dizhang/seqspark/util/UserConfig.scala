@@ -16,11 +16,11 @@
 
 package org.dizhang.seqspark.util
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import org.dizhang.seqspark.annot._
 import org.dizhang.seqspark.ds.Region
 import org.dizhang.seqspark.util.LogicalParser.LogExpr
-
+import ConfigValue._
 import scala.collection.JavaConverters._
 import scala.io.Source
 import java.nio.file.{Files, Path, Paths}
@@ -42,6 +42,7 @@ object UserConfig {
   lazy val hadoopConf = new hadoop.conf.Configuration()
   lazy val hdfs = hadoop.fs.FileSystem.get(hadoopConf)
 
+
   def getProperPath(unchecked: String): String = {
     if (unchecked.isEmpty) {
       //logger.warn(s"using empty path")
@@ -58,75 +59,33 @@ object UserConfig {
     }
   }
 
-  object GenomeBuild extends Enumeration {
-    val hg18 = Value("hg18")
-    val hg19 = Value("hg19")
-    val hg38 = Value("hg38")
+  def getGroups(config: Config): Map[String, Map[String, LogExpr]] = {
+    if (config.isEmpty) {
+      Map[String, Map[String, LogExpr]]()
+    } else {
+      config.root().keySet().asScala.toList.map{grp =>
+        logger.info(s"group name: ${grp}")
+        val grpConf = config.getConfig(grp)
+        if (grpConf.isEmpty || ! config.hasPath(grp)) {
+          logger.info(s"what: ${grpConf}")
+          grp -> Map[String, LogExpr]()
+        } else {
+          logger.info(s"haha: ${grpConf}")
+          grp ->
+            grpConf.root().keySet().asScala.map(tag =>
+              if (grpConf.hasPath(tag)) {
+                tag -> LogicalParser.parse(grpConf.getStringList(tag).asScala.toList)
+              } else {
+                tag -> LogicalParser.F
+              }
+            ).toMap
+
+        }
+      }.toMap
+    }
   }
 
-  object GenotypeFormat extends Enumeration {
-    val vcf = Value("vcf")
-    val imputed = Value("impute2")
-    //val bgen = Value("bgen")
-    //val cacheFullvcf = Value("cachedFullVcf")
-    val cacheVcf = Value("cachedVcf")
-    val cacheImputed = Value("cachedImpute2")
-  }
 
-  object Samples extends Enumeration {
-    val all = Value("all")
-    val none = Value("none")
-  }
-
-  object Variants extends Enumeration {
-    val all = Value("all")
-    val exome = Value("exome")
-    val none = Value("none")
-  }
-
-  object MutType extends Enumeration {
-    val snv = Value("snv")
-    val indel = Value("indel")
-    val cnv = Value("cnv")
-  }
-
-  object MethodType extends Enumeration {
-    val skat = Value("skat")
-    val skato = Value("skato")
-    val meta = Value("meta")
-    val cmc = Value("cmc")
-    val brv = Value("brv")
-    val snv = Value("snv")
-  }
-
-  object WeightMethod extends Enumeration {
-    val none = Value("none")
-    val equal = Value("equal")
-    val wss = Value("wss")
-    val erec = Value("erec")
-    val skat = Value("skat")
-    val annotation = Value("annotation")
-  }
-
-  object TestMethod extends Enumeration {
-    val score = Value("score")
-    //val lhr = Value("lhr")
-    val wald = Value("wald")
-  }
-
-  object ImputeMethod extends Enumeration {
-    val bestGuess = Value("bestGuess")
-    val meanDosage = Value("meanDosage")
-    val random = Value("random")
-    val no = Value("no")
-  }
-
-  object DBFormat extends Enumeration {
-    val vcf: Value = Value("vcf")
-    val plain: Value = Value("plain")
-    val csv: Value = Value("csv")
-    val tsv: Value = Value("tsv")
-  }
 
   case class RootConfig(config: Config) extends UserConfig {
 
@@ -196,23 +155,10 @@ object UserConfig {
 
     val missing: ImputeMethod.Value = ImputeMethod.withName(config.getString("missing"))
 
-    val samples: Either[Samples.Value, String] = {
-      config.getString("samples") match {
-        case "all" => Left(Samples.all)
-        case "none" => Left(Samples.none)
-        case field => Right(field)
-      }
-    }
+    val samples: Samples = Samples(config.getString("samples"))
 
-    val variants: Either[Variants.Value, Regions] = {
-      val file = """file://(.+)""".r
-      config.getString("variants") match {
-        case "all" => Left(Variants.all)
-        case "exome" => Left(Variants.exome)
-        case file(f) => Right(Regions(Source.fromFile(f).getLines().map(Region(_))))
-        case x => Right(Regions(x.split(",").map(Region(_)).toIterator))
-      }
-    }
+    val variants: Variants = Variants(config.getString("variants"))
+
   }
 
   case class PhenotypeConfig(config: Config) extends UserConfig {
@@ -220,6 +166,7 @@ object UserConfig {
     def path = getProperPath(pathRaw)
     def pathValid = path != ""
     val batch = config.getString("batch")
+    def samples: Samples = Samples(config.getString("samples"))
   }
 
   case class QualityControlConfig(config: Config) extends UserConfig {
@@ -229,11 +176,17 @@ object UserConfig {
     val save = config.getBoolean("save")
     val export = config.getBoolean("export")
     val pca = PCAConfig(config.getConfig("pca"))
-    def groups: List[String] = {
-      if (config.hasPath("groups"))
-        config.getStringList("groups").asScala.toList
-      else
-        List[String]()
+    def group: GroupConfig = GroupConfig(config.getConfig("group"))
+    def countBy: List[String] = config.getStringList("count.by").asScala.toList
+    def titvBy: List[String] = config.getStringList("titv.by").asScala.toList
+  }
+
+  case class GroupConfig(config: Config) extends UserConfig {
+    def variants: Map[String, Map[String, LogExpr]] = {
+      getGroups(config.getConfig("variants"))
+    }
+    def samples: Map[String, Map[String, LogExpr]] = {
+      getGroups(config.getConfig("samples"))
     }
   }
 
@@ -254,7 +207,12 @@ object UserConfig {
     def CADD = config.getConfig("CADD")
     def ExAC = config.getConfig("ExAC")
     def dbList: List[String] = config.getConfig("db").root().keySet().asScala.toList
-    def db(name: String): DatabaseConfig = DatabaseConfig(config.getConfig(s"db.$name"))
+    def db(name: String): DatabaseConfig = {
+      if (config.hasPath(s"db.$name"))
+        DatabaseConfig(config.getConfig(s"db.$name"))
+      else
+        DatabaseConfig(config.getConfig(name))
+    }
     def addInfo: Map[String, String] = {
       if (config.hasPath("addInfo")) {
         val keys = config.getConfig("addInfo").root().keySet().asScala.toList
@@ -268,29 +226,42 @@ object UserConfig {
   case class DatabaseConfig(config: Config) extends UserConfig {
     def format: DBFormat.Value = DBFormat.withName(config.getString("format"))
     def delimiter: String = format match {
-      case DBFormat.vcf => ""
+      case DBFormat.vcf|DBFormat.gene => ""
       case _ => config.getString("delimiter")
     }
     def header: Array[String] = format match {
-      case DBFormat.vcf => Array[String]()
+      case DBFormat.vcf|DBFormat.gene => Array[String]()
       case _ => config.getStringList("header").asScala.toArray
     }
     def pathRaw: String = config.getString("path")
     def path: String = if (config.hasPath("path")) getProperPath(pathRaw) else ""
-    def pathValid: Boolean = path != ""
+    def pathValid: Boolean = format == DBFormat.gene || path != ""
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {
     def traitList = config.getStringList("trait.list").asScala.toArray
     def methodList = config.getStringList("method.list").asScala.toArray
-    def method(name: String) = MethodConfig(config.getConfig(s"method.$name"))
+    def method(name: String) = {
+      val conf = config.getConfig(s"method.$name")
+      val mtype = conf.getString("type")
+      if (name != mtype)
+        MethodConfig(conf.withFallback(config.getConfig(s"method.$mtype")).resolve())
+      else
+        MethodConfig(conf)
+
+    }
     def `trait`(name: String) = TraitConfig(config.getConfig(s"trait.$name"))
     def sites: String = config.getString("method.sites")
 
   }
 
   case class MiscConfig(config: Config) extends UserConfig {
-    val impute: ImputeMethod.Value = ImputeMethod.withName(config.getString("impute"))
+    val impute: ImputeMethod.Value =
+      if (config.hasPath("impute"))
+        ImputeMethod.withName(config.getString("impute"))
+      else
+        ImputeMethod.withName("bestGuess")
+
     val varLimit: (Int, Int) = {
       if (config.hasPath("varLimit")) {
         val res = config.getIntList("varLimit").asScala.toList
@@ -354,7 +325,11 @@ object UserConfig {
 
   case class MethodConfig(config: Config) extends UserConfig {
     val `type` = MethodType.withName(config.getString("type"))
-    val weight = WeightMethod.withName(config.getString("weight"))
+    val weight =
+      if (config.hasPath("weight"))
+        WeightMethod.withName(config.getString("weight"))
+      else
+        WeightMethod.withName("none")
     val maf = config.getConfig("maf")
     val resampling = if (config.hasPath("resampling")) config.getBoolean("resampling") else false
     val test = if (config.hasPath("test"))

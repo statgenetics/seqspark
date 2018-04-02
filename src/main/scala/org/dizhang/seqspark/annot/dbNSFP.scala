@@ -20,7 +20,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.dizhang.seqspark.annot.dbNSFP.Record
 import org.dizhang.seqspark.ds.{Region, Variation}
-import org.dizhang.seqspark.util.UserConfig.GenomeBuild
+import org.dizhang.seqspark.util.ConfigValue.GenomeBuild
 
 /**
   * Created by zhangdi on 4/13/16.

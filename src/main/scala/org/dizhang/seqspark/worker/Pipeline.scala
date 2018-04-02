@@ -16,9 +16,9 @@
 
 package org.dizhang.seqspark.worker
 
-import org.dizhang.seqspark.ds.Genotype
+import org.dizhang.seqspark.ds.{Genotype, Phenotype}
 import org.dizhang.seqspark.ds.Genotype.Imp
-import org.dizhang.seqspark.util.UserConfig.GenotypeFormat
+import org.dizhang.seqspark.util.{ConfigValue => CV}
 import org.dizhang.seqspark.util.SeqContext
 //import scalaz.{Free, ~>, Id, Coyoneda}
 //import scalaz.syntax.traverse._
@@ -47,13 +47,13 @@ object Pipeline {
   def apply(implicit ssc: SeqContext): Unit = {
     val conf = ssc.userConfig
     conf.input.genotype.format match {
-      case GenotypeFormat.vcf =>
+      case CV.GenotypeFormat.vcf =>
         run[String, Byte](a, b)
-      case GenotypeFormat.imputed =>
+      case CV.GenotypeFormat.imputed =>
         run[Imp, Imp](c, c)
-      case GenotypeFormat.cacheVcf =>
+      case CV.GenotypeFormat.cacheVcf =>
         run[Byte, Byte](b, b)
-      case GenotypeFormat.cacheImputed =>
+      case CV.GenotypeFormat.cacheImputed =>
         run[Imp, Imp](c, c)
     }
   }
@@ -73,12 +73,21 @@ object Pipeline {
 
     val imported = Import(ssc, a)
 
+    /** if select samples */
+    conf.input.phenotype.samples match {
+      case CV.Samples.by(b) => Phenotype.select(b, "phenotype")(ssc.sparkSession)
+      case _ => Unit
+    }
+
     if (pipeline.isEmpty) {
       Export(imported)
     } else {
       val annotated =
-        if (pipeline.nonEmpty && pipeline.head == "annotation") {
-          pipeline = pipeline.tail
+        if (pipeline.nonEmpty && (pipeline.head == "annotation" || pipeline.contains("association"))) {
+          pipeline = if (pipeline.head == "annotation")
+            pipeline.tail
+          else
+            pipeline
           Annotation(imported, a)
         } else {
           imported

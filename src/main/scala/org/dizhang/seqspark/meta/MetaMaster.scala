@@ -30,7 +30,9 @@ import org.dizhang.seqspark.ds.SummaryStatistic._
 import org.dizhang.seqspark.meta.MetaMaster._
 import org.dizhang.seqspark.util.Constant.{Annotation, Variant}
 import org.dizhang.seqspark.util.SeqContext
-import org.dizhang.seqspark.util.UserConfig.{MetaConfig, MethodType, RootConfig}
+import org.dizhang.seqspark.util.UserConfig.{MetaConfig, RootConfig}
+import org.dizhang.seqspark.util.ConfigValue.MethodType
+
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec

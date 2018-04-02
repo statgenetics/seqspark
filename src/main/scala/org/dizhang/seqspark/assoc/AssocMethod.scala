@@ -17,7 +17,7 @@
 package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup
+import org.dizhang.seqspark.ds.SemiGroup
 import org.dizhang.seqspark.ds.Variation
 
 
@@ -30,7 +30,7 @@ trait AssocMethod extends Serializable
 
 object AssocMethod {
   class Statistic[A](val value: A) {
-    def +(that: Statistic[A])(implicit sg: CounterElementSemiGroup[A]): Statistic[A] = {
+    def +(that: Statistic[A])(implicit sg: SemiGroup[A]): Statistic[A] = {
       new Statistic[A](sg.op(this.value, that.value))
     }
   }

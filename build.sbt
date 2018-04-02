@@ -11,15 +11,14 @@ scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 libraryDependencies ++= Seq(
 	"org.slf4j" % "slf4j-api" % "1.7.5" % "provided",
 	"org.slf4j" % "slf4j-log4j12" % "1.7.5" % "provided",
-	"org.apache.spark" % "spark-core_2.11" % "2.0.0" % "provided",
-	"org.apache.spark" % "spark-sql_2.11" % "2.0.0" % "provided",
-	"org.apache.spark" % "spark-mllib_2.11" % "2.0.0" % "provided",
+	"org.apache.spark" % "spark-core_2.11" % "2.1.0" % "provided",
+	"org.apache.spark" % "spark-sql_2.11" % "2.1.0" % "provided",
+	"org.apache.spark" % "spark-mllib_2.11" % "2.1.0" % "provided",
 	"com.typesafe" % "config" % "1.2.1",
-	"it.unimi.dsi" % "fastutil" % "7.0.4",
 	"org.scalanlp" %% "breeze" % "0.12",
 	"org.scalanlp" %% "breeze-natives" % "0.12",
 	"org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-	"net.java.dev.jna" % "jna" % "4.2.2",
+	//"net.java.dev.jna" % "jna" % "4.2.2",
   //"com.chuusai" %% "shapeless" % "2.3.3"
 	"org.scalaz" %% "scalaz-core" % "7.2.4"
 )

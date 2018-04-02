@@ -19,7 +19,7 @@ package org.dizhang.seqspark.stat
 import breeze.linalg.{DenseVector, shuffle}
 import breeze.stats.distributions.Bernoulli
 import org.dizhang.seqspark.assoc.Encode
-import org.dizhang.seqspark.ds.Counter.CounterElementSemiGroup.PairInt
+import org.dizhang.seqspark.ds.SemiGroup.PairInt
 import org.dizhang.seqspark.stat.HypoTest.NullModel
 
 import scala.language.existentials

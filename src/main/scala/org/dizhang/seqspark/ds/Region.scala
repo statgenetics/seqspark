@@ -206,16 +206,16 @@ object Region {
   def apply(c: String, s: Int, e: Int, n: String): Region = Named(c.byte, s, e, n)
 
   def apply(pattern: String): Region = {
-    val onlyChr = """(?:chr)?([MTXY0-9]+)""".r
-    val start = """(?:chr)?([MTXY0-9]+):(\d+)-""".r
-    val end = """(?:chr)?([MTXY0-9]+):-(\d+)""".r
-    val full = """(?:chr)?([MTXY0-9]+):(\d+)-(\d+)""".r
+    val onlyChr = """(?i)(?:chr)?([MTXY0-9]+)""".r
+    val start = """(?i)(?:chr)?([MTXY0-9]+):(\d+)-""".r
+    val end = """(?i)(?:chr)?([MTXY0-9]+):-(\d+)""".r
+    val full = """(?i)(?:chr)?([MTXY0-9]+):(\d+)-(\d+)""".r
     pattern match {
       case onlyChr(chr) => apply(chr, 0, Int.MaxValue)
       case start(chr, s) => apply(chr, s.toInt, Int.MaxValue)
       case end(chr, e) => apply(chr, 0, e.toInt)
       case full(chr, s, e) => apply(chr, s.toInt, e.toInt)
-      case _ => apply("27", 0, 1)
+      case _ => Empty
     }
   }
 

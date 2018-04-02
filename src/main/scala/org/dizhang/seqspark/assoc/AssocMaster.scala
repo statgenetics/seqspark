@@ -26,10 +26,11 @@ import org.dizhang.seqspark.annot.VariantAnnotOp._
 import org.dizhang.seqspark.assoc.AssocMaster._
 import org.dizhang.seqspark.ds.Counter._
 import org.dizhang.seqspark.ds.VCF._
-import org.dizhang.seqspark.ds.{Genotype, Phenotype}
+import org.dizhang.seqspark.ds.{Genotype, Phenotype, SemiGroup}
 import org.dizhang.seqspark.stat._
 import org.dizhang.seqspark.util.Constant.Pheno
 import org.dizhang.seqspark.util.UserConfig._
+import org.dizhang.seqspark.util.ConfigValue._
 import org.dizhang.seqspark.util.{Constant, LogicalParser, SeqContext}
 import org.dizhang.seqspark.worker.Data
 import org.slf4j.LoggerFactory
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory
   */
 object AssocMaster {
   /** constants */
-  val IntPair = CounterElementSemiGroup.PairInt
+  val IntPair = SemiGroup.PairInt
   val Permu = Constant.Permutation
   val F = Constant.Annotation.Feature
   val FuncF = Set(F.StopGain, F.StopLoss, F.SpliceSite, F.NonSynonymous)
@@ -258,16 +259,19 @@ object AssocMaster {
 
   def writeResults(res: Seq[(String, AssocMethod.Result)], outFile: File): Unit = {
     //val header = implicitly[AssocMethod.Header[A]]
-
-    val pw = new PrintWriter(outFile)
-    pw.write(s"${res.head._2.header}\n")
-    res.sortBy(p =>
-      p._2.pValue match {
-        case None => 2.0
-        case Some(x) => x}).foreach{p =>
-      pw.write("%s\t%s\n".format(p._1, p._2.toString))
+    if (res.isEmpty) {
+      logger.warn(s"no res for file ${outFile.toString}")
+    } else {
+      val pw = new PrintWriter(outFile)
+      pw.write(s"${res.head._2.header}\n")
+      res.sortBy(p =>
+        p._2.pValue match {
+          case None => 2.0
+          case Some(x) => x}).foreach{p =>
+        pw.write("%s\t%s\n".format(p._1, p._2.toString))
+      }
+      pw.close()
     }
-    pw.close()
   }
 
 }
@@ -297,8 +301,8 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
         val currentTrait = (traitName, tr)
         val methods = assocConf.methodList
         val indicator = sc.broadcast(phenotype.indicate(traitName))
-        val controls = if (phenotype.contains(Pheno.Header.control)) {
-          Some(phenotype.select(Pheno.Header.control).zip(indicator.value)
+        val controls = if (phenotype.contains(Pheno.control)) {
+          Some(phenotype.select(Pheno.control).zip(indicator.value)
             .filter(p => p._2).map(p => if (p._1.get == "1") true else false))
         } else {
           None
@@ -306,7 +310,7 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
 
         val chooseSample = genotype.samples(indicator.value)(sc)
         val cond = LogicalParser.parse("informative")
-        val currentGenotype = chooseSample.variants(cond)(ssc)
+        val currentGenotype = chooseSample.variants(cond, None, true)(ssc)
         currentGenotype.persist(StorageLevel.MEMORY_AND_DISK)
         val traitConfig = assocConf.`trait`(traitName)
         val cov =
@@ -336,11 +340,11 @@ class AssocMaster[A: Genotype](genotype: Data[A])(implicit ssc: SeqContext) {
     val config = cnf.association
     val methodConfig = config.method(method)
     val cond = LogicalParser.parse(methodConfig.misc.variants)
-    val chosenVars = currentGenotype.variants(cond)(ssc)
+    val chosenVars = currentGenotype.variants(cond, None, true)(ssc)
 
-    //if (cnf.benchmark) {
-      //logger.info(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")
-    //}
+    if (cnf.benchmark) {
+      logger.debug(s"${chosenVars.count()} variants were selected for testing assocition for ${currentTrait._1} with $method")
+    }
 
     val codings = encode(chosenVars, currentTrait._2, cov, controls, methodConfig)
 

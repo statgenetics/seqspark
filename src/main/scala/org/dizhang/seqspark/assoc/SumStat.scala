@@ -18,7 +18,7 @@ package org.dizhang.seqspark.assoc
 
 import breeze.linalg.{inv, DenseMatrix => DM, DenseVector => DV}
 import org.dizhang.seqspark.assoc.SumStat._
-import org.dizhang.seqspark.ds.Counter.{CounterElementSemiGroup => cesg}
+import org.dizhang.seqspark.ds.{SemiGroup => sg}
 import org.dizhang.seqspark.ds.{Region, Variation}
 import org.dizhang.seqspark.stat.ScoreTest
 import org.dizhang.seqspark.stat.HypoTest.{NullModel => NM}
@@ -203,7 +203,7 @@ object SumStat {
       val mc = v.info.get.split(",").map(_.toInt)
       v -> (mc(0), mc(1))
     }.toMap
-    val res = vm1 ++ (for ((v, m) <- vm2) yield if (vm1.contains(v)) v -> cesg.PairInt.op(m, vm1(v)) else v -> m)
+    val res = vm1 ++ (for ((v, m) <- vm2) yield if (vm1.contains(v)) v -> sg.PairInt.op(m, vm1(v)) else v -> m)
     res.map{
       case (v, m) =>
         v.info = Some(s"${IK.mac}=${m._1},${m._2}")

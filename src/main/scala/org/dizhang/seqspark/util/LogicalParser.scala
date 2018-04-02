@@ -19,6 +19,7 @@ package org.dizhang.seqspark.util
 import org.dizhang.seqspark.util.LogicalParser._
 
 import scala.util.parsing.combinator.JavaTokenParsers
+
 /**
   * Created by zhangdi on 11/23/16.
   */
@@ -46,7 +47,10 @@ class LogicalParser extends JavaTokenParsers with Serializable {
       case name~"!="~value => NE(name, value.toDouble)
     }
   def existence: Parser[LogExpr] =
-    """[a-zA-Z_]\w*""".r ^^ (name => EX(name))
+    opt("!"|"not") ~ """[a-zA-Z_]\w*""".r ^^ {
+      case None ~ name => EX(name)
+      case Some(_) ~ name => Not(EX(name))
+    }
   def parse(input: String): ParseResult[LogExpr] = this.parseAll(expr, input)
 }
 
@@ -56,14 +60,14 @@ object LogicalParser {
     if (input.isEmpty || input.forall(_.isEmpty))
       T
     else
-      parse(input.reduce((a,b) => s"($a) and ($b)"))
+      input.map(c => parse(c)).reduce((a, b) => AND(a, b))
   }
 
   def parse(input: String): LogExpr = {
     if (input.isEmpty)
       T
     else
-      new LogicalParser().parse(input).get
+      new LogicalParser().parse(input).getOrElse(Error(input))
   }
 
   sealed trait LogExpr
@@ -80,12 +84,14 @@ object LogicalParser {
   case class SNE(id: String, v: String) extends LogExpr
   case class AND(e1: LogExpr, e2: LogExpr) extends LogExpr
   case class OR(e1: LogExpr, e2: LogExpr) extends LogExpr
+  case class Not(expr: LogExpr) extends LogExpr
+  case class Error(msg: String) extends LogExpr
 
   def evalExists(logExpr: LogExpr)(vm: Map[String, List[String]]): Boolean ={
     logExpr match {
       case T => true
       case F => false
-      case EX(id) => vm.contains(id)
+      case EX(id) => vm.contains(id) && vm(id).exists(x => x != "" && x != "0" )
       case LT(id, v) => vm(id).exists(_.toDouble < v)
       case LE(id, v) => vm(id).exists(_.toDouble <= v)
       case GT(id, v) => vm(id).exists(_.toDouble > v)
@@ -98,6 +104,7 @@ object LogicalParser {
       case AND(e1, e2) => evalExists(e1)(vm) && evalExists(e2)(vm)
       case OR(_, T) => true
       case OR(e1, e2) => evalExists(e1)(vm) || evalExists(e2)(vm)
+      case Not(e) => ! evalExists(e)(vm)
     }
   }
 
@@ -118,6 +125,7 @@ object LogicalParser {
       case AND(e1, e2) => eval(e1)(vm) && eval(e2)(vm)
       case OR(_, T) => true
       case OR(e1, e2) => eval(e1)(vm) || eval(e2)(vm)
+      case Not(e) => ! eval(e)(vm)
     }
   }
 
@@ -136,6 +144,7 @@ object LogicalParser {
       case SNE(id, v) => s"$id != '$v'"
       case AND(e1, e2) => s"(${view(e1)}) and (${view(e2)})"
       case OR(e1, e2) => s"(${view(e1)}) or (${view(e2)})"
+      case Not(e) => s"not (${view(e)})"
     }
   }
 
@@ -154,6 +163,7 @@ object LogicalParser {
       case SNE(id, _) => Set(id)
       case AND(e1, e2) => names(e1) ++ names(e2)
       case OR(e1, e2) => names(e1) ++ names(e2)
+      case Not(e) => names(e)
     }
   }
 }

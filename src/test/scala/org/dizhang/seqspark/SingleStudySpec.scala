@@ -20,7 +20,7 @@ import org.dizhang.seqspark.util.UserConfig.RootConfig
 
 class SingleStudySpec extends IntegrationSpec with SharedTestData {
 
-  private val confFile = getClass.getResource("/demo.conf").getPath
+  private val confFile = getClass.getResource("/anno.conf").getPath
   private val conf = SeqSpark.readConf(confFile)
 
   def readConf(path: String): RootConfig = {
@@ -60,11 +60,11 @@ class SingleStudySpec extends IntegrationSpec with SharedTestData {
     SingleStudy(ssc)
   }
 
-  ignore should "run annotation" in {
+  it should "run annotation" in {
     runPipeline(readConf("anno.conf"))
   }
 
-  it should "run qc" in {
+  ignore should "run qc" in {
     runPipeline(readConf("qc.conf"))
   }
 

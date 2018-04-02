@@ -226,16 +226,16 @@ object UserConfig {
   case class DatabaseConfig(config: Config) extends UserConfig {
     def format: DBFormat.Value = DBFormat.withName(config.getString("format"))
     def delimiter: String = format match {
-      case DBFormat.vcf => ""
+      case DBFormat.vcf|DBFormat.gene => ""
       case _ => config.getString("delimiter")
     }
     def header: Array[String] = format match {
-      case DBFormat.vcf => Array[String]()
+      case DBFormat.vcf|DBFormat.gene => Array[String]()
       case _ => config.getStringList("header").asScala.toArray
     }
     def pathRaw: String = config.getString("path")
     def path: String = if (config.hasPath("path")) getProperPath(pathRaw) else ""
-    def pathValid: Boolean = path != ""
+    def pathValid: Boolean = format == DBFormat.gene || path != ""
   }
 
   case class AssociationConfig(config: Config) extends UserConfig {

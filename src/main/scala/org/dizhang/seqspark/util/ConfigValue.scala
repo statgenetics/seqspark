@@ -104,6 +104,7 @@ object ConfigValue {
 
   object DBFormat extends Enumeration {
     val vcf: Value = Value("vcf")
+    val gene: Value = Value("gene")
     val plain: Value = Value("plain")
     val csv: Value = Value("csv")
     val tsv: Value = Value("tsv")

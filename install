@@ -124,18 +124,54 @@ sub download_dbs {
 	if ($db_dir) {
 		print STDERR "going to download refseq and dbsnp to $db_dir\n";
 		for my $db (@db) {
-			my $test = system("hdfs dfs -test -f $db_dir/$db");
-			if (!$test) {
-				print STDERR "database $db already exists, skip downloading\n";
-				next;
-			}
-			!system("curl http://seqspark.statgen.us/$db | hdfs dfs -appendToFile - $db_dir/$db") 
-				or die "Failed to download\n";
+			&put_db($db_dir, $db);
 		}
-		
 	} else {
 		die "You didn't specify a valid HDFS path\n";
 	}
+}
+
+sub put_db {
+    my ($db_dir, $db) = @_;
+    my $hdfs = &which("hdfs");
+    if ($hdfs) {
+        print STDERR "Downloading the databases to the HDFS\n";
+        my $test = system("hdfs dfs -test -f $db_dir/$db");
+        if (!$test) {
+            print STDERR "database $db already exists, skip downloading\n";
+            return;
+        }
+        !system("hdfs", "dfs", "-mkdir", "-p", "$db_dir")
+        		or die "Cannot create dir $db_dir on HDFS, you have to mannually download databases later\n";
+        !system("curl http://seqspark.statgen.us/$db | hdfs dfs -put -f - $db_dir/$db")
+        	or die "Failed to download $db\n";
+    } else {
+        print STDERR "you don't have hdfs command in your PATH. Downloading the databases to local FS\n";
+        if ((-e $db_dir/$db) and (-f $db_dir/$db)) {
+            print STDERR "database $db already exists, skip downloading\n";
+            return;
+        }
+        !system("mkdir", "-p", "$db_dir")
+            or die "Cannot create $db_dir, you have to mannually download databases later\n";
+        !system("curl http://seqspark.statgen.us/$db | cat > $db_dir/$db")
+            or die "Failed to download $db\n";
+    }
+}
+
+sub which {
+    my $program = shift;
+
+    return if (not defined($program));
+
+    my @path = split /:/, $ENV{PATH};
+
+    for my $p (@path) {
+        my $f = join("/", $p, $program);
+        if ((-e $f) and (-f $f) and (-x $f)) {
+            return $f;
+        }
+    }
+    return;
 }
 
 sub help {
@@ -143,7 +179,7 @@ sub help {
 Options:
 	--help,-h            		Show this help message
 	--prefix=[dir]      		Set install directory. [\"\"]
-	--db-dir=[dir]       		HDFS path to store the database files. [/user/$ENV{USER}/seqspark]
+	--db-dir=[dir]       		HDFS/local path to store the database files. [/user/$ENV{USER}/seqspark]
 	--download|no-download		download the database files or not. [download]
 Examples:
 	Fresh install:

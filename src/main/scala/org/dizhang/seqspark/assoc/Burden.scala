@@ -59,7 +59,7 @@ object Burden {
 
   def getStatistic(nm: NM, x: DenseVector[Double]): Double = {
     val wt = WaldTest(nm, x)
-    (wt.beta :/ wt.std).apply(1)
+    (wt.beta /:/ wt.std).apply(1)
   }
 
   @SerialVersionUID(7727280101L)

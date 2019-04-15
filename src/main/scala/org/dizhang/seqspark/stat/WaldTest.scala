@@ -52,7 +52,7 @@ trait WaldTest {
     sqrt(diag(inv(reg.information)))
   }
   def dof: Int = nm.dof - 1
-  def t: DenseVector[Double] = beta :/ std
+  def t: DenseVector[Double] = beta /:/ std
   def pValue(oneSided: Boolean = true): DenseVector[Double] = {
     val dis = new StudentsT(dof)
     if (oneSided) {

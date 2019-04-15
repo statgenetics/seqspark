@@ -91,8 +91,8 @@ object SKAT {
     val dm2 = dm * dm
     val c1 = sum(diag(dm))
     val c2 = sum(diag(dm2))
-    val c3 = sum(dm :* dm2.t)
-    val c4 = sum(dm2 :* dm2.t)
+    val c3 = sum(dm *:* dm2.t)
+    val c4 = sum(dm2 *:* dm2.t)
     Vector(c1, c2, c3, c4)
   }
 

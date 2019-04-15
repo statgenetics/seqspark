@@ -137,10 +137,10 @@ trait LCCSDavies extends LCCS {
     val u2 = 2.0 * u
     val x = u2 * lambda
     val y = DenseVector.fill(size)(1.0) - x
-    val xconst = xconst_init + sum(lambda :* ((nonCentrality :/ y) + degreeOfFreedom) :/ y)
+    val xconst = xconst_init + sum(lambda *:* ((nonCentrality /:/ y) + degreeOfFreedom) /:/ y)
     val sum1 = sum1_init + sum(
-      (nonCentrality :* pow(x :/ y, 2)) +
-        degreeOfFreedom :* ((pow(x, 2) :/ y) + x.map(e => log1(-e, first = false)))
+      (nonCentrality *:* pow(x /:/ y, 2)) +
+        degreeOfFreedom *:* ((pow(x, 2) /:/ y) + x.map(e => log1(-e, first = false)))
     )
     val res = (exp1(-0.5 * sum1), xconst)
     //println(s" res: ${res._1} newcx: ${res._2}")
@@ -277,9 +277,9 @@ trait LCCSDavies extends LCCS {
       sum3 = -0.5 * sigsq * u.square
       val tmpX = 2.0 * u * lambda
       val tmpY = pow(tmpX, 2)
-      sum3 += -0.25 * sum(degreeOfFreedom :* tmpY.map(y => log1(y, true)))
-      val tmpY2 = (nonCentrality :* tmpX) :/ tmpY.map(1.0 + _)
-      val tmpZ = (degreeOfFreedom :* atan(tmpX)) + tmpY2
+      sum3 += -0.25 * sum(degreeOfFreedom *:* tmpY.map(y => log1(y, true)))
+      val tmpY2 = (nonCentrality *:* tmpX) /:/ tmpY.map(1.0 + _)
+      val tmpZ = (degreeOfFreedom *:* atan(tmpX)) + tmpY2
       sum1 += sum(tmpZ)
       sum2 += abs(sum(tmpZ))
       sum3 += -0.5 * (tmpX dot tmpY2)

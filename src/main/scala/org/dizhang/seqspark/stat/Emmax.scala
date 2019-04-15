@@ -61,10 +61,10 @@ object Emmax {
     val lambdas: BDM[Double] = tile(eigSHS._1, 1, m) + tile(delta, 1, n - q).t
     val xis: BDM[Double] = tile(eigH._1, 1, m) + tile(delta, 1, n).t
     val etasq: BDM[Double] = tile(pow(etas, 2), 1, n-q).t
-    val ll: BDV[Double] = 0.5 * (n.toDouble * (log(n/(2*math.Pi)) - 1 - log(sum(etasq :/ lambdas, Axis._0).t))
+    val ll: BDV[Double] = 0.5 * (n.toDouble * (log(n/(2*math.Pi)) - 1 - log(sum(etasq /:/ lambdas, Axis._0).t))
       - sum(log(xis), Axis._0).t )
-    val dLl: BDV[Double] = 0.5 * delta :* (n.toDouble * sum(etasq :/ pow(lambdas, 2), Axis._0).t
-      :/ sum(etasq :/ lambdas, Axis._0).t - sum(1.0 / xis, Axis._0).t)
+    val dLl: BDV[Double] = 0.5 * delta *:* (n.toDouble * sum(etasq /:/ pow(lambdas, 2), Axis._0).t
+      /:/ sum(etasq /:/ lambdas, Axis._0).t - sum(1.0 / xis, Axis._0).t)
     
   }
 

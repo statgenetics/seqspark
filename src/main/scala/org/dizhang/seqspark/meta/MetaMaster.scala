@@ -128,7 +128,7 @@ object MetaMaster {
 
   def runSNV(data: Data): Result = {
     data.flatMap{r =>
-      val res = r.score :/ diag(r.variance).map(math.sqrt)
+      val res = r.score /:/ diag(r.variance).map(math.sqrt)
       r.vars.zip(res.toArray).map{
         case (v, s) =>
           val key = v.toRegion

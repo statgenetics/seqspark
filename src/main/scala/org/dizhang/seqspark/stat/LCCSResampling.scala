@@ -52,7 +52,7 @@ object LCCSResampling {
   def varElement(m4: DV[Double],
                  u1: DV[Double],
                  u2: DV[Double]): Double = {
-    val tmp = pow(u1, 2) :* pow(u2, 2)
+    val tmp = pow(u1, 2) *:* pow(u2, 2)
     val a1 = m4 dot tmp
     val a2 = sum(pow(u1,2)) * sum(pow(u2, 2)) - sum(tmp)
     val a3 = (u1 dot u2).square - sum(tmp)
@@ -99,7 +99,7 @@ object LCCSResampling {
       if (n == 1) {
         DM(zeta(0) * lambda(0).square)
       } else {
-        diag(zeta :* pow(lambda, 2))
+        diag(zeta *:* pow(lambda, 2))
       }
     for {
       i <- 0 until (n - 1)

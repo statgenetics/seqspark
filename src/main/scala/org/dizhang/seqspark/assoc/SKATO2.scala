@@ -124,7 +124,7 @@ object SKATO2 {
       * */
     val w3 = iterm2.t * iterm2
 
-    val varZeta = sum((iterm1.t * iterm1) :* w3) * 4
+    val varZeta = sum((iterm1.t * iterm1) *:* w3) * 4
     val moments: Option[(Double, Double, Double, DV[Double])] =
       if (resampled.isEmpty) {
         SKAT.getLambda(w3).map{l =>
@@ -256,7 +256,7 @@ object SKATO2 {
 
     def integrand(x: DV[Double]): DV[Double] = {
       require(x.length == GKSize)
-      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
+      val tmp = (pmqDM - (tauDM(*, ::) *:* x)) /:/ rhoDM
       val kappa = min(tmp(::, *)).t
       val F = kappa.map{k =>
         if (k > sum(param.lambda) * 1e4) {
@@ -267,7 +267,7 @@ object SKATO2 {
         }
       }
       //logger.info(s"F: $F")
-      F :* df1pdf(x)
+      F *:* df1pdf(x)
     }
 
   }
@@ -288,7 +288,7 @@ object SKATO2 {
 
     def integrand(x: DV[Double]): DV[Double] = {
       require(x.length == GKSize)
-      val tmp = (pmqDM - (tauDM(*, ::) :* x)) :/ rhoDM
+      val tmp = (pmqDM - (tauDM(*, ::) *:* x)) /:/ rhoDM
       val kappa = min(tmp(::, *)).t
       //val cutoff = (kappa - param.muQ) * (param.varQ - param.varZeta).sqrt/param.varQ.sqrt + param.muQ
       val cutoff = (kappa - param.muQ)/param.varQ.sqrt * (2 * df).sqrt + df
@@ -310,7 +310,7 @@ object SKATO2 {
           s"tmpQ: ${tmpQ.toArray.mkString(",")}\n").toDouble
       }
         */
-      val res = dfcdf(cutoff.map(q => if (q < 0) 0.0 else q)) :* df1pdf(x)
+      val res = dfcdf(cutoff.map(q => if (q < 0) 0.0 else q)) *:* df1pdf(x)
       //logger.debug(s"res: $res")
       res
     }
@@ -430,7 +430,7 @@ trait SKATO2 extends AssocMethod with AssocMethod.AnalyticTest {
   lazy val rhoDM = tile(DV(rhos.map(1.0 - _)), 1, GKSize)
 
   def df1pdf(x: DV[Double]): DV[Double] = {
-    (pow(x, -0.5) :* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
+    (pow(x, -0.5) *:* exp(-x/2.0))/(2.sqrt * exp(lgamma(0.5)))
   }
 
   def dfcdf(x: DV[Double]): DV[Double] = {

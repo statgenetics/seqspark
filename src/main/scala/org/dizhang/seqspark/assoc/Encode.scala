@@ -313,7 +313,7 @@ object Encode {
         case WeightMethod.annotation =>
           DenseVector(vars.map(v => v.parseInfo(Constant.Variant.InfoKey.weight).toDouble))
         case WeightMethod.wss =>
-          pow(mafDV :* mafDV.map(1.0 - _), -0.5)
+          pow(mafDV *:* mafDV.map(1.0 - _), -0.5)
         case WeightMethod.skat =>
           val beta = lbeta(1.0, 25.0)
           mafDV.map(m => 1.0/exp(beta) * pow(1 - m, 24.0))

@@ -82,7 +82,7 @@ case class LogisticRegression(responses: DenseVector[Double],
     * z contains n elements (samples), is the result of xs * beta
     */
   def sigmoid(z: DenseVector[Double]): DenseVector[Double] =
-    ones :/ (exp(-1.0 * z) + ones)
+    ones /:/ (exp(-1.0 * z) + ones)
 
   /** beta contains p elements (variable numbers plus 1 intercept)
     * g [n]: probability of n samples
@@ -116,12 +116,12 @@ case class LogisticRegression(responses: DenseVector[Double],
   /** the estimated probabilities of responses equal to 1 */
   val estimates = sigmoid(xs * coefficients)
 
-  lazy val residualsVariance: DenseVector[Double] = estimates :* estimates.map(1.0 - _)
+  lazy val residualsVariance: DenseVector[Double] = estimates *:* estimates.map(1.0 - _)
 
   lazy val xsRotated = xs //if (rank(xs) < xs.cols) svd(xs).leftVectors else xs
 
   lazy val information: DenseMatrix[Double] = {
     /** this is essentially (xs.t * diag(residualsVariance) * xs) */
-    xsRotated.t * (xsRotated(::, *) :* residualsVariance)
+    xsRotated.t * (xsRotated(::, *) *:* residualsVariance)
   }
 }

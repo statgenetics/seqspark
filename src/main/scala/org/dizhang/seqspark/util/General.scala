@@ -91,7 +91,7 @@ object General {
     val de = eigSym(sm)
     val values = de.eigenvalues
     val vectors = de.eigenvectors
-    (vectors(*, ::) :* pow(values, 0.5)) * vectors.t
+    (vectors(*, ::) *:* pow(values, 0.5)) * vectors.t
   }
 
   def simpson2(h: Double, fa: Double, fm: Double, fb: Double): Double = {

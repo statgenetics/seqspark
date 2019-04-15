@@ -67,7 +67,7 @@ object ScoreTest {
       val c = nm.xs
       val IccInv = nm.invInfo * nm.a
       val Igg = (colMultiply(x, nm.b).t * x).toDense
-      val Icg = (c(::, *) :* nm.b).t * x
+      val Icg = (c(::, *) *:* nm.b).t * x
       val Igc = Icg.t
       (Igg - Igc * IccInv * Icg) / nm.a
     }
@@ -79,8 +79,8 @@ object ScoreTest {
     lazy val variance = {
       val c = nm.xs
       val IccInv = nm.invInfo * nm.a
-      val Igg = (x(::, *) :* nm.b).t * x
-      val Icg = (c(::, *) :* nm.b).t * x
+      val Igg = (x(::, *) *:* nm.b).t * x
+      val Icg = (c(::, *) *:* nm.b).t * x
       val Igc = Icg.t
       (Igg - Igc * IccInv * Icg)/nm.a
     }
@@ -98,9 +98,9 @@ object ScoreTest {
       val v2 = {
         val c = nm.xs
         val IccInv = nm.invInfo * nm.a
-        val Igg = (x1(::, *) :* nm.b).t * x2
-        val Icg = (c(::, *) :* nm.b).t * x2
-        val Igc = x1.t * (c(::, *) :* nm.b).t
+        val Igg = (x1(::, *) *:* nm.b).t * x2
+        val Icg = (c(::, *) *:* nm.b).t * x2
+        val Igc = x1.t * (c(::, *) *:* nm.b).t
         (Igg - Igc * IccInv * Icg) / nm.a
       }
       val v3 = v2.t

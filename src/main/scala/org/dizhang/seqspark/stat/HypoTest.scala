@@ -51,7 +51,7 @@ object HypoTest {
                     ) extends NullModel {
       def dof = y.length - xs.cols + 1
       def residuals = y - estimates
-      val invInfo = inv(xs.t * (xs(::, *) :* b) * a)
+      val invInfo = inv(xs.t * (xs(::, *) *:* b) * a)
     }
 
     def apply(y: DenseVector[Double], x: Option[DenseMatrix[Double]], fit: Boolean, binary: Boolean): NullModel = {

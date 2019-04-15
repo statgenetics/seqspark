@@ -50,7 +50,7 @@ object MetaMethod {
         val beta = lbeta(1.0, 25.0)
         maf.map(m => 1.0/exp(beta) * pow(1 - m, 24.0))
       case WeightMethod.wss =>
-        pow(maf :* maf.map(1.0 - _), -0.5)
+        pow(maf *:* maf.map(1.0 - _), -0.5)
       case _ =>
         DV.ones[Double](vars.length)
     }
@@ -77,9 +77,9 @@ object MetaMethod {
                   rho: Double) extends MetaMethod {
     def result: AME.Result = {
       val weight = getWeight(data.vars, weightType)
-      val u = weight :* data.score
-      val tmp =  data.variance(::, *) :* weight
-      val v = tmp(*, ::) :* weight
+      val u = weight *:* data.score
+      val tmp =  data.variance(::, *) *:* weight
+      val v = tmp(*, ::) *:* weight
       val st = ScoreTest.Mock(u, v)
       ASKAT(st, data.vars, numericalMethod, rho).result
     }
@@ -93,9 +93,9 @@ object MetaMethod {
                    rhos: Array[Double]) extends MetaMethod {
     def result: AME.Result = {
       val weight = getWeight(data.vars, weightType)
-      val u = weight :* data.score
-      val tmp =  data.variance(::, *) :* weight
-      val v = tmp(*, ::) :* weight
+      val u = weight *:* data.score
+      val tmp =  data.variance(::, *) *:* weight
+      val v = tmp(*, ::) *:* weight
       val st = ScoreTest.Mock(u, v)
       ASKATO(st, data.vars, numericalMethod, rhos).result
     }

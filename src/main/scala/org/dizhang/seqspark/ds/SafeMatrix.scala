@@ -46,7 +46,7 @@ class SafeMatrix[A, B](val mat: DenseMatrix[Double]) {
 
   def -(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat - other.mat)
 
-  def :*(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat :* other.mat)
+  def *:*(other: SafeMatrix[A, B]): SafeMatrix[A, B] = new SafeMatrix[A, B](mat *:* other.mat)
 
   def *(scalar: Double): SafeMatrix[A, B] = new SafeMatrix[A, B](mat * scalar)
 }

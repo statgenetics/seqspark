@@ -57,7 +57,7 @@ sub check_args {
 
 sub build {
 	print STDERR "Building seqspark ...\n";
-	!system("sbt -sbt-version 0.13.16 assembly 2>&1 | tee build.log") or die "Failed to build jar: $!\n";
+	!system("bash", "-c", "sbt -sbt-version 0.13.16 assembly 2>&1 | tee build.log") or die "Failed to build jar: $!\n";
 	print STDERR "Finished building seqspark.\n";
 }
 

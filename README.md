@@ -17,7 +17,7 @@ docker build -t seqspark .
 - **Option 2:** Pull from Dockerhub:
 ```bash
 docker pull zhangdbio/seqspark:test
-docker tag zhangdbio/seqspark:test seqspark:lastest
+docker tag zhangdbio/seqspark:test seqspark:latest
 ```
 
 ### Download the database files for annotation
